@@ -302,10 +302,10 @@ function renderReport(r) {
       <tbody>${rows}</tbody>
     </table>
     <div class="summary">
-      <span class="k">χ²</span><span class="v">${fmtNum(r.chi2)}</span>
-      <span class="k">NDF</span><span class="v">${r.ndf}</span>
-      <span class="k">χ² / NDF</span><span class="v">${r.chi2_ndf === null ? '—' : fmtNum(r.chi2_ndf, 4)}</span>
-      <span class="k">p-value</span><span class="v">${fmtNum(r.prob, 4)}</span>
+      <div class="stat"><span class="k">χ²</span><span class="v">${fmtNum(r.chi2)}</span></div>
+      <div class="stat"><span class="k">NDF</span><span class="v">${r.ndf}</span></div>
+      <div class="stat"><span class="k">χ² / NDF</span><span class="v">${r.chi2_ndf === null ? '—' : fmtNum(r.chi2_ndf, 4)}</span></div>
+      <div class="stat"><span class="k">p-value</span><span class="v">${fmtNum(r.prob, 4)}</span></div>
     </div>
     <p class="fine">NDF = number of points − number of free parameters. χ²/NDF near 1 means the model describes the data within the quoted errors;
     the p-value is the probability of a χ² at least this large if the model were right. Without Y errors, χ² is in arbitrary units.</p>`;
