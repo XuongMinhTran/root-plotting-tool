@@ -11,8 +11,8 @@ FROM rootproject/root:latest
 
 # Flask is the only extra Python package. Newer Ubuntu images make pip refuse
 # to install into the system Python unless told it's fine, hence the fallback.
-RUN pip3 install --no-cache-dir flask numpy \
-    || pip3 install --no-cache-dir --break-system-packages flask numpy
+RUN python3 -m pip install --no-cache-dir flask numpy \
+    || python3 -m pip install --no-cache-dir --break-system-packages flask numpy
 
 WORKDIR /app
 COPY . /app

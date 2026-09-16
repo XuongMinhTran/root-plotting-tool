@@ -115,7 +115,10 @@ def run_fit(x, y, ex=None, ey=None, formula="pol1",
     # to the ordinary weighted least-squares chi^2.
     # Points with ey = 0 (and ex = 0) get weight 1, i.e. an unweighted fit; the
     # reported chi2 is then in units of the (unknown) data variance.
-    result = graph.Fit(func, "SQR")
+    fit_ptr = graph.Fit(func, "SQR")      # a TFitResultPtr (a smart pointer)
+    result = fit_ptr.Get()                # -> the TFitResult itself
+    if not result:
+        raise RuntimeError("ROOT returned no fit result (the fit could not be started)")
 
     status = int(result.Status())
     ndf = int(result.Ndf())
