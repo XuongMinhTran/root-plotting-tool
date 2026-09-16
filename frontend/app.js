@@ -252,7 +252,16 @@ async function runFit() {
     await drawPlot(result);
     autosave();
     if (!result.converged) {
-      showMessage('warn', `The fit did not converge cleanly: ${result.status_message} Try better initial guesses.`);
+      let advice = 'Try better initial guesses.';
+      const stuckAtZero = result.params.filter((p) => p.value === 0 && p.error === 0).length;
+      if (payload.initial_guesses.length === 0) {
+        advice = 'You gave no initial guesses, so every parameter started at 0 — for a non-linear function that is ' +
+                 'often a dead end. Read rough values off the plot (peak height, position, width, decay constant…) ' +
+                 'and enter them under "Initial guesses".';
+      } else if (stuckAtZero > 0) {
+        advice = `${stuckAtZero} parameter(s) never moved away from 0. Give them a non-zero starting value.`;
+      }
+      showMessage('warn', `The fit did not converge cleanly: ${result.status_message} ${advice}`);
     }
     setStatus($('fit-status'), 'done', 'ok');
   } catch (e) {

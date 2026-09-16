@@ -84,6 +84,9 @@
       <input id="param-names" type="text" placeholder="slope, intercept" spellcheck="false"></label>
     <label>Initial guesses <span class="hint-inline">(comma-separated; important for non-linear fits)</span>
       <input id="initial-guesses" type="text" class="mono" placeholder="1, 0" spellcheck="false"></label>
+    <p class="hint">Without guesses every parameter starts at 0. That is fine for straight lines and polynomials, and ROOT
+      finds its own starting values for a lone <code>gaus</code>, <code>expo</code> or <code>landau</code> — but for anything
+      else (sums like <code>gaus(0)+pol0(3)</code>, exponentials, sines) read rough values off your data and type them here.</p>
 
     <h2>Labels</h2>
     <label>Graph title <input id="graph-title" type="text" placeholder="Period vs length"></label>
