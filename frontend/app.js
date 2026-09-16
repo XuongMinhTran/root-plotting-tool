@@ -141,6 +141,8 @@ function clearForm() {
   $('report').innerHTML = '';
   $('plot').innerHTML = '<p class="placeholder">The plot appears here after a fit.</p>';
   $('btn-png').disabled = true;
+  lastResult = null;
+  lastDrawn = null;
   showMessage('');
 }
 
@@ -244,6 +246,7 @@ async function runFit() {
     });
     lastResult = result;
     renderReport(result);
+    await drawPlot(result);
     if (!result.converged) {
       showMessage('warn', `The fit did not converge cleanly: ${result.status_message} Try better initial guesses.`);
     }
@@ -288,6 +291,109 @@ function renderReport(r) {
     the p-value is the probability of a χ² at least this large if the model were right. Without Y errors, χ² is in arbitrary units.</p>`;
 }
 
+// ---------------------------------------------------------------- 5b. plot (JSROOT)
+
+// JSROOT is CERN's JavaScript library that understands ROOT objects. The
+// backend sends the finished TCanvas (graph + fitted curve + stats box) as
+// ROOT-JSON; JSROOT draws it exactly as ROOT would. Nothing about the plot is
+// computed on this side. Loaded on demand so the page still works offline for
+// text results.
+const JSROOT_URL = 'https://root.cern/js/latest/modules/main.mjs';
+let jsrootPromise = null;
+let lastDrawn = null;   // { json, option } of the object on screen, for PNG export
+
+function loadJSROOT() {
+  if (!jsrootPromise) {
+    jsrootPromise = import(JSROOT_URL).then((m) => {
+      // Draw the fitted TF1 from the points ROOT itself evaluated (fSave),
+      // instead of letting JSROOT re-evaluate the formula in JavaScript.
+      m.settings.PreferSavedPoints = true;
+      // Used only when a bare TGraph is drawn (no canvas from the backend):
+      // show the fit box with p-value, chi2/ndf, errors, values.
+      m.gStyle.fOptFit = 1111;
+      m.gStyle.fOptStat = 0;
+      return m;
+    }).catch((e) => {
+      jsrootPromise = null;                 // allow a retry next time
+      throw new Error(`Could not load JSROOT from ${JSROOT_URL} — are you online? (${e.message})`);
+    });
+  }
+  return jsrootPromise;
+}
+
+/** Pick what to draw from a /fit response: the whole canvas if we have it,
+ *  otherwise just the graph (which still carries the fitted function). */
+function drawableFrom(result) {
+  if (result && result.canvas_json) return { json: result.canvas_json, option: '' };
+  if (result && result.graph_json) return { json: result.graph_json, option: 'AP' };
+  return null;
+}
+
+async function drawPlot(result) {
+  const plot = $('plot');
+  const src = drawableFrom(result);
+  $('btn-png').disabled = true;
+  lastDrawn = null;
+  if (!src) {
+    plot.innerHTML = '<p class="placeholder">The backend returned no plot.</p>';
+    return;
+  }
+  let jsroot;
+  try {
+    jsroot = await loadJSROOT();
+  } catch (e) {
+    plot.innerHTML = `<p class="placeholder">${escapeHtml(e.message)}</p>`;
+    return;
+  }
+  try {
+    jsroot.cleanup(plot);
+    plot.innerHTML = '';
+    // parse() resolves the "$ref" links inside ROOT-JSON. It modifies the
+    // object it is given, so hand it a copy and keep the original for saving.
+    const obj = jsroot.parse(JSON.stringify(src.json));
+    const painter = await jsroot.draw(plot, obj, src.option);
+    jsroot.registerForResize(painter);    // redraw when the window changes size
+    lastDrawn = src;
+    $('btn-png').disabled = false;
+  } catch (e) {
+    plot.innerHTML = `<p class="placeholder">JSROOT could not draw the result: ${escapeHtml(e.message)}</p>`;
+  }
+}
+
+/** Ask JSROOT to render the current plot into a PNG and download it. */
+async function exportPng() {
+  if (!lastDrawn) return;
+  const btn = $('btn-png');
+  btn.disabled = true;
+  try {
+    const jsroot = await loadJSROOT();
+    const obj = jsroot.parse(JSON.stringify(lastDrawn.json));   // fresh copy, not the on-screen one
+    const dataUrl = await jsroot.makeImage({ format: 'png', object: obj, option: lastDrawn.option, width: 1200, height: 800 });
+    if (!dataUrl) throw new Error('JSROOT returned no image.');
+    downloadDataUrl(dataUrl, fileBaseName() + '.png');
+  } catch (e) {
+    showMessage('error', 'PNG export failed: ' + e.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function downloadDataUrl(href, filename) {
+  const a = document.createElement('a');
+  a.href = href;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+/** A safe file name from the document title (or graph title), e.g. "pendulum-lab-3". */
+function fileBaseName() {
+  const raw = ($('doc-title').value || $('graph-title').value || 'rootfit').trim();
+  const slug = raw.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  return slug || 'rootfit';
+}
+
 // ---------------------------------------------------------------- 6. wiring
 
 function init() {
@@ -316,6 +422,7 @@ function init() {
   });
 
   $('btn-fit').addEventListener('click', runFit);
+  $('btn-png').addEventListener('click', exportPng);
   $('btn-clear').addEventListener('click', () => { if (confirm('Clear the whole form?')) clearForm(); });
 
   // Ctrl/Cmd+Enter anywhere in the form runs the fit
