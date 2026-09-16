@@ -1,0 +1,134 @@
+/* style.css — layout and looks for index.html. Plain CSS, no framework.
+   Two columns on wide screens (inputs left, plot + report right), one column
+   on narrow screens. */
+
+:root {
+  --bg: #f5f6f8;
+  --panel: #ffffff;
+  --ink: #1d2330;
+  --muted: #5d6675;
+  --line: #d9dde3;
+  --accent: #1f5fbf;
+  --accent-ink: #ffffff;
+  --ok: #1a7f37;
+  --warn: #9a6700;
+  --err: #b42318;
+  --err-bg: #fff1f0;
+  --ok-bg: #eefaf1;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }   /* the hidden attribute must win over any display: rule */
+
+html, body { margin: 0; }
+body {
+  font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: var(--ink);
+  background: var(--bg);
+}
+
+a { color: var(--accent); }
+code { font-family: var(--mono); font-size: 0.92em; background: #eef1f5; padding: 0 3px; border-radius: 3px; }
+.mono { font-family: var(--mono); }
+
+/* ---- header ---------------------------------------------------------- */
+.topbar {
+  display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between;
+  padding: 14px 20px; background: var(--panel); border-bottom: 1px solid var(--line);
+}
+.brand h1 { margin: 0; font-size: 22px; }
+.brand p { margin: 2px 0 0; color: var(--muted); font-size: 13.5px; }
+.toolbar { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* ---- layout ---------------------------------------------------------- */
+.layout {
+  display: grid; grid-template-columns: minmax(340px, 460px) minmax(0, 1fr);
+  gap: 18px; padding: 18px 20px; max-width: 1500px; margin: 0 auto;
+}
+@media (max-width: 960px) { .layout { grid-template-columns: 1fr; } }
+
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px 18px; }
+.panel h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 18px 0 8px; }
+.panel h2:first-of-type { margin-top: 6px; }
+
+/* ---- form controls --------------------------------------------------- */
+label { display: block; font-size: 13.5px; color: var(--muted); margin: 8px 0; }
+label > input, label > textarea, .row > input, select {
+  display: block; width: 100%; margin-top: 4px; padding: 7px 9px; font: inherit; color: var(--ink);
+  border: 1px solid var(--line); border-radius: 6px; background: #fff;
+}
+select { width: auto; }
+textarea { resize: vertical; }
+input:focus, textarea:focus, select:focus { outline: 2px solid #bcd0f2; border-color: var(--accent); }
+
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.row.actions { margin-top: 16px; }
+.grow { flex: 1 1 160px; }
+.row > .grow { margin-top: 0; }
+.hint { color: var(--muted); font-size: 12.5px; margin: 6px 0 8px; }
+.hint-inline { font-weight: normal; color: var(--muted); font-size: 12px; }
+
+.columns { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+@media (max-width: 520px) { .columns { grid-template-columns: repeat(2, 1fr); } }
+.columns textarea { font-family: var(--mono); font-size: 13px; padding: 6px; }
+.count {
+  float: right; font-family: var(--mono); font-size: 11.5px; color: var(--muted);
+  background: #eef1f5; border-radius: 10px; padding: 0 7px;
+}
+.count.mismatch { background: #fde8e6; color: var(--err); }
+
+.settings { border: 1px dashed var(--line); border-radius: 6px; padding: 6px 10px; margin-bottom: 8px; }
+.settings summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+
+button {
+  font: inherit; padding: 7px 14px; border-radius: 6px; border: 1px solid var(--line);
+  background: #fff; color: var(--ink); cursor: pointer;
+}
+button:hover { border-color: #b8c0cc; background: #f7f8fa; }
+button:disabled { opacity: 0.5; cursor: default; }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); padding: 9px 22px; font-weight: 600; }
+button.primary:hover { background: #184f9f; }
+button.quiet { border-color: transparent; color: var(--muted); }
+button.small { padding: 4px 10px; font-size: 13px; }
+
+.status { font-size: 13px; color: var(--muted); }
+.status.ok { color: var(--ok); }
+.status.err { color: var(--err); }
+.status.busy::before { content: "⏳ "; }
+
+/* ---- results --------------------------------------------------------- */
+.message { padding: 10px 12px; border-radius: 6px; margin-bottom: 12px; font-size: 14px; white-space: pre-wrap; }
+.message.error { background: var(--err-bg); color: var(--err); border: 1px solid #f5c2c0; }
+.message.warn { background: #fff8e6; color: var(--warn); border: 1px solid #f3dc9a; }
+.message.info { background: var(--ok-bg); color: var(--ok); border: 1px solid #bfe6c8; }
+
+.plot { width: 100%; height: 520px; border: 1px solid var(--line); border-radius: 6px; background: #fff; position: relative; overflow: hidden; }
+.plot .placeholder { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); margin: 0; }
+@media (max-width: 960px) { .plot { height: 420px; } }
+
+.report { margin-top: 14px; }
+.report h3 { font-size: 15px; margin: 12px 0 6px; }
+.report table { border-collapse: collapse; width: 100%; font-size: 14px; }
+.report th, .report td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--line); }
+.report th { color: var(--muted); font-weight: 600; font-size: 12.5px; text-transform: uppercase; letter-spacing: 0.04em; }
+.report td.num { font-family: var(--mono); }
+.report .summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin: 8px 0 4px; }
+.report .stat { border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; background: #fafbfc; }
+.report .stat .k { font-size: 12px; color: var(--muted); }
+.report .stat .v { font-family: var(--mono); font-size: 15px; }
+.report .converged { color: var(--ok); }
+.report .not-converged { color: var(--err); }
+.report .fine { font-size: 12.5px; color: var(--muted); }
+
+/* ---- drag & drop overlay, dialog ------------------------------------- */
+.drop-overlay {
+  position: fixed; inset: 0; background: rgba(31, 95, 191, 0.12); border: 4px dashed var(--accent);
+  display: grid; place-items: center; font-size: 22px; color: var(--accent); z-index: 50; pointer-events: none;
+}
+dialog { border: 1px solid var(--line); border-radius: 8px; padding: 18px 20px; width: min(640px, 92vw); }
+dialog::backdrop { background: rgba(0,0,0,0.25); }
+dialog h3 { margin: 0 0 6px; }
+dialog textarea { width: 100%; margin: 10px 0; font-size: 12.5px; }
+
+footer { max-width: 1500px; margin: 0 auto; padding: 8px 20px 24px; color: var(--muted); font-size: 12.5px; }

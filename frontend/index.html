@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ROOT Fit — curve fitting with CERN ROOT</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <h1>ROOT Fit</h1>
+    <p>Non-linear curve fitting with CERN ROOT: parameters with uncertainties, χ²/NDF, p-value, and a proper plot.</p>
+  </div>
+  <div class="toolbar">
+    <button id="btn-load" type="button" title="Open a saved .json document">Load document</button>
+    <button id="btn-save" type="button" title="Download everything on this page as a .json file">Save document</button>
+    <button id="btn-png" type="button" title="Download the plot as a PNG image" disabled>Export PNG</button>
+    <button id="btn-clear" type="button" class="quiet" title="Empty the form">Clear</button>
+    <input id="file-input" type="file" accept=".json,application/json" hidden>
+  </div>
+</header>
+
+<main class="layout">
+
+  <!-- ============ left column: everything the user types ============ -->
+  <section class="panel inputs">
+
+    <details class="settings">
+      <summary>Settings</summary>
+      <label>Backend URL
+        <input id="backend-url" type="url" value="http://localhost:8000" spellcheck="false">
+      </label>
+      <div class="row">
+        <button id="btn-health" type="button" class="small">Check connection</button>
+        <span id="health-status" class="status"></span>
+      </div>
+      <p class="hint">Where the ROOT server runs. <code>http://localhost:8000</code> is the Docker container on this machine.</p>
+    </details>
+
+    <h2>Document</h2>
+    <label>Title <input id="doc-title" type="text" placeholder="e.g. Pendulum period vs length, lab 3"></label>
+    <label>Notes <textarea id="doc-notes" rows="2" placeholder="Anything you want saved with the fit"></textarea></label>
+
+    <h2>Data</h2>
+    <p class="hint">One value per line — commas, tabs or spaces are fine too. Error columns are optional; leave them empty for an unweighted fit.</p>
+    <div class="columns">
+      <label>X <span class="count" id="count-x">0</span>
+        <textarea id="col-x" rows="10" spellcheck="false" placeholder="1&#10;2&#10;3"></textarea></label>
+      <label>Y <span class="count" id="count-y">0</span>
+        <textarea id="col-y" rows="10" spellcheck="false" placeholder="2.1&#10;3.9&#10;6.2"></textarea></label>
+      <label>X errors <span class="count" id="count-ex">0</span>
+        <textarea id="col-ex" rows="10" spellcheck="false" placeholder="optional"></textarea></label>
+      <label>Y errors <span class="count" id="count-ey">0</span>
+        <textarea id="col-ey" rows="10" spellcheck="false" placeholder="optional"></textarea></label>
+    </div>
+
+    <h2>Fit function</h2>
+    <div class="row">
+      <input id="formula" type="text" class="grow mono" value="[0]*x+[1]" spellcheck="false" placeholder="[0]*x+[1]">
+      <select id="quick-pick" title="Insert a common function">
+        <option value="">Examples…</option>
+        <option value="[0]*x+[1]|slope, intercept|1, 0">Straight line  [0]*x+[1]</option>
+        <option value="pol2|a, b, c|">Quadratic  pol2</option>
+        <option value="[0]*exp(-x/[1])|amplitude, tau|1, 1">Exponential decay  [0]*exp(-x/[1])</option>
+        <option value="[0]*(1-TMath::Exp(-x/[1]))|A, tau|1, 1">Saturating rise  [0]*(1-TMath::Exp(-x/[1]))</option>
+        <option value="gaus|constant, mean, sigma|">Gaussian  gaus</option>
+        <option value="expo|constant, slope|">Exponential  expo</option>
+        <option value="landau|constant, mpv, sigma|">Landau  landau</option>
+        <option value="[0]*sin([1]*x+[2])+[3]|amplitude, omega, phase, offset|1, 1, 0, 0">Sine  [0]*sin([1]*x+[2])+[3]</option>
+        <option value="[0]*pow(x,[1])|A, n|1, 1">Power law  [0]*pow(x,[1])</option>
+      </select>
+    </div>
+    <p class="hint">
+      A ROOT <a href="https://root.cern/doc/master/classTFormula.html" target="_blank" rel="noopener">TFormula</a>:
+      <code>x</code> is the variable, parameters are <code>[0]</code>, <code>[1]</code>, …
+      Named functions <code>gaus</code>, <code>expo</code>, <code>landau</code>, <code>pol1</code>, <code>pol2</code> … also work.
+      Functions: <code>exp log log10 sqrt pow abs sin cos tan asin acos atan sinh cosh tanh</code> and
+      <a href="https://root.cern/doc/master/namespaceTMath.html" target="_blank" rel="noopener">TMath::</a> (e.g. <code>TMath::Exp</code>, <code>TMath::Pi()</code>).
+      See also <a href="https://root.cern/doc/master/classTF1.html" target="_blank" rel="noopener">TF1</a>.
+    </p>
+    <label>Parameter names <span class="hint-inline">(comma-separated, may be fewer than the parameters)</span>
+      <input id="param-names" type="text" placeholder="slope, intercept" spellcheck="false"></label>
+    <label>Initial guesses <span class="hint-inline">(comma-separated; important for non-linear fits)</span>
+      <input id="initial-guesses" type="text" class="mono" placeholder="1, 0" spellcheck="false"></label>
+
+    <h2>Labels</h2>
+    <label>Graph title <input id="graph-title" type="text" placeholder="Period vs length"></label>
+    <div class="row">
+      <label class="grow">X-axis title <input id="x-title" type="text" placeholder="L (m)"></label>
+      <label class="grow">Y-axis title <input id="y-title" type="text" placeholder="T (s)"></label>
+    </div>
+
+    <div class="row actions">
+      <button id="btn-fit" type="button" class="primary">Fit</button>
+      <span id="fit-status" class="status"></span>
+    </div>
+  </section>
+
+  <!-- ============ right column: what comes back ============ -->
+  <section class="panel results">
+    <div id="message" class="message" hidden></div>
+    <div id="plot" class="plot"><p class="placeholder">The plot appears here after a fit.</p></div>
+    <div id="report" class="report"></div>
+  </section>
+
+</main>
+
+<!-- shown while dragging a file over the page -->
+<div id="drop-overlay" class="drop-overlay" hidden><div>Drop a saved document (.json) to load it</div></div>
+
+<!-- "paste JSON" loader -->
+<dialog id="paste-dialog">
+  <form method="dialog">
+    <h3>Load a document</h3>
+    <p class="hint">Choose a file, or paste the contents of a saved <code>.json</code> document below.</p>
+    <div class="row">
+      <button id="btn-pick-file" type="button">Choose file…</button>
+      <span class="hint">or drag a file anywhere onto the page</span>
+    </div>
+    <textarea id="paste-area" rows="8" class="mono" placeholder='{"version": 1, ...}' spellcheck="false"></textarea>
+    <div class="row actions">
+      <button id="btn-paste-load" type="button" class="primary">Load pasted text</button>
+      <button type="submit" class="quiet">Cancel</button>
+    </div>
+  </form>
+</dialog>
+
+<footer>
+  Fits are computed server-side by <a href="https://root.cern" target="_blank" rel="noopener">CERN ROOT</a> (Minuit) and drawn by
+  <a href="https://root.cern/js/" target="_blank" rel="noopener">JSROOT</a>. Nothing you enter is stored on the server —
+  use <em>Save document</em> to keep your work. A redesign of Dr. D. Beznosko's
+  <a href="https://sos.clayton.edu/physics/chi2/" target="_blank" rel="noopener">chi2 tool</a>.
+</footer>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
