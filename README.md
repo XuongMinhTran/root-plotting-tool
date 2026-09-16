@@ -39,6 +39,23 @@ folder with any static server, e.g. `cd frontend && python3 -m http.server 8080`
 and visit <http://localhost:8080>. The "Backend URL" setting on the page
 defaults to `http://localhost:8000`; change it if the backend runs elsewhere.
 
+### Using the page
+
+Paste X and Y (and optionally the errors) one value per line, type a fit
+function or pick one from "Examples…", give parameter names / starting values,
+and press **Fit** (or Ctrl/Cmd+Enter). The plot is the ROOT canvas drawn by
+JSROOT; the report lists every parameter ± uncertainty, χ², NDF, χ²/NDF and
+the p-value.
+
+- **Save document** downloads a `.json` file with everything: inputs, the
+  last fit result (including the ROOT canvas, so it redraws without a backend),
+  title, notes and timestamps. `examples/` contains a few.
+- **Load document** opens a saved file (file picker, drag-and-drop anywhere on
+  the page, or paste the JSON text).
+- **Export PNG** renders the current plot to an image.
+- The form is autosaved in your browser (localStorage) so a reload does not
+  lose your work; nothing leaves your machine except the fit request.
+
 ## Talk to the backend directly
 
 ```sh

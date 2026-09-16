@@ -7,6 +7,8 @@
  *   3. form <-> object    read the whole form into one object and back
  *   4. backend            talk to the Flask server (/health, /fit)
  *   5. fit report         render parameters, chi2, ndf, p-value as HTML
+ *   5b. plot              load JSROOT from the CDN, draw the ROOT canvas, export PNG
+ *   5c. documents         save / load JSON documents, autosave to localStorage
  *   6. wiring             connect buttons and inputs
  *
  * Plain JavaScript, loaded as an ES module (so we can `import()` JSROOT later).
@@ -247,6 +249,7 @@ async function runFit() {
     lastResult = result;
     renderReport(result);
     await drawPlot(result);
+    autosave();
     if (!result.converged) {
       showMessage('warn', `The fit did not converge cleanly: ${result.status_message} Try better initial guesses.`);
     }
@@ -394,6 +397,136 @@ function fileBaseName() {
   return slug || 'rootfit';
 }
 
+// ---------------------------------------------------------------- 5c. documents (save / load / autosave)
+
+// A "document" is one JSON file holding everything on the page: the inputs,
+// the last fit result (including the ROOT canvas, so a loaded document can be
+// redrawn without a backend) and some metadata. There is no server-side
+// storage — this file is the only place your work lives.
+const DOC_VERSION = 1;
+const APP_VERSION = '0.1.0';
+const AUTOSAVE_KEY = 'rootfit.autosave';
+let documentCreated = null;   // "created" timestamp carried over from a loaded document
+
+function buildDocument() {
+  const now = new Date().toISOString();
+  if (!documentCreated) documentCreated = now;
+  return {
+    version: DOC_VERSION,
+    app: 'rootfit',
+    app_version: APP_VERSION,
+    created: documentCreated,
+    modified: now,
+    title: $('doc-title').value,
+    notes: $('doc-notes').value,
+    inputs: readForm(),
+    results: lastResult,            // the full /fit response, or null if nothing was fitted
+    backend_url: backendUrl(),      // for the record only; loading a document does not change your setting
+  };
+}
+
+function saveDocument() {
+  const text = JSON.stringify(buildDocument(), null, 1);
+  const blob = new Blob([text], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  downloadDataUrl(url, fileBaseName() + '.json');
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+  showMessage('info', 'Document saved to your downloads folder.');
+}
+
+/** Put a parsed document onto the page. Throws with a readable message if the
+ *  object is not one of ours. */
+function applyDocument(doc) {
+  if (!doc || typeof doc !== 'object' || Array.isArray(doc)) {
+    throw new Error('This is not a ROOT Fit document (expected a JSON object with "version" and "inputs").');
+  }
+  if (doc.version !== DOC_VERSION) {
+    throw new Error(`Unsupported document version "${doc.version}" — this page understands version ${DOC_VERSION}.`);
+  }
+  if (!doc.inputs || typeof doc.inputs !== 'object') {
+    throw new Error('The document has no "inputs" section.');
+  }
+  writeForm(doc.inputs);
+  $('doc-title').value = doc.title || '';
+  $('doc-notes').value = doc.notes || '';
+  documentCreated = doc.created || null;
+
+  lastResult = (doc.results && Array.isArray(doc.results.params)) ? doc.results : null;
+  showMessage('');
+  if (lastResult) {
+    renderReport(lastResult);
+    drawPlot(lastResult);           // async; the plot fills in when JSROOT is ready
+  } else {
+    $('report').innerHTML = '';
+    $('plot').innerHTML = '<p class="placeholder">The plot appears here after a fit.</p>';
+    $('btn-png').disabled = true;
+    lastDrawn = null;
+  }
+}
+
+function loadDocumentText(text, sourceName) {
+  let doc;
+  try {
+    doc = JSON.parse(text);
+  } catch (e) {
+    showMessage('error', `${sourceName} is not valid JSON: ${e.message}`);
+    return false;
+  }
+  try {
+    applyDocument(doc);
+  } catch (e) {
+    showMessage('error', e.message);
+    return false;
+  }
+  showMessage('info', `Loaded ${sourceName}${doc.title ? ` — "${doc.title}"` : ''}.`);
+  autosave();
+  return true;
+}
+
+function loadDocumentFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => loadDocumentText(reader.result, file.name);
+  reader.onerror = () => showMessage('error', `Could not read ${file.name}.`);
+  reader.readAsText(file);
+}
+
+// --- autosave: the current page state goes to localStorage a moment after
+// --- every change, and comes back when the page is reopened.
+let autosaveTimer = null;
+function autosaveNow() {
+  autosaveTimer = null;
+  try {
+    localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(buildDocument()));
+  } catch (_) {
+    // storage full or unavailable: try again without the (large) results
+    try { localStorage.setItem(AUTOSAVE_KEY, JSON.stringify({ ...buildDocument(), results: null })); } catch (__) { /* give up quietly */ }
+  }
+}
+function autosave() {
+  clearTimeout(autosaveTimer);
+  autosaveTimer = setTimeout(autosaveNow, 400);   // wait for typing to pause
+}
+// if the tab is closed or reloaded while a save is pending, write it now
+window.addEventListener('pagehide', () => { if (autosaveTimer) { clearTimeout(autosaveTimer); autosaveNow(); } });
+
+function restoreAutosave() {
+  let text = null;
+  try { text = localStorage.getItem(AUTOSAVE_KEY); } catch (_) { return false; }
+  if (!text) return false;
+  try {
+    applyDocument(JSON.parse(text));
+    showMessage('info', 'Restored your previous session from this browser (autosave). Use "Save document" to keep a file.');
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+function clearAutosave() {
+  try { localStorage.removeItem(AUTOSAVE_KEY); } catch (_) { /* ignore */ }
+}
+
 // ---------------------------------------------------------------- 6. wiring
 
 function init() {
@@ -423,12 +556,70 @@ function init() {
 
   $('btn-fit').addEventListener('click', runFit);
   $('btn-png').addEventListener('click', exportPng);
-  $('btn-clear').addEventListener('click', () => { if (confirm('Clear the whole form?')) clearForm(); });
+  $('btn-clear').addEventListener('click', () => {
+    if (confirm('Clear the whole form? (Save the document first if you want to keep it.)')) {
+      clearForm();
+      documentCreated = null;
+      clearAutosave();
+    }
+  });
 
   // Ctrl/Cmd+Enter anywhere in the form runs the fit
   $('btn-fit').closest('.inputs').addEventListener('keydown', (ev) => {
     if ((ev.ctrlKey || ev.metaKey) && ev.key === 'Enter') { ev.preventDefault(); runFit(); }
   });
+
+  // --- save / load ---
+  $('btn-save').addEventListener('click', saveDocument);
+  $('btn-load').addEventListener('click', () => { $('paste-area').value = ''; $('paste-dialog').showModal(); });
+  $('btn-pick-file').addEventListener('click', () => $('file-input').click());
+  $('file-input').addEventListener('change', (ev) => {
+    $('paste-dialog').close();
+    loadDocumentFile(ev.target.files[0]);
+    ev.target.value = '';                 // so choosing the same file again fires "change"
+  });
+  $('btn-paste-load').addEventListener('click', () => {
+    const text = $('paste-area').value.trim();
+    if (!text) return;
+    if (loadDocumentText(text, 'pasted text')) $('paste-dialog').close();
+  });
+
+  // pasting a whole document anywhere outside a text box also loads it
+  document.addEventListener('paste', (ev) => {
+    const t = ev.target;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
+    const text = (ev.clipboardData || window.clipboardData).getData('text');
+    if (text && text.trim().startsWith('{')) { ev.preventDefault(); loadDocumentText(text, 'pasted text'); }
+  });
+
+  // drag a .json file anywhere onto the page
+  let dragDepth = 0;
+  const overlay = $('drop-overlay');
+  document.addEventListener('dragenter', (ev) => {
+    if (!ev.dataTransfer || ![...ev.dataTransfer.types].includes('Files')) return;
+    ev.preventDefault();
+    dragDepth += 1;
+    overlay.hidden = false;
+  });
+  document.addEventListener('dragover', (ev) => { if (!overlay.hidden) ev.preventDefault(); });
+  document.addEventListener('dragleave', () => {
+    dragDepth = Math.max(0, dragDepth - 1);
+    if (dragDepth === 0) overlay.hidden = true;
+  });
+  document.addEventListener('drop', (ev) => {
+    ev.preventDefault();
+    dragDepth = 0;
+    overlay.hidden = true;
+    const file = ev.dataTransfer && ev.dataTransfer.files && ev.dataTransfer.files[0];
+    if (file) loadDocumentFile(file);
+  });
+
+  // --- autosave on every change, restore on load ---
+  for (const el of document.querySelectorAll('.inputs input, .inputs textarea')) {
+    if (el.id === 'backend-url') continue;
+    el.addEventListener('input', autosave);
+  }
+  restoreAutosave();
 }
 
 init();

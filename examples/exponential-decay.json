@@ -1,0 +1,26 @@
+{
+ "version": 1,
+ "app": "rootfit",
+ "app_version": "0.1.0",
+ "created": "2026-09-16T20:00:00Z",
+ "modified": "2026-09-16T20:00:00Z",
+ "title": "Exponential decay with background",
+ "notes": "Counts vs time. Poisson errors on y (sqrt N), 0.05 s timing error on x. Try the same fit without the [2] background term and compare chi2/NDF.",
+ "inputs": {
+  "data": {
+   "x": "0\n0.5\n1\n1.5\n2\n2.5\n3\n3.5\n4\n4.5\n5\n5.5\n6\n6.5\n7\n7.5\n8\n8.5\n9\n9.5\n10",
+   "y": "990\n838\n688.7\n563.5\n482.8\n396.1\n353.9\n323.1\n248.1\n210.2\n195.8\n168.5\n144.2\n115.1\n110.8\n106\n76.4\n76.67\n57.55\n57.51\n48.74",
+   "ex": "0.05\n0.05\n0.05\n0.05\n0.05\n0.05\n0.05\n0.05\n0.05\n0.05\n0.05\n0.05\n0.05\n0.05\n0.05\n0.05\n0.05\n0.05\n0.05\n0.05\n0.05",
+   "ey": "31.5\n28.8\n26.4\n24.2\n22.2\n20.4\n18.8\n17.3\n16\n14.8\n13.8\n12.8\n12\n11.2\n10.5\n9.95\n9.44\n8.99\n8.6\n8.26\n7.96"
+  },
+  "formula": "[0]*exp(-x/[1])+[2]",
+  "param_names": "N0, tau, background",
+  "initial_guesses": "1000, 2, 10",
+  "graph_title": "Decay curve",
+  "x_title": "t (s)",
+  "y_title": "counts",
+  "options": {}
+ },
+ "results": null,
+ "backend_url": "http://localhost:8000"
+}

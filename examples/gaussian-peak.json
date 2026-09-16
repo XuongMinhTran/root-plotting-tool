@@ -1,0 +1,26 @@
+{
+ "version": 1,
+ "app": "rootfit",
+ "app_version": "0.1.0",
+ "created": "2026-09-16T20:00:00Z",
+ "modified": "2026-09-16T20:00:00Z",
+ "title": "Gaussian peak on flat background",
+ "notes": "Uses ROOT's named functions: gaus(0) takes parameters 0-2, pol0(3) takes parameter 3. Named functions get automatic starting values, so guesses can stay empty.",
+ "inputs": {
+  "data": {
+   "x": "0\n0.5\n1\n1.5\n2\n2.5\n3\n3.5\n4\n4.5\n5\n5.5\n6\n6.5\n7\n7.5\n8\n8.5\n9\n9.5\n10\n10.5\n11\n11.5\n12\n12.5\n13\n13.5\n14\n14.5\n15\n15.5\n16\n16.5\n17\n17.5\n18\n18.5\n19\n19.5\n20",
+   "y": "14.09\n10.09\n16.05\n15.61\n14.28\n5.253\n12.92\n14.83\n15.49\n9.209\n13.62\n12.38\n14.79\n27.14\n24.93\n40.74\n64.42\n73.55\n100.1\n122.1\n133.6\n119.9\n124.9\n119.5\n69.12\n68.37\n44.69\n27.65\n32.93\n22.13\n11.72\n15.9\n17.46\n14.33\n17.67\n14.75\n17.59\n20.57\n12.38\n15.79\n13.21",
+   "ex": "",
+   "ey": "3.87\n3.87\n3.87\n3.87\n3.87\n3.87\n3.87\n3.87\n3.88\n3.89\n3.94\n4.04\n4.27\n4.71\n5.41\n6.4\n7.6\n8.87\n10.1\n11\n11.5\n11.6\n11.1\n10.3\n9.12\n7.85\n6.63\n5.59\n4.82\n4.34\n4.07\n3.95\n3.9\n3.88\n3.88\n3.87\n3.87\n3.87\n3.87\n3.87\n3.87"
+  },
+  "formula": "gaus(0)+pol0(3)",
+  "param_names": "amplitude, mean, sigma, background",
+  "initial_guesses": "",
+  "graph_title": "Spectrum",
+  "x_title": "channel",
+  "y_title": "counts",
+  "options": {}
+ },
+ "results": null,
+ "backend_url": "http://localhost:8000"
+}
