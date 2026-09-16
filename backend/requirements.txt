@@ -1,0 +1,3 @@
+flask>=2.2
+numpy
+# ROOT itself is not on PyPI; it comes from the rootproject/root Docker image.

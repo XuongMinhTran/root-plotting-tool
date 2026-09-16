@@ -1,0 +1,21 @@
+{
+  "description": "Straight-line fit with y errors only. Expected values are the exact weighted least-squares solution (closed form), computed independently of ROOT with numpy; prob is the chi2 survival function from scipy. ROOT/Minuit should reproduce values to ~1e-4 relative and errors to ~1e-2.",
+  "formula": "[0]*x+[1]",
+  "param_names": ["slope", "intercept"],
+  "initial_guesses": [1, 0],
+  "data": {
+    "x":  [1, 2, 3, 4, 5, 6, 7, 8],
+    "y":  [2.3, 4.1, 6.2, 7.9, 10.3, 11.8, 14.1, 16.2],
+    "ex": [],
+    "ey": [0.2, 0.2, 0.3, 0.3, 0.3, 0.4, 0.4, 0.4]
+  },
+  "expected": {
+    "params": [
+      {"name": "slope",     "value": 1.975392, "error": 0.045541},
+      {"name": "intercept", "value": 0.229477, "error": 0.180958}
+    ],
+    "chi2": 2.101547,
+    "ndf": 6,
+    "prob": 0.910126
+  }
+}
