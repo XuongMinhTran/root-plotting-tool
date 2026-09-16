@@ -182,6 +182,12 @@
           <label class="check"><input type="checkbox" id="opt-grid" checked> Grid</label>
           <button type="button" class="help-btn" data-help="plot" aria-label="Help on plot options">?</button>
         </div>
+        <div class="field"><label for="opt-resid">Panel under the plot</label>
+          <select id="opt-resid">
+            <option value="residual">Residuals: data − fit</option>
+            <option value="pull">Pulls: (data − fit) / error</option>
+            <option value="none">None</option>
+          </select></div>
       </details>
     </fieldset>
 

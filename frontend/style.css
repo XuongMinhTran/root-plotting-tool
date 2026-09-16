@@ -240,9 +240,9 @@ button.expand { margin-left: auto; }
 .message.info { border-left-color: var(--ok); color: var(--ok); }
 
 .canvas-frame { background: var(--entry); padding: 3px; }
-.plot { width: 100%; height: 520px; background: #fff; position: relative; overflow: hidden; }
+.plot { width: 100%; height: 600px; background: #fff; position: relative; overflow: hidden; }
 .plot .placeholder { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); margin: 0; text-align: center; padding: 20px; }
-@media (max-width: 960px) { .plot { height: 420px; } }
+@media (max-width: 960px) { .plot { height: 460px; } }
 
 .report-group { margin-top: 12px; }
 .report .placeholder-text { color: var(--muted); margin: 2px 0; }

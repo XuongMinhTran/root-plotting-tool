@@ -55,7 +55,8 @@ def run_fit(x, y, ex=None, ey=None, formula="pol1",
     par_guesses : list of float (or None entries), may be shorter than the number of parameters
     x_range     : (xmin, xmax) or None -> use the data range
     title, x_title, y_title : plot labels
-    plot        : dict of drawing options: {"logx": bool, "logy": bool, "grid": bool}
+    plot        : dict of drawing options: {"logx": bool, "logy": bool, "grid": bool,
+                  "residuals": "residual" | "pull" | "none"}
 
     Returns a plain dict (JSON-serialisable). Raises ValueError for bad input.
     """
@@ -136,30 +137,102 @@ def run_fit(x, y, ex=None, ey=None, formula="pol1",
     ]
     cov = [[float(result.CovMatrix(i, j)) for j in range(npar)] for i in range(npar)]
 
-    # --- the picture -------------------------------------------------------
-    # Draw the graph on a canvas in batch mode. Painting is what makes ROOT
-    # create the title and the statistics box (fit parameters, chi2/ndf, prob),
-    # so we call Update() before serialising. The fitted TF1 is already attached
-    # to the graph by Fit(), so JSROOT will draw the curve on top of the points.
+    # --- residuals ---------------------------------------------------------
+    # residual_i = y_i - f(x_i), with the fitted parameters. Its error bar is the
+    # same sigma that entered chi2: sigma_eff^2 = ey^2 + (f'(x) * ex)^2, so a
+    # point that sits "1 error bar" from zero here contributed 1 to chi2.
+    # "pull" = residual / sigma_eff: for a good fit the pulls scatter like a
+    # standard normal (about 2/3 within +-1, hardly any beyond +-3). A trend in
+    # the residuals (a bow, a wave) is the clearest sign of a wrong model.
+    fitted = graph.GetListOfFunctions().FindObject("fit")
+    if not fitted:
+        raise RuntimeError("ROOT did not attach the fitted function to the graph")
+    resid = np.array([y[i] - fitted.Eval(float(x[i])) for i in range(n)])
+    slope = np.array([fitted.Derivative(float(x[i])) for i in range(n)])
+    sigma = np.sqrt(ey ** 2 + (slope * ex) ** 2)
+    have_errors = bool((sigma > 0).all())
+
     plot = plot or {}
-    canvas = ROOT.TCanvas("c1", "fit", 900, 600)
-    if plot.get("grid", True):
-        canvas.SetGrid()
-    # Log axes are a property of the pad, not of the data. ROOT simply cannot
-    # place x <= 0 (or y <= 0) points on a log axis; they are skipped, not an error.
-    if plot.get("logx"):
-        canvas.SetLogx(1)
-    if plot.get("logy"):
-        canvas.SetLogy(1)
-    graph.Draw("AP")                  # A = draw axes, P = draw points/markers
+    resid_kind = str(plot.get("residuals", "residual") or "none")
+    if resid_kind == "pull" and not have_errors:
+        resid_kind = "residual"           # pulls need an error for every point
+    if resid_kind == "pull":
+        resid_y, resid_e, resid_title = resid / sigma, np.ones(n), "(data - fit) / #sigma"
+    else:
+        resid_y, resid_e, resid_title = resid, sigma, "data - fit"
+
+    # --- the picture -------------------------------------------------------
+    # Draw on a canvas in batch mode. Painting is what makes ROOT create the
+    # title and the statistics box (fit parameters, chi2/ndf, prob), so we
+    # call Update() before serialising. The fitted TF1 is attached to the
+    # graph by Fit(), so JSROOT draws the curve on top of the points.
+    # With residuals, the canvas holds two pads stacked vertically that share
+    # the x range: the main plot (top 70 %) and the residual plot (bottom 30 %).
+    keep = []                              # Python must keep drawn objects alive until ToJSON
+    canvas = ROOT.TCanvas("c1", "fit", 900, 700 if resid_kind != "none" else 600)
+
+    def style_pad(pad, logx, logy):
+        if plot.get("grid", True):
+            pad.SetGrid()
+        # Log axes are a property of the pad. ROOT cannot place x <= 0 (or y <= 0)
+        # points on a log axis; they are skipped, not an error.
+        if logx:
+            pad.SetLogx(1)
+        if logy:
+            pad.SetLogy(1)
+
+    if resid_kind == "none":
+        style_pad(canvas, plot.get("logx"), plot.get("logy"))
+        graph.Draw("AP")                  # A = draw axes, P = draw points/markers
+    else:
+        pad1 = ROOT.TPad("pad1", "fit", 0.0, 0.30, 1.0, 1.0)
+        pad2 = ROOT.TPad("pad2", "residuals", 0.0, 0.0, 1.0, 0.30)
+        keep += [pad1, pad2]
+        pad1.SetBottomMargin(0.03)        # the two frames touch; x labels only on the lower pad
+        pad2.SetTopMargin(0.04)
+        pad2.SetBottomMargin(0.34)
+        style_pad(pad1, plot.get("logx"), plot.get("logy"))
+        style_pad(pad2, plot.get("logx"), False)
+        pad1.Draw()
+        pad2.Draw()
+
+        pad1.cd()
+        graph.Draw("AP")
+        xaxis = graph.GetXaxis()          # exists once the graph has been drawn
+        xaxis.SetLabelSize(0)             # hide the top pad's x labels and title
+        xaxis.SetTitleSize(0)
+        xlow, xhigh = xaxis.GetXmin(), xaxis.GetXmax()
+
+        pad2.cd()
+        rgraph = ROOT.TGraphErrors(n, x, resid_y, ex, resid_e)
+        rgraph.SetName("residuals")
+        rgraph.SetTitle(f";{_safe_title(x_title)};{resid_title}")
+        rgraph.SetMarkerStyle(20)
+        rgraph.SetMarkerSize(0.8)
+        rgraph.Draw("AP")
+        rgraph.GetXaxis().SetLimits(xlow, xhigh)   # same x range as the main plot
+        # the lower pad is 30 % of the height, so text sizes (fractions of the
+        # pad) must be scaled up by ~1/0.3 to look the same as on top
+        for ax in (rgraph.GetXaxis(), rgraph.GetYaxis()):
+            ax.SetLabelSize(0.10)
+            ax.SetTitleSize(0.11)
+        rgraph.GetXaxis().SetTitleOffset(1.2)
+        rgraph.GetYaxis().SetTitleOffset(0.42)
+        rgraph.GetYaxis().SetNdivisions(505)
+        rgraph.GetYaxis().CenterTitle(True)
+        zero = ROOT.TLine(xlow, 0.0, xhigh, 0.0)
+        zero.SetLineColor(ROOT.kRed)
+        zero.SetLineStyle(2)
+        zero.Draw()
+        keep += [rgraph, zero]
+        canvas.cd()
+
     canvas.Update()
 
     # Store the curve as sampled points too (fSave). JSROOT can evaluate most
     # formulas itself, but for anything exotic it falls back to these values,
     # so the browser always shows ROOT's own evaluation of the fitted function.
-    fitted = graph.GetListOfFunctions().FindObject("fit")
-    if fitted:
-        fitted.Save(xmin, xmax, 0, 0, 0, 0)
+    fitted.Save(xmin, xmax, 0, 0, 0, 0)
 
     def to_dict(obj):
         return json.loads(str(ROOT.TBufferJSON.ToJSON(obj)))
@@ -177,6 +250,13 @@ def run_fit(x, y, ex=None, ey=None, formula="pol1",
         "chi2_ndf": (chi2 / ndf) if ndf > 0 else None,
         "prob": float(result.Prob()),          # p-value of chi2 for ndf degrees of freedom
         "covariance": cov,
+        "residuals": {
+            "kind": resid_kind,                       # "residual", "pull" or "none"
+            "pull_available": have_errors,
+            "values": [float(v) for v in resid],      # y - f(x), always the plain residual
+            "sigma": [float(v) for v in sigma],       # effective error used in chi2
+            "fit_values": [float(fitted.Eval(float(v))) for v in x],
+        },
         # ROOT objects serialised for JSROOT
         "canvas_json": to_dict(canvas),
         "graph_json": to_dict(graph),
@@ -184,4 +264,5 @@ def run_fit(x, y, ex=None, ey=None, formula="pol1",
     }
 
     canvas.Close()
+    del keep
     return out

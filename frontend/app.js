@@ -155,7 +155,12 @@ const HELP = {
     html: `
       <p><b>Log axes</b> are applied to the ROOT canvas; points with zero or negative values cannot be shown on a log axis.
       A straight line on a log-Y plot is an exponential; on log-log it is a power law.</p>
-      <p><b>Grid</b> draws dotted lines at the major ticks.</p>`,
+      <p><b>Grid</b> draws dotted lines at the major ticks.</p>
+      <p><b>Panel under the plot.</b> <em>Residuals</em> show data − fit for every point, with the same error bar
+      that entered χ² (so a point one error bar from the dashed zero line contributed 1 to χ²). <em>Pulls</em> divide
+      by that error: for a good fit they scatter like a standard normal — about ⅔ within ±1, hardly any beyond ±3.
+      Look for <em>patterns</em>: a bow, a wave or a drift in the residuals means the model is missing something,
+      even when χ²/NDF looks acceptable.</p>`,
   },
   report: {
     title: 'Reading the fit report',
@@ -172,7 +177,9 @@ const HELP = {
       <p><b>p-value</b> (ROOT's "Prob"): the probability of getting a χ² at least this large by chance if the model
       and the errors were right. Below ~0.05 is suspicious; astronomically small (1e-30) means "not this model".</p>
       <p><b>Status</b>: "converged" means Minuit reached a proper minimum and the uncertainties can be trusted.
-      Other messages mean try better starting values, or that the model has parameters the data cannot pin down.</p>`,
+      Other messages mean try better starting values, or that the model has parameters the data cannot pin down.</p>
+      <p><b>Residual panel</b>: the lower plot shows data − fit (or pulls). Random scatter around the dashed zero line
+      is what a correct model looks like; any shape (a bow, a wave, a trend) means the function is wrong or incomplete.</p>`,
   },
 };
 
@@ -620,6 +627,7 @@ function readForm() {
       logx: $('opt-logx').checked,
       logy: $('opt-logy').checked,
       grid: $('opt-grid').checked,
+      residuals: $('opt-resid').value,
     },
   };
 }
@@ -650,6 +658,7 @@ function writeForm(inputs) {
   $('opt-logx').checked = !!o.logx;
   $('opt-logy').checked = !!o.logy;
   $('opt-grid').checked = o.grid === undefined ? true : !!o.grid;
+  $('opt-resid').value = ['residual', 'pull', 'none'].includes(o.residuals) ? o.residuals : 'residual';
   renderParamTable();
 }
 
@@ -719,7 +728,7 @@ function buildPayload(inputs) {
     x_title: inputs.x_title,
     y_title: inputs.y_title,
     x_range,
-    plot: { logx: !!o.logx, logy: !!o.logy, grid: o.grid !== false },
+    plot: { logx: !!o.logx, logy: !!o.logy, grid: o.grid !== false, residuals: o.residuals || 'residual' },
     dataset_name: name,
   };
 }
@@ -910,6 +919,7 @@ function renderReport(r) {
 
   $('report').innerHTML = `
     <p>Function <code>${escapeHtml(r.formula)}</code> on${ds} x ∈ [${fmtNum(r.range[0])}, ${fmtNum(r.range[1])}], ${r.n_points} points. ${conv}${weighted}</p>
+    ${residualSummary(r)}
     <table class="report-table">
       <thead><tr><th>Parameter</th><th>Value ± uncertainty</th><th>Full value</th><th>Full error</th></tr></thead>
       <tbody>${rows}</tbody>
@@ -921,6 +931,28 @@ function renderReport(r) {
       <div class="stat"><span class="k">p-value</span><span class="v">${fmtNum(r.prob, 4)}</span></div>
     </div>`;
   setResultEnabled(true);
+}
+
+/** One line about the residuals: RMS, and the worst pull if errors exist. */
+function residualSummary(r) {
+  const R = r.residuals;
+  if (!R || !Array.isArray(R.values) || !R.values.length) return '';
+  const n = R.values.length;
+  const rms = Math.sqrt(R.values.reduce((a, v) => a + v * v, 0) / n);
+  let text = `Residuals (data − fit): RMS ${fmtNum(rms, 3)}`;
+  if (R.pull_available && lastPayload && Array.isArray(lastPayload.x)) {
+    let worst = 0, at = 0, outside = 0;
+    R.values.forEach((v, i) => {
+      const pull = Math.abs(v / R.sigma[i]);
+      if (pull > worst) { worst = pull; at = i; }
+      if (pull > 2) outside += 1;
+    });
+    text += `; largest pull ${fmtNum(worst, 3)}σ at x = ${fmtNum(lastPayload.x[at], 4)}; ${outside} of ${n} points beyond 2σ` +
+            ` (expect about ${Math.max(1, Math.round(0.046 * n))} for a good fit).`;
+  } else {
+    text += '.';
+  }
+  return `<p class="fine">${text}</p>`;
 }
 
 function clearReport() {
@@ -1489,9 +1521,9 @@ function init() {
   });
 
   // --- autosave on every change, restore on load ---
-  for (const el of document.querySelectorAll('.inputs input, .inputs textarea')) {
+  for (const el of document.querySelectorAll('.inputs input, .inputs textarea, .inputs select')) {
     el.addEventListener('input', autosave);
-    if (el.type === 'checkbox') el.addEventListener('change', autosave);
+    if (el.type === 'checkbox' || el.tagName === 'SELECT') el.addEventListener('change', autosave);
   }
   restoreAutosave();
   checkHealth();
