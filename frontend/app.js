@@ -11,7 +11,8 @@
  *   5c. documents         save / load JSON documents, autosave to localStorage
  *   6. wiring             connect buttons and inputs
  *
- * Plain JavaScript, loaded as an ES module (so we can `import()` JSROOT later).
+ * Plain JavaScript, loaded as an ordinary script (not a module) so the page
+ * also works when opened straight from disk.
  */
 
 'use strict';
@@ -299,15 +300,40 @@ function renderReport(r) {
 // JSROOT is CERN's JavaScript library that understands ROOT objects. The
 // backend sends the finished TCanvas (graph + fitted curve + stats box) as
 // ROOT-JSON; JSROOT draws it exactly as ROOT would. Nothing about the plot is
-// computed on this side. Loaded on demand so the page still works offline for
-// text results.
-const JSROOT_URL = 'https://root.cern/js/latest/modules/main.mjs';
+// computed on this side.
+//
+// It is loaded on demand, as a classic <script> tag rather than an ES module:
+// module imports are blocked when the page is opened from disk (file://), and
+// a script tag works everywhere. The bundle defines a global "JSROOT" object.
+// Two URLs are tried in case the CDN layout changes.
+const JSROOT_URLS = [
+  'https://root.cern/js/latest/build/jsroot.min.js',
+  'https://root.cern/js/latest/build/jsroot.js',
+];
 let jsrootPromise = null;
 let lastDrawn = null;   // { json, option } of the object on screen, for PNG export
 
+function loadScript(url) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = url;
+    s.onload = () => resolve(url);
+    s.onerror = () => { s.remove(); reject(new Error(`could not load ${url}`)); };
+    document.head.appendChild(s);
+  });
+}
+
 function loadJSROOT() {
   if (!jsrootPromise) {
-    jsrootPromise = import(JSROOT_URL).then((m) => {
+    jsrootPromise = (async () => {
+      if (!window.JSROOT) {
+        let lastError = null;
+        for (const url of JSROOT_URLS) {
+          try { await loadScript(url); break; } catch (e) { lastError = e; }
+        }
+        if (!window.JSROOT) throw lastError || new Error('JSROOT did not define window.JSROOT');
+      }
+      const m = window.JSROOT;
       // Draw the fitted TF1 from the points ROOT itself evaluated (fSave),
       // instead of letting JSROOT re-evaluate the formula in JavaScript.
       m.settings.PreferSavedPoints = true;
@@ -316,9 +342,9 @@ function loadJSROOT() {
       m.gStyle.fOptFit = 1111;
       m.gStyle.fOptStat = 0;
       return m;
-    }).catch((e) => {
+    })().catch((e) => {
       jsrootPromise = null;                 // allow a retry next time
-      throw new Error(`Could not load JSROOT from ${JSROOT_URL} — are you online? (${e.message})`);
+      throw new Error(`Could not load JSROOT from root.cern — are you online? (${e.message})`);
     });
   }
   return jsrootPromise;
@@ -345,7 +371,7 @@ async function drawPlot(result) {
   try {
     jsroot = await loadJSROOT();
   } catch (e) {
-    plot.innerHTML = `<p class="placeholder">${escapeHtml(e.message)}</p>`;
+    plot.innerHTML = `<p class="placeholder">${escapeHtml(e.message)}<br>The fit report below is still valid.</p>`;
     return;
   }
   try {

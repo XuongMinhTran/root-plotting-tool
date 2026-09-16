@@ -134,6 +134,8 @@
   <a href="https://sos.clayton.edu/physics/chi2/" target="_blank" rel="noopener">chi2 tool</a>.
 </footer>
 
-<script type="module" src="app.js"></script>
+<!-- A plain (non-module) script: module scripts are refused when the page is
+     opened straight from disk (file://), and this page must work that way. -->
+<script src="app.js" defer></script>
 </body>
 </html>
