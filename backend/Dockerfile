@@ -9,10 +9,12 @@
 # rebuilds stay reproducible.
 FROM rootproject/root:latest
 
-# Flask is the only extra Python package. Newer Ubuntu images make pip refuse
-# to install into the system Python unless told it's fine, hence the fallback.
-RUN python3 -m pip install --no-cache-dir flask numpy \
-    || python3 -m pip install --no-cache-dir --break-system-packages flask numpy
+# The image has Python but no pip, so Flask comes from Ubuntu's package
+# manager instead. numpy is listed too in case a future image drops it.
+# The rm at the end just keeps the image small.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends python3-flask python3-numpy \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 COPY . /app
