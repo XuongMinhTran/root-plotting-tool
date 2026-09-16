@@ -173,6 +173,7 @@ def do_fit():
                 title=payload.get("title", ""),
                 x_title=payload.get("x_title", ""),
                 y_title=payload.get("y_title", ""),
+                plot=payload.get("plot") if isinstance(payload.get("plot"), dict) else None,
             )
         return jsonify(result)
 

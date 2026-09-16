@@ -44,7 +44,7 @@ def _safe_title(text):
 
 def run_fit(x, y, ex=None, ey=None, formula="pol1",
             par_names=None, par_guesses=None, x_range=None,
-            title="", x_title="", y_title=""):
+            title="", x_title="", y_title="", plot=None):
     """
     Fit a function to (x, y) data with optional errors.
 
@@ -55,6 +55,7 @@ def run_fit(x, y, ex=None, ey=None, formula="pol1",
     par_guesses : list of float (or None entries), may be shorter than the number of parameters
     x_range     : (xmin, xmax) or None -> use the data range
     title, x_title, y_title : plot labels
+    plot        : dict of drawing options: {"logx": bool, "logy": bool, "grid": bool}
 
     Returns a plain dict (JSON-serialisable). Raises ValueError for bad input.
     """
@@ -140,8 +141,16 @@ def run_fit(x, y, ex=None, ey=None, formula="pol1",
     # create the title and the statistics box (fit parameters, chi2/ndf, prob),
     # so we call Update() before serialising. The fitted TF1 is already attached
     # to the graph by Fit(), so JSROOT will draw the curve on top of the points.
+    plot = plot or {}
     canvas = ROOT.TCanvas("c1", "fit", 900, 600)
-    canvas.SetGrid()
+    if plot.get("grid", True):
+        canvas.SetGrid()
+    # Log axes are a property of the pad, not of the data. ROOT simply cannot
+    # place x <= 0 (or y <= 0) points on a log axis; they are skipped, not an error.
+    if plot.get("logx"):
+        canvas.SetLogx(1)
+    if plot.get("logy"):
+        canvas.SetLogy(1)
     graph.Draw("AP")                  # A = draw axes, P = draw points/markers
     canvas.Update()
 

@@ -16,8 +16,19 @@
       <button type="button" data-action="load">Load document…</button>
       <button type="button" data-action="save">Save document</button>
       <button type="button" data-action="png" data-needs-plot>Export PNG…</button>
+      <button type="button" data-action="report-txt" data-needs-result>Export report as text…</button>
+      <button type="button" data-action="report-csv" data-needs-result>Export report as CSV…</button>
       <hr>
       <button type="button" data-action="clear">Clear form</button>
+    </div>
+  </div>
+  <div class="menu">
+    <span class="menu-title" tabindex="0">Data</span>
+    <div class="dropdown">
+      <button type="button" data-action="table">Open data table… <span class="shortcut">⌘E</span></button>
+      <button type="button" data-action="dataset-add">Add dataset</button>
+      <button type="button" data-action="dataset-rename">Rename dataset…</button>
+      <button type="button" data-action="dataset-remove">Remove dataset</button>
     </div>
   </div>
   <div class="menu">
@@ -31,6 +42,12 @@
     </div>
   </div>
   <div class="menu">
+    <span class="menu-title" tabindex="0">View</span>
+    <div class="dropdown">
+      <button type="button" data-action="reset-layout">Reset panel sizes</button>
+    </div>
+  </div>
+  <div class="menu">
     <span class="menu-title" tabindex="0">Options</span>
     <div class="dropdown">
       <button type="button" data-action="settings">Backend URL…</button>
@@ -40,6 +57,9 @@
   <div class="menu">
     <span class="menu-title" tabindex="0">Help</span>
     <div class="dropdown">
+      <button type="button" data-action="help" data-help="formula">Writing a fit function</button>
+      <button type="button" data-action="help" data-help="report">Reading the fit report</button>
+      <hr>
       <a href="https://root.cern/doc/master/classTFormula.html" target="_blank" rel="noopener">TFormula syntax</a>
       <a href="https://root.cern/doc/master/classTF1.html" target="_blank" rel="noopener">TF1 reference</a>
       <a href="https://root.cern/doc/master/namespaceTMath.html" target="_blank" rel="noopener">TMath functions</a>
@@ -52,9 +72,11 @@
 
 <!-- ============ toolbar, like TGToolBar ============ -->
 <div class="toolbar">
-  <button id="btn-load" type="button" title="Open a saved .json document">Load</button>
-  <button id="btn-save" type="button" title="Download everything on this page as a .json file">Save</button>
-  <button id="btn-png" type="button" title="Download the plot as a PNG image" disabled>Export PNG</button>
+  <button id="btn-load" type="button" title="Open a saved .json document"><i class="ic ic-load"></i>Load</button>
+  <button id="btn-save" type="button" title="Download everything on this page as a .json file"><i class="ic ic-save"></i>Save</button>
+  <button id="btn-png" type="button" title="Download the plot as a PNG image" disabled><i class="ic ic-png"></i>Export PNG</button>
+  <span class="separator"></span>
+  <button id="btn-table" type="button" title="Edit the data in a spreadsheet-style table"><i class="ic ic-table"></i>Data table</button>
   <span class="separator"></span>
   <button id="btn-clear" type="button" title="Empty the form">Clear</button>
   <span class="spacer"></span>
@@ -62,11 +84,11 @@
   <input id="file-input" type="file" accept=".json,application/json" hidden>
 </div>
 
-<!-- ============ main frame ============ -->
-<div class="main">
+<!-- ============ main frame: inputs | splitter | results ============ -->
+<div class="main" id="main">
 
   <!-- left: controls -->
-  <div class="inputs">
+  <div class="inputs" id="inputs">
 
     <fieldset class="group">
       <legend>Document</legend>
@@ -77,22 +99,30 @@
     </fieldset>
 
     <fieldset class="group">
-      <legend>Data</legend>
-      <p class="hint">One value per line — commas, tabs or spaces also work. Error columns are optional (leave empty for an unweighted fit).</p>
-      <div class="columns">
-        <div class="col"><div class="col-head"><span>X</span><span class="count" id="count-x">0</span></div>
-          <textarea id="col-x" rows="10" spellcheck="false" placeholder="1&#10;2&#10;3"></textarea></div>
-        <div class="col"><div class="col-head"><span>Y</span><span class="count" id="count-y">0</span></div>
-          <textarea id="col-y" rows="10" spellcheck="false" placeholder="2.1&#10;3.9&#10;6.2"></textarea></div>
-        <div class="col"><div class="col-head"><span>X err</span><span class="count" id="count-ex">0</span></div>
-          <textarea id="col-ex" rows="10" spellcheck="false" placeholder="optional"></textarea></div>
-        <div class="col"><div class="col-head"><span>Y err</span><span class="count" id="count-ey">0</span></div>
-          <textarea id="col-ey" rows="10" spellcheck="false" placeholder="optional"></textarea></div>
+      <legend>Data <button type="button" class="help-btn" data-help="data" aria-label="Help on data entry">?</button></legend>
+      <div class="row dataset-row">
+        <span class="swatch" id="dataset-swatch"></span>
+        <select id="dataset-select" title="Which dataset the columns below show" class="grow"></select>
+        <button type="button" class="small" data-action="dataset-add" title="Add an independent dataset (x2, y2, …)">+</button>
+        <button type="button" class="small" data-action="dataset-rename" title="Rename this dataset">Rename</button>
+        <button type="button" class="small" data-action="dataset-remove" title="Remove this dataset">−</button>
+        <button type="button" class="small expand" data-action="table" title="Open the spreadsheet-style editor">Expand ⤢</button>
       </div>
+      <div class="columns">
+        <div class="col"><div class="col-head"><span class="cx">X</span><span class="count" id="count-x">0</span></div>
+          <textarea id="col-x" rows="10" spellcheck="false" placeholder="1&#10;2&#10;3"></textarea></div>
+        <div class="col"><div class="col-head"><span class="cy">Y</span><span class="count" id="count-y">0</span></div>
+          <textarea id="col-y" rows="10" spellcheck="false" placeholder="2.1&#10;3.9&#10;6.2"></textarea></div>
+        <div class="col"><div class="col-head"><span class="cerr">Y err</span><span class="count" id="count-ey">0</span></div>
+          <textarea id="col-ey" rows="10" spellcheck="false" placeholder="optional"></textarea></div>
+        <div class="col"><div class="col-head"><span class="cerr">X err</span><span class="count" id="count-ex">0</span></div>
+          <textarea id="col-ex" rows="10" spellcheck="false" placeholder="optional"></textarea></div>
+      </div>
+      <p class="hint">One value per line; commas, tabs or spaces work too. Errors are optional. Use <em>Expand</em> to paste a whole table from a spreadsheet.</p>
     </fieldset>
 
     <fieldset class="group">
-      <legend>Fit function</legend>
+      <legend>Fit function <button type="button" class="help-btn" data-help="formula" aria-label="Help on fit functions">?</button></legend>
       <div class="row">
         <input id="formula" type="text" class="grow mono" value="[0]*x+[1]" spellcheck="false" placeholder="[0]*x+[1]">
         <select id="quick-pick" title="Insert a common function">
@@ -102,38 +132,57 @@
           <option value="[0]*exp(-x/[1])|amplitude, tau|1, 1">Exponential decay  [0]*exp(-x/[1])</option>
           <option value="[0]*(1-TMath::Exp(-x/[1]))|A, tau|1, 1">Saturating rise  [0]*(1-TMath::Exp(-x/[1]))</option>
           <option value="gaus|constant, mean, sigma|">Gaussian  gaus</option>
+          <option value="gaus(0)+pol0(3)|constant, mean, sigma, background|">Gaussian + flat background  gaus(0)+pol0(3)</option>
           <option value="expo|constant, slope|">Exponential  expo</option>
           <option value="landau|constant, mpv, sigma|">Landau  landau</option>
           <option value="[0]*sin([1]*x+[2])+[3]|amplitude, omega, phase, offset|1, 1, 0, 0">Sine  [0]*sin([1]*x+[2])+[3]</option>
           <option value="[0]*pow(x,[1])|A, n|1, 1">Power law  [0]*pow(x,[1])</option>
         </select>
       </div>
-      <p class="hint">
-        A ROOT <a href="https://root.cern/doc/master/classTFormula.html" target="_blank" rel="noopener">TFormula</a>:
-        <code>x</code> is the variable, parameters are <code>[0]</code>, <code>[1]</code>, …
-        Named functions <code>gaus</code>, <code>expo</code>, <code>landau</code>, <code>pol1</code>, <code>pol2</code> … also work.
-        Functions: <code>exp log log10 sqrt pow abs sin cos tan asin acos atan sinh cosh tanh</code> and
-        <a href="https://root.cern/doc/master/namespaceTMath.html" target="_blank" rel="noopener">TMath::</a>
-        (e.g. <code>TMath::Exp</code>, <code>TMath::Pi()</code>). See also
-        <a href="https://root.cern/doc/master/classTF1.html" target="_blank" rel="noopener">TF1</a>.
-      </p>
-      <div class="field"><label for="param-names">Parameter names <span class="hint-inline">(comma-separated, may be fewer than the parameters)</span></label>
+      <p class="hint"><code>x</code> is the variable, parameters are <code>[0]</code>, <code>[1]</code>, … Named functions
+        <code>gaus</code>, <code>expo</code>, <code>landau</code>, <code>pol2</code> … also work.
+        <a href="https://root.cern/doc/master/classTFormula.html" target="_blank" rel="noopener">TFormula</a> ·
+        <a href="https://root.cern/doc/master/namespaceTMath.html" target="_blank" rel="noopener">TMath</a></p>
+      <div class="field"><label for="param-names">Parameter names <span class="hint-inline">(comma-separated)</span></label>
         <input id="param-names" type="text" placeholder="slope, intercept" spellcheck="false"></div>
-      <div class="field"><label for="initial-guesses">Initial guesses <span class="hint-inline">(comma-separated)</span></label>
+      <div class="field"><label for="initial-guesses">Initial guesses <span class="hint-inline">(comma-separated)</span>
+          <button type="button" class="help-btn" data-help="guesses" aria-label="Help on initial guesses">?</button></label>
         <input id="initial-guesses" type="text" class="mono" placeholder="1, 0" spellcheck="false"></div>
-      <p class="hint">Without guesses every parameter starts at 0. That is fine for straight lines and polynomials, and ROOT
-        finds its own starting values for a lone <code>gaus</code>, <code>expo</code> or <code>landau</code> — but for anything
-        else (sums like <code>gaus(0)+pol0(3)</code>, exponentials, sines) read rough values off your data and type them here.</p>
+
+      <details class="expander" id="param-expander">
+        <summary>Parameter table &amp; fit range</summary>
+        <table class="param-table" id="param-table">
+          <thead><tr><th>#</th><th>Name</th><th>Start value</th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <p class="hint" id="param-table-note"></p>
+        <div class="row">
+          <div class="field grow"><label for="fit-xmin">Fit range from <span class="hint-inline">(blank = all data)</span></label>
+            <input id="fit-xmin" type="text" class="mono" inputmode="decimal" placeholder="x min"></div>
+          <div class="field grow"><label for="fit-xmax">to</label>
+            <input id="fit-xmax" type="text" class="mono" inputmode="decimal" placeholder="x max"></div>
+          <button type="button" class="help-btn" data-help="range" aria-label="Help on the fit range">?</button>
+        </div>
+      </details>
     </fieldset>
 
     <fieldset class="group">
-      <legend>Labels</legend>
+      <legend>Labels &amp; plot</legend>
       <div class="field"><label for="graph-title">Graph title</label>
         <input id="graph-title" type="text" placeholder="Period vs length"></div>
       <div class="row">
         <div class="field grow"><label for="x-title">X-axis title</label><input id="x-title" type="text" placeholder="L (m)"></div>
         <div class="field grow"><label for="y-title">Y-axis title</label><input id="y-title" type="text" placeholder="T (s)"></div>
       </div>
+      <details class="expander" id="plot-expander">
+        <summary>Plot options</summary>
+        <div class="row checks">
+          <label class="check"><input type="checkbox" id="opt-logx"> Log X axis</label>
+          <label class="check"><input type="checkbox" id="opt-logy"> Log Y axis</label>
+          <label class="check"><input type="checkbox" id="opt-grid" checked> Grid</label>
+          <button type="button" class="help-btn" data-help="plot" aria-label="Help on plot options">?</button>
+        </div>
+      </details>
     </fieldset>
 
     <div class="row actions">
@@ -142,12 +191,20 @@
     </div>
   </div>
 
+  <div class="splitter" id="splitter" title="Drag to resize · double-click to reset"></div>
+
   <!-- right: canvas and report -->
-  <div class="results">
+  <div class="results" id="results">
     <div id="message" class="message" hidden></div>
     <div class="canvas-frame"><div id="plot" class="plot"><p class="placeholder">The plot appears here after a fit.</p></div></div>
+    <div class="hsplitter" id="plot-resizer" title="Drag to change the plot height"></div>
     <fieldset class="group report-group">
-      <legend>Fit report</legend>
+      <legend>Fit report <button type="button" class="help-btn" data-help="report" aria-label="Help on the fit report">?</button></legend>
+      <div class="row report-tools" id="report-tools" hidden>
+        <button type="button" class="small" data-action="report-copy">Copy as text</button>
+        <button type="button" class="small" data-action="report-txt">Save .txt</button>
+        <button type="button" class="small" data-action="report-csv">Save .csv</button>
+      </div>
       <div id="report" class="report"><p class="placeholder-text">No fit yet.</p></div>
     </fieldset>
   </div>
@@ -159,10 +216,50 @@
   <span class="status-part" id="health-status">Backend: not checked</span>
   <span class="status-part" id="fit-status">Ready</span>
   <span class="status-part grow" id="jsroot-status">JSROOT loads with the first plot</span>
+  <span class="status-part credit">Minh Tran · 2026</span>
 </div>
+
+<!-- floating help pop-over (one, re-used) -->
+<div id="help-pop" class="help-pop" hidden></div>
 
 <!-- shown while dragging a file over the page -->
 <div id="drop-overlay" class="drop-overlay" hidden><div>Drop a saved document (.json) to load it</div></div>
+
+<!-- ============ data table dialog (spreadsheet-style editor) ============ -->
+<dialog id="table-dialog" class="tframe resizable">
+  <div class="titlebar">Data table <span class="titlebar-note">paste from Excel / Sheets / a text file — one row per point, columns X · Y · Y err · X err</span></div>
+  <div class="dialog-body table-body">
+    <div class="tabs" id="dataset-tabs"></div>
+    <div class="row table-tools">
+      <button type="button" class="small" data-taction="add-rows">+ 10 rows</button>
+      <button type="button" class="small" data-taction="delete-empty">Delete empty rows</button>
+      <button type="button" class="small" data-taction="clear">Clear this dataset</button>
+      <button type="button" class="small" data-taction="import">Import from text…</button>
+      <span class="spacer"></span>
+      <span class="hint" id="table-count"></span>
+    </div>
+    <div class="grid-wrap" id="grid-wrap">
+      <table class="grid" id="grid">
+        <thead><tr><th class="rownum">#</th><th class="cx">X</th><th class="cy">Y</th><th class="cerr">Y err</th><th class="cerr">X err</th><th class="rowdel"></th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="import-panel" id="import-panel" hidden>
+      <p class="hint">Paste a block of text with one point per line. Columns may be separated by tabs, commas, semicolons or spaces. Then say which column is which.</p>
+      <textarea id="import-text" rows="6" class="mono" spellcheck="false" placeholder="1&#9;2.3&#9;0.2&#10;2&#9;4.1&#9;0.2"></textarea>
+      <div class="row" id="import-mapping"></div>
+      <div class="row actions">
+        <button type="button" class="primary" data-taction="import-apply">Replace this dataset with the text</button>
+        <button type="button" data-taction="import-cancel">Cancel</button>
+      </div>
+    </div>
+    <div class="row actions">
+      <button type="button" class="primary" data-taction="done">Done</button>
+      <button type="button" data-taction="cancel">Cancel</button>
+      <span class="hint">Tip: Enter moves down, ↑/↓ move between rows, pasting several columns fills to the right.</span>
+    </div>
+  </div>
+</dialog>
 
 <!-- "load document" dialog -->
 <dialog id="paste-dialog" class="tframe">
@@ -208,7 +305,8 @@
       <p>Fits are computed server-side by <a href="https://root.cern" target="_blank" rel="noopener">CERN ROOT</a> (Minuit)
         and drawn by <a href="https://root.cern/js/" target="_blank" rel="noopener">JSROOT</a>. Nothing you enter is stored
         on the server — use <em>Save document</em> to keep your work.</p>
-      <p>A redesign of Dr. D. Beznosko's <a href="https://sos.clayton.edu/physics/chi2/" target="_blank" rel="noopener">chi2 tool</a>
+      <p>Built by <strong>Minh Tran</strong> (2026) as a redesign of Dr. D. Beznosko's
+        <a href="https://sos.clayton.edu/physics/chi2/" target="_blank" rel="noopener">chi2 tool</a>
         (Clayton State University), without accounts or server-side storage.</p>
       <p class="hint" id="about-versions"></p>
       <div class="row actions"><button type="submit" class="primary">Close</button></div>
