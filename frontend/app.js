@@ -1025,7 +1025,8 @@ const JSROOT_URLS = [
   'https://root.cern/js/latest/build/jsroot.js',
 ];
 let jsrootPromise = null;
-let lastDrawn = null;   // { json, option } of the object on screen, for PNG export
+let lastDrawn = null;   // { json, option } of the object on screen
+let lastPainter = null; // the JSROOT painter of what is on screen (used for export)
 
 function loadScript(url) {
   return new Promise((resolve, reject) => {
@@ -1071,6 +1072,7 @@ async function drawPlot(result) {
   const src = drawableFrom(result);
   setPngEnabled(false);
   lastDrawn = null;
+  lastPainter = null;
   if (!src) {
     plot.innerHTML = '<p class="placeholder">The backend returned no plot.</p>';
     return;
@@ -1089,6 +1091,7 @@ async function drawPlot(result) {
     const painter = await jsroot.draw(plot, obj, src.option);
     jsroot.registerForResize(painter);
     lastDrawn = src;
+    lastPainter = painter;
     setPngEnabled(true);
     setStatus($('jsroot-status'), `JSROOT ${jsroot.version}`);
   } catch (e) {
@@ -1103,23 +1106,65 @@ function replotToSize() {
   }
 }
 
+/** The plot exactly as it is on screen, as SVG text. JSROOT's produceImage
+ *  takes the live drawing (same size, same fonts, same layout) rather than
+ *  re-rendering at another size, which would change the proportions. */
+async function currentPlotSvg() {
+  if (!lastPainter) throw new Error('There is no plot to export yet.');
+  const canv = (typeof lastPainter.getCanvPainter === 'function' && lastPainter.getCanvPainter()) || lastPainter;
+  if (typeof canv.produceImage !== 'function') throw new Error('JSROOT did not give a canvas painter.');
+  const svg = await canv.produceImage(true, 'svg');
+  if (!svg) throw new Error('JSROOT returned an empty picture.');
+  return svg;
+}
+
+/** Draw an SVG string onto a bitmap `scale` times larger than its own size
+ *  (2x = the same picture, just crisper), white background, as a PNG data URL. */
+function rasterizeSvg(svgText, scale) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(new Blob([svgText], { type: 'image/svg+xml;charset=utf-8' }));
+    const img = new Image();
+    img.onload = () => {
+      const w = img.naturalWidth || img.width;
+      const h = img.naturalHeight || img.height;
+      const c = document.createElement('canvas');
+      c.width = Math.round(w * scale);
+      c.height = Math.round(h * scale);
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, c.width, c.height);
+      ctx.scale(scale, scale);
+      ctx.drawImage(img, 0, 0);
+      URL.revokeObjectURL(url);
+      try { resolve(c.toDataURL('image/png')); } catch (e) { reject(e); }
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('the browser could not render the SVG')); };
+    img.src = url;
+  });
+}
+
 async function exportPng() {
   if (!lastDrawn) return;
   const btn = $('btn-png');
   btn.disabled = true;
   try {
-    const jsroot = await loadJSROOT();
-    const obj = jsroot.parse(JSON.stringify(lastDrawn.json));
-    const plot = $('plot');
-    const w = 1200;
-    const h = Math.round(w * Math.max(0.5, Math.min(1.2, plot.clientHeight / Math.max(1, plot.clientWidth))));
-    const dataUrl = await jsroot.makeImage({ format: 'png', object: obj, option: lastDrawn.option, width: w, height: h });
-    if (!dataUrl) throw new Error('JSROOT returned no image.');
+    const svg = await currentPlotSvg();
+    const dataUrl = await rasterizeSvg(svg, 2);
     downloadDataUrl(dataUrl, fileBaseName() + '.png');
   } catch (e) {
     showMessage('error', 'PNG export failed: ' + e.message);
   } finally {
     btn.disabled = false;
+  }
+}
+
+async function exportSvg() {
+  if (!lastDrawn) return;
+  try {
+    const svg = await currentPlotSvg();
+    downloadText(svg, fileBaseName() + '.svg', 'image/svg+xml');
+  } catch (e) {
+    showMessage('error', 'SVG export failed: ' + e.message);
   }
 }
 
@@ -1366,6 +1411,7 @@ const ACTIONS = {
   load: openLoadDialog,
   save: saveDocument,
   png: exportPng,
+  svg: exportSvg,
   clear: clearEverything,
   fit: runFit,
   example: (el) => loadExample(el.dataset.example),
