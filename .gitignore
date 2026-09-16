@@ -1,0 +1,9 @@
+# macOS folder metadata
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+
+# Local scratch (never commit user data)
+*.local.json

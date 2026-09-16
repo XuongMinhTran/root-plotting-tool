@@ -1,0 +1,2 @@
+#!/bin/sh
+docker run --rm --platform linux/amd64 -v "$(pwd)":/work -w /work rootproject/root "$@"
