@@ -9,6 +9,7 @@
  *   5. fit report         render parameters, chi2, ndf, p-value as HTML
  *   5b. plot              load JSROOT from the CDN, draw the ROOT canvas, export PNG
  *   5c. documents         save / load JSON documents, autosave to localStorage
+ *   5d. menus             menu bar, dialogs, built-in examples
  *   6. wiring             connect buttons and inputs
  *
  * Plain JavaScript, loaded as an ordinary script (not a module) so the page
@@ -49,7 +50,7 @@ function escapeHtml(s) {
 
 function setStatus(el, text, kind = '') {
   el.textContent = text;
-  el.className = 'status' + (kind ? ' ' + kind : '');
+  el.className = 'status-part' + (el.classList.contains('grow') ? ' grow' : '') + (kind ? ' ' + kind : '');
 }
 
 /** Show a message above the plot. kind = 'error' | 'warn' | 'info' | '' (hide). */
@@ -141,12 +142,19 @@ function clearForm() {
   writeForm({ formula: '[0]*x+[1]' });
   $('doc-title').value = '';
   $('doc-notes').value = '';
-  $('report').innerHTML = '';
+  clearReport();
   $('plot').innerHTML = '<p class="placeholder">The plot appears here after a fit.</p>';
-  $('btn-png').disabled = true;
+  setPngEnabled(false);
   lastResult = null;
   lastDrawn = null;
   showMessage('');
+  setStatus($('fit-status'), 'Ready');
+}
+
+/** The PNG export lives in two places (toolbar button and File menu). */
+function setPngEnabled(on) {
+  $('btn-png').disabled = !on;
+  for (const el of document.querySelectorAll('[data-needs-plot]')) el.disabled = !on;
 }
 
 /** Turn the form into the JSON body the backend expects. Throws an Error with
@@ -217,12 +225,12 @@ async function callBackend(path, options = {}, timeoutMs = 60000) {
 
 async function checkHealth() {
   const el = $('health-status');
-  setStatus(el, 'checking…', 'busy');
+  setStatus(el, 'Backend: checking', 'busy');
   try {
     const h = await callBackend('/health', {}, 8000);
-    setStatus(el, `connected — ROOT ${h.root_version}`, 'ok');
+    setStatus(el, `Backend: connected, ROOT ${h.root_version}`, 'ok');
   } catch (e) {
-    setStatus(el, e.message.split('\n')[0], 'err');
+    setStatus(el, 'Backend: ' + e.message.split('\n')[0], 'err');
   }
 }
 
@@ -240,7 +248,7 @@ async function runFit() {
 
   const btn = $('btn-fit');
   btn.disabled = true;
-  setStatus($('fit-status'), 'fitting…', 'busy');
+  setStatus($('fit-status'), 'Fitting', 'busy');
   try {
     const result = await callBackend('/fit', {
       method: 'POST',
@@ -263,10 +271,10 @@ async function runFit() {
       }
       showMessage('warn', `The fit did not converge cleanly: ${result.status_message} ${advice}`);
     }
-    setStatus($('fit-status'), 'done', 'ok');
+    setStatus($('fit-status'), 'Fit done', 'ok');
   } catch (e) {
     showMessage('error', e.message);
-    setStatus($('fit-status'), 'failed', 'err');
+    setStatus($('fit-status'), 'Fit failed', 'err');
   } finally {
     btn.disabled = false;
   }
@@ -279,29 +287,32 @@ function renderReport(r) {
     <tr>
       <td>${escapeHtml(p.name)}</td>
       <td class="num" title="${p.value} ± ${p.error}">${fmtPair(p.value, p.error)}</td>
-      <td class="num fine">${fmtNum(p.value, 8)}</td>
-      <td class="num fine">${fmtNum(p.error, 4)}</td>
+      <td class="num">${fmtNum(p.value, 8)}</td>
+      <td class="num">${fmtNum(p.error, 4)}</td>
     </tr>`).join('');
 
   const conv = r.converged
-    ? `<span class="converged">✔ ${escapeHtml(r.status_message)}</span>`
-    : `<span class="not-converged">✖ ${escapeHtml(r.status_message)}</span>`;
+    ? `<span class="converged">${escapeHtml(r.status_message)}</span>`
+    : `<span class="not-converged">${escapeHtml(r.status_message)}</span>`;
 
   $('report').innerHTML = `
-    <h3>Fit report</h3>
-    <p class="fine">Function: <code>${escapeHtml(r.formula)}</code> &nbsp; fitted over x ∈ [${fmtNum(r.range[0])}, ${fmtNum(r.range[1])}] &nbsp; ${r.n_points} points &nbsp; ${conv}</p>
-    <table>
-      <thead><tr><th>Parameter</th><th>Value ± uncertainty</th><th>full value</th><th>full error</th></tr></thead>
+    <p>Function <code>${escapeHtml(r.formula)}</code>, fitted over x ∈ [${fmtNum(r.range[0])}, ${fmtNum(r.range[1])}], ${r.n_points} points. ${conv}</p>
+    <table class="report-table">
+      <thead><tr><th>Parameter</th><th>Value ± uncertainty</th><th>Full value</th><th>Full error</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
     <div class="summary">
-      <div class="stat"><div class="k">χ²</div><div class="v">${fmtNum(r.chi2)}</div></div>
-      <div class="stat"><div class="k">NDF</div><div class="v">${r.ndf}</div></div>
-      <div class="stat"><div class="k">χ² / NDF</div><div class="v">${r.chi2_ndf === null ? '—' : fmtNum(r.chi2_ndf, 4)}</div></div>
-      <div class="stat"><div class="k">p-value</div><div class="v">${fmtNum(r.prob, 4)}</div></div>
+      <span class="k">χ²</span><span class="v">${fmtNum(r.chi2)}</span>
+      <span class="k">NDF</span><span class="v">${r.ndf}</span>
+      <span class="k">χ² / NDF</span><span class="v">${r.chi2_ndf === null ? '—' : fmtNum(r.chi2_ndf, 4)}</span>
+      <span class="k">p-value</span><span class="v">${fmtNum(r.prob, 4)}</span>
     </div>
     <p class="fine">NDF = number of points − number of free parameters. χ²/NDF near 1 means the model describes the data within the quoted errors;
     the p-value is the probability of a χ² at least this large if the model were right. Without Y errors, χ² is in arbitrary units.</p>`;
+}
+
+function clearReport() {
+  $('report').innerHTML = '<p class="placeholder-text">No fit yet.</p>';
 }
 
 // ---------------------------------------------------------------- 5b. plot (JSROOT)
@@ -370,7 +381,7 @@ function drawableFrom(result) {
 async function drawPlot(result) {
   const plot = $('plot');
   const src = drawableFrom(result);
-  $('btn-png').disabled = true;
+  setPngEnabled(false);
   lastDrawn = null;
   if (!src) {
     plot.innerHTML = '<p class="placeholder">The backend returned no plot.</p>';
@@ -392,7 +403,8 @@ async function drawPlot(result) {
     const painter = await jsroot.draw(plot, obj, src.option);
     jsroot.registerForResize(painter);    // redraw when the window changes size
     lastDrawn = src;
-    $('btn-png').disabled = false;
+    setPngEnabled(true);
+    setStatus($('jsroot-status'), `JSROOT ${jsroot.version}`);
   } catch (e) {
     plot.innerHTML = `<p class="placeholder">JSROOT could not draw the result: ${escapeHtml(e.message)}</p>`;
   }
@@ -492,9 +504,9 @@ function applyDocument(doc) {
     renderReport(lastResult);
     drawPlot(lastResult);           // async; the plot fills in when JSROOT is ready
   } else {
-    $('report').innerHTML = '';
+    clearReport();
     $('plot').innerHTML = '<p class="placeholder">The plot appears here after a fit.</p>';
-    $('btn-png').disabled = true;
+    setPngEnabled(false);
     lastDrawn = null;
   }
 }
@@ -562,9 +574,98 @@ function clearAutosave() {
   try { localStorage.removeItem(AUTOSAVE_KEY); } catch (_) { /* ignore */ }
 }
 
+// ---------------------------------------------------------------- 5d. menus, dialogs, examples
+
+// The three example documents from examples/, embedded so the Fit menu can load
+// them even when the page is opened from disk (a file:// page cannot fetch files).
+const EXAMPLES = {
+  linear: {
+    title: "Straight line (reference dataset)",
+    notes: "Same data as tests/linear_reference.json. Expected: slope 1.975 \u00b1 0.046, intercept 0.23 \u00b1 0.18, chi2/NDF = 2.10/6.",
+    inputs: {"data": {"x": "1\n2\n3\n4\n5\n6\n7\n8", "y": "2.3\n4.1\n6.2\n7.9\n10.3\n11.8\n14.1\n16.2", "ex": "", "ey": "0.2\n0.2\n0.3\n0.3\n0.3\n0.4\n0.4\n0.4"}, "formula": "[0]*x+[1]", "param_names": "slope, intercept", "initial_guesses": "1, 0", "graph_title": "Straight line", "x_title": "x", "y_title": "y", "options": {}},
+  },
+  exp: {
+    title: "Exponential decay with background",
+    notes: "Counts vs time. Poisson errors on y (sqrt N), 0.05 s timing error on x. Try the same fit without the [2] background term and compare chi2/NDF.",
+    inputs: {"data": {"x": "0\n0.5\n1\n1.5\n2\n2.5\n3\n3.5\n4\n4.5\n5\n5.5\n6\n6.5\n7\n7.5\n8\n8.5\n9\n9.5\n10", "y": "990\n838\n688.7\n563.5\n482.8\n396.1\n353.9\n323.1\n248.1\n210.2\n195.8\n168.5\n144.2\n115.1\n110.8\n106\n76.4\n76.67\n57.55\n57.51\n48.74", "ex": "0.05\n0.05\n0.05\n0.05\n0.05\n0.05\n0.05\n0.05\n0.05\n0.05\n0.05\n0.05\n0.05\n0.05\n0.05\n0.05\n0.05\n0.05\n0.05\n0.05\n0.05", "ey": "31.5\n28.8\n26.4\n24.2\n22.2\n20.4\n18.8\n17.3\n16\n14.8\n13.8\n12.8\n12\n11.2\n10.5\n9.95\n9.44\n8.99\n8.6\n8.26\n7.96"}, "formula": "[0]*exp(-x/[1])+[2]", "param_names": "N0, tau, background", "initial_guesses": "1000, 2, 10", "graph_title": "Decay curve", "x_title": "t (s)", "y_title": "counts", "options": {}},
+  },
+  gaus: {
+    title: "Gaussian peak on flat background",
+    notes: "Uses ROOT's named functions: gaus(0) takes parameters 0-2, pol0(3) takes parameter 3. Because this is a SUM of named functions, ROOT does not compute starting values for it (it only does that for a lone gaus/expo/landau/polN), so the guesses matter: read the peak height (~120), position (~10) and width (~1.5) off the plot and the background (~15) from the flat part. Try clearing the guesses to see how the fit collapses to a flat line.",
+    inputs: {"data": {"x": "0\n0.5\n1\n1.5\n2\n2.5\n3\n3.5\n4\n4.5\n5\n5.5\n6\n6.5\n7\n7.5\n8\n8.5\n9\n9.5\n10\n10.5\n11\n11.5\n12\n12.5\n13\n13.5\n14\n14.5\n15\n15.5\n16\n16.5\n17\n17.5\n18\n18.5\n19\n19.5\n20", "y": "14.09\n10.09\n16.05\n15.61\n14.28\n5.253\n12.92\n14.83\n15.49\n9.209\n13.62\n12.38\n14.79\n27.14\n24.93\n40.74\n64.42\n73.55\n100.1\n122.1\n133.6\n119.9\n124.9\n119.5\n69.12\n68.37\n44.69\n27.65\n32.93\n22.13\n11.72\n15.9\n17.46\n14.33\n17.67\n14.75\n17.59\n20.57\n12.38\n15.79\n13.21", "ex": "", "ey": "3.87\n3.87\n3.87\n3.87\n3.87\n3.87\n3.87\n3.87\n3.88\n3.89\n3.94\n4.04\n4.27\n4.71\n5.41\n6.4\n7.6\n8.87\n10.1\n11\n11.5\n11.6\n11.1\n10.3\n9.12\n7.85\n6.63\n5.59\n4.82\n4.34\n4.07\n3.95\n3.9\n3.88\n3.88\n3.87\n3.87\n3.87\n3.87\n3.87\n3.87"}, "formula": "gaus(0)+pol0(3)", "param_names": "amplitude, mean, sigma, background", "initial_guesses": "120, 10, 1.5, 15", "graph_title": "Spectrum", "x_title": "channel", "y_title": "counts", "options": {}},
+  },
+};
+
+function loadExample(key) {
+  const ex = EXAMPLES[key];
+  if (!ex) return;
+  applyDocument({ version: DOC_VERSION, title: ex.title, notes: ex.notes, inputs: ex.inputs, results: null });
+  documentCreated = null;
+  showMessage('info', `Loaded the example "${ex.title}". Press Fit.`);
+  autosave();
+}
+
+function clearEverything() {
+  if (!confirm('Clear the whole form? (Save the document first if you want to keep it.)')) return;
+  clearForm();
+  documentCreated = null;
+  clearAutosave();
+}
+
+function openLoadDialog() { $('paste-area').value = ''; $('paste-dialog').showModal(); }
+function openSettings() { $('settings-dialog').showModal(); $('backend-url').focus(); }
+function openAbout() {
+  const v = [`Document format version ${DOC_VERSION}`, `page ${APP_VERSION}`];
+  if (window.JSROOT) v.push(`JSROOT ${window.JSROOT.version}`);
+  $('about-versions').textContent = v.join(' · ');
+  $('about-dialog').showModal();
+}
+
+/** Every menu item and toolbar button names what it does in data-action. */
+const ACTIONS = {
+  load: openLoadDialog,
+  save: saveDocument,
+  png: exportPng,
+  clear: clearEverything,
+  fit: runFit,
+  example: (el) => loadExample(el.dataset.example),
+  settings: openSettings,
+  health: checkHealth,
+  about: openAbout,
+};
+
+/** Menu bar behaviour, like TGMenuBar: click a title to open, move across
+ *  titles while one is open, click anywhere else or press Escape to close. */
+function initMenus() {
+  const bar = $('menubar');
+  const menus = [...bar.querySelectorAll('.menu')];
+  const closeAll = () => menus.forEach((m) => m.classList.remove('open'));
+  const anyOpen = () => menus.some((m) => m.classList.contains('open'));
+  for (const m of menus) {
+    const title = m.querySelector('.menu-title');
+    title.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      const wasOpen = m.classList.contains('open');
+      closeAll();
+      if (!wasOpen) m.classList.add('open');
+    });
+    title.addEventListener('mouseenter', () => { if (anyOpen()) { closeAll(); m.classList.add('open'); } });
+    title.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); title.click(); } });
+    m.querySelector('.dropdown').addEventListener('click', () => closeAll());   // an item was chosen
+  }
+  document.addEventListener('click', closeAll);
+  document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') closeAll(); });
+}
+
 // ---------------------------------------------------------------- 6. wiring
 
 function init() {
+  initMenus();
+  for (const el of document.querySelectorAll('[data-action]')) {
+    const fn = ACTIONS[el.dataset.action];
+    if (fn) el.addEventListener('click', () => fn(el));
+  }
+
   // backend URL persists across visits (a setting, not part of a document)
   try {
     const saved = localStorage.getItem(BACKEND_KEY);
@@ -591,13 +692,7 @@ function init() {
 
   $('btn-fit').addEventListener('click', runFit);
   $('btn-png').addEventListener('click', exportPng);
-  $('btn-clear').addEventListener('click', () => {
-    if (confirm('Clear the whole form? (Save the document first if you want to keep it.)')) {
-      clearForm();
-      documentCreated = null;
-      clearAutosave();
-    }
-  });
+  $('btn-clear').addEventListener('click', clearEverything);
 
   // Ctrl/Cmd+Enter anywhere in the form runs the fit
   $('btn-fit').closest('.inputs').addEventListener('keydown', (ev) => {
@@ -606,7 +701,7 @@ function init() {
 
   // --- save / load ---
   $('btn-save').addEventListener('click', saveDocument);
-  $('btn-load').addEventListener('click', () => { $('paste-area').value = ''; $('paste-dialog').showModal(); });
+  $('btn-load').addEventListener('click', openLoadDialog);
   $('btn-pick-file').addEventListener('click', () => $('file-input').click());
   $('file-input').addEventListener('change', (ev) => {
     $('paste-dialog').close();
@@ -655,6 +750,7 @@ function init() {
     el.addEventListener('input', autosave);
   }
   restoreAutosave();
+  checkHealth();                        // fill the status bar right away
 }
 
 init();
