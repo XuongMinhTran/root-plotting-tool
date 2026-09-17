@@ -7,7 +7,7 @@ computed by ROOT's fitter (Minuit), drawn in the browser by JSROOT.
 
 ```
 backend/    Python + Flask + PyROOT, runs in a Docker container (rootproject/root)
-frontend/   landing page, Classic, Modern, and native CLI interfaces (no build step)
+frontend/   landing page, Classic and Modern interfaces (no build step)
 examples/   sample saved documents (JSON) you can load into the page
 tests/      reference datasets with independently known results
 root-run    helper: run any command inside the ROOT container
@@ -15,8 +15,7 @@ root-run    helper: run any command inside the ROOT container
 
 The form backend stores no analysis data: `POST /fit` returns a result, and
 the page saves your work in a JSON file you download ("Save") and re-open
-("Load"). The separate native CLI service keeps temporary interpreter state
-and working files for each active session, as described below.
+("Load").
 
 ## Run the backend
 
@@ -36,9 +35,9 @@ curl -s http://localhost:8000/health
 
 ## Open the frontend
 
-Open `frontend/index.html` for the front page, then choose **Make a Plot** and **Classic**, **Modern**, or **Command Line Interface**. The Classic interface is the original compact layout; Modern uses full-width Data, Fit settings, and Results sections with the same functions in the shared `app.js`. Its section navigation is implemented in `modern.js`; sections can be visited in any order, and a completed fit opens Results automatically. **What is ROOT?** opens a short explanation and a link to the official website.
+Open `frontend/index.html` for the front page, then choose **Make a Plot** and **Classic** or **Modern**. Classic is the compact desktop-style layout. Modern is a worksheet: three numbered steps (data, function, labels and extras) in one column, with the plot and fit report in a panel beside them that stays in view, so changing a setting and fitting again never hides the result; below about 1100px the panel moves underneath. Both share every function in `app.js`. `modern.js` adds only Modern's own presentation — the clickable function shapes (mirrored from the `quick-pick` list app.js maintains, so they follow the analysis type), the one-line summary under each step, and the step highlight that follows the page. Modern's visual design follows root.cern: ROOT blue `#346295`, sand `#e9dcbe` hairlines, a pale blue-grey footer and a 4px radius. **What is ROOT?** opens a short explanation and a link to the official website.
 
-You can also open `frontend/classic.html`, `frontend/modern.html`, or `frontend/cli.html` directly. For shared autosave when switching between Classic and Modern, serve the pages from the same address. Serve the
+You can also open `frontend/classic.html` or `frontend/modern.html` directly. For shared autosave when switching between Classic and Modern, serve the pages from the same address. Serve the
 folder with any static server, e.g. `cd frontend && python3 -m http.server 8080`
 and visit <http://localhost:8080>. The "Backend URL" setting on the page
 defaults to `http://localhost:8000`; change it if the backend runs elsewhere.
@@ -56,86 +55,58 @@ the p-value.
   title, notes and timestamps. `examples/` contains a few.
 - **Load document** opens a saved file (file picker, drag-and-drop anywhere on
   the page, or paste the JSON text).
+- **Dataset fit settings** are independent: each dataset retains its own function,
+  parameter names, initial guesses and fit range. New XY tables start with a
+  straight-line function and blank parameter and range fields. These fields can
+  be edited in the main form or beneath each table in the table editor. Done
+  applies table edits; Cancel discards them. Older documents migrate their shared
+  settings to each existing dataset, and save/load preserves subsequent changes.
 - **Optional plots** include residuals, pulls, data/fit ratio, percentage difference, and a residual histogram. Select any combination under **Labels & plot → Plot options** (Classic) or **Fit settings → Labels and plot options** (Modern), then fit again. All are off by default. **Advanced optional plot settings** lets you rename each selected plot, set axis labels and Y limits, panel height, point scope, grids, reference lines, uncertainty bars, and histogram bins. Settings are saved with the document; older single-panel selections migrate automatically. Ratio and percentage uncertainty bars hold the fitted model fixed and are not model confidence bands. Undefined points are omitted with an explanatory message.
 - **Export PNG** renders the current plot to an image.
 - The form is autosaved in your browser (localStorage) so a reload does not
   lose your work; nothing leaves your machine except the fit request.
 
-## Native ROOT Command Line Interface
+### Histograms
 
-The CLI is a general ROOT/C++ workspace, independent of the form views. It does
-not use `app.js`, the `/fit` endpoint, or Classic/Modern autosave. Its own code,
-connection, live interpreters, session files, and saved-document format are
-kept separate. `style.css` and `modern.css` provide the shared visual styling.
+Both interfaces have an **Analysis type → Histogram** selector in Data.
+Choose individual measurements with a bin count and optional range, or
+pre-binned counts with explicit bin edges. Custom, unequal-width edges are
+supported for either input type. The final right edge is included; measurements
+outside the edges are reported separately. Use **Plot histogram** without a
+model, or choose a formula and fit in the normal Fit settings.
 
-For local development, the operator starts the website and native service from the project folder:
+The graph includes a results box with counts, fitted parameters and uncertainties,
+and the appropriate fit statistic. Without a fit it shows the distribution mean
+and standard deviation (estimated from bin centers for pre-binned input). The
+histogram example uses `gausn`: its `norm` parameter is the model’s full area,
+while ordinary `gaus` uses a peak amplitude.
 
-```sh
-./root-cli
-```
+The first version accepts unweighted, nonnegative integer counts. It does not
+accept normalized, background-subtracted or weighted bin contents. ROOT fits
+the original counts with `TH1::Fit`; the function is a **count density**, and
+`I` plus `WIDTH` integrates it over each bin. The display divides counts and
+their uncertainties by bin width. Fit ranges select bins by their centers.
 
-The launcher waits for the backend and opens the connected CLI in your browser.
-It also prints the website address (normally
-`http://127.0.0.1:8080/cli.html`). The launcher selects a free backend port;
-if the default website port is busy, it selects a free website port too.
-Existing instances remain running. Press Ctrl+C in the launcher's terminal
-to stop that instance. Users select **Run** (or Ctrl/Cmd+Enter)
-to start a session and submit native ROOT/C++. They do not enter service
-addresses or access keys. There is no plotting-specific command language. For example:
+**Poisson likelihood** is the default, includes empty bins, and reports
+Poisson deviance without an approximate χ² p-value. **χ²** uses √count
+uncertainties and excludes empty bins. Optional diagnostics compare counts
+with integrated predictions; pulls use √prediction for Poisson and √count
+for χ². All optional panels remain off by default.
 
-```cpp
-auto c = new TCanvas("surface_canvas", "3D surface", 900, 650);
-auto f = new TF2("surface", "sin(x)*cos(y)", -3, 3, -3, 3);
-f->Draw("surf1");
-```
+Save/load and autosave retain the analysis type, both input formats, binning,
+method and results. CSV reports include a bin table with counts, density and
+predicted counts. **Example: count histogram** is available in Classic's Fit
+menu and Modern's More menu, and as `examples/04-count-histogram.json`.
 
-Variables remain available between submissions. Each session has its own
-worker process and working directory. **Session files** uploads data/macros
-and downloads files created there, including `.root` files. Uploading does
-not execute a file; use native commands such as `.x example.C` or `.L example.C`.
-The file list shows regular files at the top level of the working directory.
-**Canvases** selects among the live interpreter's canvas snapshots; JSROOT
-renders supported ROOT objects and exports PNG/SVG.
+The separate `POST /histogram` endpoint accepts a `histogram` object with
+`source: "samples"`, `samples`, `bins`, optional `range` and `edges`, or
+`source: "counts"`, `counts` and `edges`. Set `method` to `poisson` or `chi2`.
+The outer object accepts the usual formula, parameter and plot settings;
+`fit_model: false` creates a histogram without a fit. Limits are 100,000
+measurements and 2–2,000 bins.
 
-**Save session** stores command history, editor input and canvas snapshots in
-a CLI-only JSON document. **Open** restores those without executing commands;
-it can also place a C++ text file in the editor. Saving does not serialize C++
-memory or temporary files. Download working files separately before ending a
-session. Opening a snapshot does not recreate interpreter variables. Compiler
-errors are shown with ROOT's diagnostic text; statements before an error may
-have already run. Command history uses Alt + arrow keys, or unmodified arrow keys in single-line input.
-
-`root-cli` launches a dedicated, non-root Docker container bound only to the
-host's loopback interface, with a read-only root filesystem, temporary writable
-storage, no host mounts, dropped capabilities and memory/CPU/process limits.
-The web gateway serves the frontend and handles `/api/root` requests on the
-same website origin. It generates browser ownership cookies automatically
-(HttpOnly, SameSite=Strict) and checks session ownership on every request.
-The private service credential stays in the gateway and native-service
-processes; it is never sent to the browser, printed, or saved in a document.
-Cross-origin API requests are rejected. Old browser-stored access keys are
-removed automatically. Native C++ has the
-permissions of this container; this is a local single-user tool, not a public
-multi-tenant execution service. Sessions within the CLI container are separate
-interpreters, not security boundaries from one another. Do not publish its port.
-
-Each submission is limited to 45 seconds, uploads to 20 MB, and canvas responses
-to 24 MB. Four sessions can run concurrently; idle interpreters expire after an
-hour. Stopping or timing out an interpreter removes its live variables and
-working files, while browser history and existing canvas snapshots remain.
-
-Operator settings: `ROOT_WEB_PORT` changes the website port (default 8080);
-`ROOT_WEB_BIND` defaults to loopback. For an HTTPS reverse proxy, set
-`ROOT_SITE_ORIGIN` to the exact public origin, preserve the original Host
-header, and forward both the frontend and `/api/root` to the gateway.
-`ROOT_NATIVE_URL` and `ROOT_CLI_TOKEN` configure a separately managed private
-ROOT service; the launcher supplies these defaults automatically. Static-only
-serving or opening `cli.html` from disk does not provide the CLI API.
-
-Run gateway checks with `python3 -m unittest discover -s backend -p gateway_test.py`.
-Run native regression checks with
-`docker run --rm --platform linux/amd64 rootfit-backend python3 -m unittest native_test.py`
-and document-format checks with `node tests/cli_session_test.cjs`.
+Run histogram checks with `node tests/histogram_frontend_test.cjs` and
+`docker run --rm --platform linux/amd64 -v "$PWD":/work -w /work/backend rootfit-backend python3 -m unittest histogram_test`.
 
 ## Talk to the backend directly
 
