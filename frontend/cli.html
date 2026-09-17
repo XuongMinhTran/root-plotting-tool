@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Command Line Interface · GAUSS-O-MATIC 3000</title>
+<link rel="stylesheet" href="style.css"><link rel="stylesheet" href="modern.css"><link rel="stylesheet" href="cli.css">
+<script src="cli-session.js" defer></script><script src="cli.js" defer></script></head>
+<body class="modern cli">
+<a class="skip-link" href="#command-input">Skip to command input</a>
+<header class="workspace-header"><a class="site-name" href="index.html">GAUSS-O-MATIC 3000</a><nav aria-label="Site"><a href="classic.html">Classic</a><a href="modern.html">Modern</a><a href="index.html">Home</a></nav></header>
+<main class="modern-main" id="main">
+<div class="document-bar"><h1>Command Line Interface</h1><div class="document-actions"><button id="load-session" type="button">Open</button><button id="save-session" type="button">Save session</button></div></div>
+<p class="section-description">Run ROOT/C++ commands in a persistent interpreter. Variables and objects remain available between commands, and canvases appear below. This workspace is independent of Classic and Modern.</p>
+<section class="command-workspace" aria-labelledby="command-heading">
+<div class="section-heading"><h2 id="command-heading">ROOT console</h2><button type="button" id="cli-help">Usage and examples</button></div>
+<details id="command-reference"><summary>Working with ROOT</summary>
+<p>Enter native ROOT/C++ statements, expressions, or complete multiline blocks. Include semicolons where C++ requires them. Commands run in order within this session. They can create ROOT objects, perform calculations, fit models, and draw 2D or 3D canvases. Use <code>.help</code> for ROOT’s interpreter commands.</p>
+<p>A new session starts a fresh interpreter. Opened files and saved sessions restore text and canvas snapshots without executing code. To recreate objects, run their declarations again. A failed command may have executed some statements before the error; ROOT’s diagnostic output is retained below.</p>
+<div class="example-actions"><button type="button" data-example="calculation">Insert calculation</button><button type="button" data-example="histogram">Insert histogram</button><button type="button" data-example="surface">Insert 3D surface</button></div>
+<p>Objects declared inside a C++ block follow normal C++ scope rules. Use top-level declarations for variables you want to reference later. The local service has a 45-second limit per submission and ends sessions after one hour of inactivity. Session files preserve commands and canvas snapshots, not live C++ memory or files in the container.</p>
+<p><a href="https://root.cern/manual/root_macros_and_shared_libraries/" target="_blank" rel="noopener">ROOT macros and interpreter documentation</a></p>
+</details>
+<div class="session-bar"><span id="cli-status" role="status" aria-live="polite">Not connected</span><div><button type="button" id="new-session">New session</button><button type="button" id="stop-session" disabled>End session</button></div></div>
+<div class="command-log" id="command-log" role="log" aria-label="ROOT output" aria-live="polite" aria-relevant="additions" tabindex="0"><p class="log-intro">ROOT output will appear here after you run a command.</p></div>
+<label class="command-label" for="command-input">ROOT/C++ input</label>
+<textarea id="command-input" rows="5" spellcheck="false" autocapitalize="off" autocomplete="off" aria-describedby="command-hint" placeholder='auto f = new TF2("surface", "sin(x)*cos(y)", -3, 3, -3, 3);&#10;f->Draw("surf1");'></textarea>
+<div class="command-actions"><span id="command-hint">Ctrl/⌘ + Enter to run. Alt + ↑ / ↓ for command history.</span><button class="primary" type="button" id="cli-run">Run</button></div>
+<div class="command-utilities"><button type="button" id="save-code">Save input as .C</button><button type="button" id="cli-clear-log">Clear output</button><span id="draft-status" role="status"></span></div>
+</section>
+<div id="cli-message" class="message" role="status" aria-live="polite" hidden></div>
+<section class="cli-results" aria-labelledby="results-heading"><div class="section-heading"><h2 id="results-heading">Canvases</h2><div class="export-actions"><button id="export-png" type="button" disabled>Export PNG</button><button id="export-svg" type="button" disabled>Export SVG</button></div></div>
+<p class="section-description" id="canvas-note">Canvases created by your commands will appear here. ROOT objects are displayed with JSROOT where supported.</p>
+<label for="canvas-select" class="command-label">Canvas</label><select id="canvas-select" disabled><option>No canvases</option></select>
+<div class="canvas-frame"><div id="cli-plot" class="plot"><p class="placeholder">No canvas to display.</p></div></div>
+</section>
+<section class="cli-files" aria-labelledby="files-heading"><div class="section-heading"><h2 id="files-heading">Session files</h2><div><button type="button" id="upload-file" disabled>Upload file</button><button type="button" id="refresh-files" disabled>Refresh</button></div></div><p class="section-description">Files uploaded or created in the session’s working directory are available to ROOT. Download files you want to keep before ending the session.</p><div id="session-files">Start a session to work with files.</div></section>
+</main><footer class="workspace-footer"><span>Native ROOT/C++</span><span>Powered by CERN ROOT</span></footer>
+<input id="open-file" type="file" accept=".json,.C,.c,.cpp,.cxx,.h,.hpp,.txt" hidden><input id="upload-input" type="file" hidden>
+
+</body></html>

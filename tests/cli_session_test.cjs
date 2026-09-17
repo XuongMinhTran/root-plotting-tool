@@ -1,0 +1,24 @@
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const session=require('../frontend/cli-session.js');
+const commands=[{code:'auto g = new TGraph2D();',output:'',ok:true}];
+const canvases=[{name:'3D',title:'Surface',json:{_typename:'TCanvas',fPrimitives:{arr:[{_typename:'TF2'}]}}}];
+const saved=session.write('g->Draw("surf1");',commands,canvases);
+assert.deepEqual(session.read(JSON.parse(JSON.stringify(saved))),{input:'g->Draw("surf1");',commands,canvases});
+assert.throws(()=>session.read({version:1,app:'rootfit',inputs:{}}),/different format/);
+assert.throws(()=>session.read({...saved,commands:[{code:12,output:''}]}),/unreadable command/);
+assert.throws(()=>session.read({...saved,canvases:[{name:'g',json:{_typename:'TGraph'}}]}),/unreadable canvas/);
+const html=fs.readFileSync('frontend/cli.html','utf8');
+assert(!html.includes('src="app.js"'));
+assert(!html.includes('col-x'));
+const js=fs.readFileSync('frontend/cli.js','utf8');
+assert(!js.includes('rootfit.autosave'));
+assert(!js.includes("'/fit'"));
+assert(!JSON.stringify(saved).includes('token'));
+console.log('OK: independent CLI document round-trip, 3D canvas snapshots, incompatible-document rejection, no form or credential coupling.');
+
+assert(!html.includes('connection-dialog'));
+assert(!html.includes('cli-token'));
+assert(!js.includes('Bearer '));
+assert(js.includes("API='/api/root'"));
+console.log('OK: CLI uses same-origin API without manual credentials or connection setup.');
