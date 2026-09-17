@@ -1,5 +1,5 @@
 /*
- * app.js — all the behaviour of index.html.
+ * app.js — shared behaviour for classic.html and modern.html.
  *
  * Sections:
  *   1. helpers            element lookup, number formatting, downloads
@@ -28,7 +28,7 @@ const $ = (id) => document.getElementById(id);
 
 const DEFAULT_BACKEND = 'http://localhost:8000';
 const BACKEND_KEY = 'rootfit.backendUrl';
-const LAYOUT_KEY = 'rootfit.layout';
+const LAYOUT_KEY = 'rootfit.layout' + (window.location?.pathname.endsWith('/modern.html') ? '.modern' : '');
 
 /** Round `value` so that its uncertainty shows two significant figures,
  *  e.g. (1.97539, 0.045541) -> "1.975 ± 0.046". */
@@ -64,6 +64,7 @@ function showMessage(kind, text) {
   box.className = 'message ' + kind;
   box.textContent = text;
   box.hidden = false;
+  document.dispatchEvent(new CustomEvent('rootfit:message', { detail: { kind } }));
 }
 
 function downloadDataUrl(href, filename) {
@@ -100,7 +101,7 @@ const HELP = {
     html: `
       <p>Each column holds one number per point. Paste straight from a spreadsheet: values separated by new lines,
       commas, tabs, semicolons or spaces are all accepted, and blank lines are ignored.</p>
-      <p><b>Errors are optional.</b> Leave both error columns empty for an <em>unweighted</em> fit: every point counts
+      <p><b>Errors are optional.</b> Enter one value to apply it to every point on that axis, or one per point. Leave both error columns empty for an <em>unweighted</em> fit: every point counts
       the same, and the reported χ² is then in arbitrary units (its absolute value means nothing, only the shape of
       the fit does). With Y errors, each point is weighted by 1/σ<sub>y</sub>², which is what makes χ² and the parameter
       uncertainties meaningful.</p>
@@ -134,7 +135,7 @@ const HELP = {
     html: `
       <p>Minuit finds the χ² minimum by walking downhill from the starting point. For a straight line or a polynomial
       the χ² surface is a simple bowl, so any start works. For most other functions there are flat regions and
-      false minima, and a bad start ends in nonsense (parameters stuck at 0, zero uncertainties, "did not converge").</p>
+      local minima, so the fitter sometimes needs a different starting point to find a stable result.</p>
       <p>Without guesses every parameter starts at <b>0</b>. ROOT computes its own starting values only for a lone
       <code>gaus</code>, <code>expo</code>, <code>landau</code> or <code>polN</code> — not for sums like
       <code>gaus(0)+pol0(3)</code>.</p>
@@ -156,11 +157,10 @@ const HELP = {
       <p><b>Log axes</b> are applied to the ROOT canvas; points with zero or negative values cannot be shown on a log axis.
       A straight line on a log-Y plot is an exponential; on log-log it is a power law.</p>
       <p><b>Grid</b> draws dotted lines at the major ticks.</p>
-      <p><b>Panel under the plot.</b> <em>Residuals</em> show data − fit for every point, with the same error bar
-      that entered χ² (so a point one error bar from the dashed zero line contributed 1 to χ²). <em>Pulls</em> divide
-      by that error: for a good fit they scatter like a standard normal — about ⅔ within ±1, hardly any beyond ±3.
-      Look for <em>patterns</em>: a bow, a wave or a drift in the residuals means the model is missing something,
-      even when χ²/NDF looks acceptable.</p>`,
+      <p><b>Optional plots.</b> Select any combination of residuals, pulls, data/fit ratio, percentage difference, and a residual histogram. They are all off by default.</p>
+      <p>Residuals show data − fit; pulls divide that difference by the effective measurement uncertainty. The ratio is data / fit and percentage difference is 100 × (data − fit) / fit. The histogram counts residuals in bins.</p>
+      <p>These are diagnostics with the fitted curve held fixed, not uncertainty bands for the model. Points where a diagnostic is undefined are omitted with a message.</p>
+      <p><b>Advanced optional plot settings</b> lets you rename each panel, set axis labels and Y limits, choose its height and point range, and adjust the grid, uncertainty bars, reference line, or histogram bins. Settings are saved with the document. Fit again to apply changes.</p>`,
   },
   report: {
     title: 'Reading the fit report',
@@ -263,8 +263,9 @@ function updateCounts() {
   for (const c of COLUMNS) {
     const { values, bad } = parseColumn($('col-' + c).value);
     const badge = $('count-' + c);
-    badge.textContent = bad.length ? `${values.length} (+${bad.length} bad)` : String(values.length);
-    badge.classList.toggle('mismatch', bad.length > 0 || (values.length > 0 && values.length !== nx));
+    const shared = (c === 'ex' || c === 'ey') && values.length === 1 && !bad.length;
+    badge.textContent = shared ? 'all points' : bad.length ? `${values.length} (check ${bad.length})` : String(values.length);
+    badge.classList.toggle('mismatch', bad.length > 0 || (values.length > 0 && values.length !== nx && !shared));
   }
   renderDatasetSelector();
 }
@@ -433,15 +434,16 @@ function renumberGrid() {
 }
 
 /** The grid -> the active table dataset (as column text). Rows without both
- *  X and Y are skipped; a blank error next to filled ones counts as 0. */
+ *  X and Y are skipped; one error value applies to every point; blanks among multiple errors count as 0. */
 function readGridToDataset() {
   const rows = [...$('grid').querySelectorAll('tbody tr')].map((tr) => [...tr.querySelectorAll('input')].map((i) => i.value.trim()));
   const kept = rows.filter((r) => r[0] !== '' && r[1] !== '');
   const d = tableDatasets[tableActive];
   GRID_COLS.forEach((col, c) => {
     if (c < 2) { d[col] = kept.map((r) => r[c]).join('\n'); return; }
-    const any = kept.some((r) => r[c] !== '');
-    d[col] = any ? kept.map((r) => r[c] === '' ? '0' : r[c]).join('\n') : '';
+    const filled = kept.filter((r) => r[c] !== '');
+    if (filled.length === 1) { d[col] = filled[0][c]; return; }
+    d[col] = filled.length ? kept.map((r) => r[c] === '' ? '0' : r[c]).join('\n') : '';
   });
   return { total: rows.filter((r) => r.some((v) => v !== '')).length, kept: kept.length };
 }
@@ -595,16 +597,74 @@ const TABLE_ACTIONS = {
 
 /** Split "a, b, c" into ["a","b","c"], keeping empty slots ("1,,3"). */
 function splitList(text) {
-  const s = String(text || '').trim();
+  const s = String(text ?? '').trim();
   if (!s) return [];
   return s.split(',').map((t) => t.trim());
 }
 
 function numberOrNull(text) {
-  const s = String(text || '').trim();
+  const s = String(text ?? '').trim();
   if (s === '') return null;
   const v = Number(s);
   return Number.isFinite(v) ? v : NaN;
+}
+
+const DIAGNOSTIC_TYPES = ['residual', 'pull', 'ratio', 'percent', 'histogram'];
+const DIAGNOSTIC_NAMES = { residual: 'Residuals', pull: 'Pulls', ratio: 'Data / fit', percent: 'Percentage difference', histogram: 'Residual histogram' };
+const DIAGNOSTIC_FIELDS = ['title', 'x_title', 'y_title', 'y_min', 'y_max', 'height', 'bins', 'scope', 'grid', 'reference', 'errors'];
+
+function selectedDiagnostics(options) {
+  if (Array.isArray(options.diagnostics)) return DIAGNOSTIC_TYPES.filter(k => options.diagnostics.includes(k));
+  return ['residual', 'pull'].includes(options.residuals) ? [options.residuals] : [];
+}
+
+function readDiagnosticSettings() {
+  return Object.fromEntries(DIAGNOSTIC_TYPES.map(kind => [kind, Object.fromEntries(DIAGNOSTIC_FIELDS.map(key => {
+    const el = $('diag-' + kind + '-' + key);
+    return [key, el ? el.type === 'checkbox' ? el.checked : el.value.trim() : undefined];
+  }))]));
+}
+
+function syncDiagnosticControls() {
+  let any = false;
+  for (const kind of DIAGNOSTIC_TYPES) {
+    const selected = $('diag-' + kind).checked;
+    $('diag-settings-' + kind).hidden = !selected;
+    any ||= selected;
+  }
+  $('diag-empty').hidden = any;
+}
+
+function writeDiagnosticSettings(options) {
+  const selected = selectedDiagnostics(options);
+  for (const kind of DIAGNOSTIC_TYPES) {
+    $('diag-' + kind).checked = selected.includes(kind);
+    const settings = (options.diagnostic_settings || {})[kind] || {};
+    for (const key of DIAGNOSTIC_FIELDS) {
+      const el = $('diag-' + kind + '-' + key);
+      if (!el) continue;
+      if (el.type === 'checkbox') el.checked = settings[key] !== false;
+      else el.value = String(settings[key] ?? ({ height: 240, bins: 15, scope: 'fit' }[key] ?? ''));
+    }
+  }
+  syncDiagnosticControls();
+}
+
+function diagnosticPayload(options) {
+  return selectedDiagnostics(options).map(kind => {
+    const cfg = { ...((options.diagnostic_settings || {})[kind] || {}), kind };
+    const name = DIAGNOSTIC_NAMES[kind];
+    for (const key of ['y_min', 'y_max']) {
+      cfg[key] = numberOrNull(cfg[key]);
+      if (Number.isNaN(cfg[key])) throw new Error(`${name}: enter a number for the Y limits, or leave them blank for automatic limits.`);
+    }
+    if (cfg.y_min !== null && cfg.y_max !== null && cfg.y_min >= cfg.y_max) throw new Error(`${name}: the lower Y limit needs to be smaller than the upper limit.`);
+    for (const [key, fallback, low, high] of [['height', 240, 180, 480], ['bins', 15, 5, 100]]) {
+      cfg[key] = cfg[key] === undefined || cfg[key] === '' ? fallback : Number(cfg[key]);
+      if (!Number.isInteger(cfg[key]) || cfg[key] < low || cfg[key] > high) throw new Error(`${name}: ${key} needs a whole number from ${low} to ${high}.`);
+    }
+    return cfg;
+  });
 }
 
 /** Everything the user typed, as one plain object (what gets saved). */
@@ -627,7 +687,8 @@ function readForm() {
       logx: $('opt-logx').checked,
       logy: $('opt-logy').checked,
       grid: $('opt-grid').checked,
-      residuals: $('opt-resid').value,
+      diagnostics: DIAGNOSTIC_TYPES.filter(kind => $('diag-' + kind).checked),
+      diagnostic_settings: readDiagnosticSettings(),
     },
   };
 }
@@ -658,7 +719,7 @@ function writeForm(inputs) {
   $('opt-logx').checked = !!o.logx;
   $('opt-logy').checked = !!o.logy;
   $('opt-grid').checked = o.grid === undefined ? true : !!o.grid;
-  $('opt-resid').value = ['residual', 'pull', 'none'].includes(o.residuals) ? o.residuals : 'residual';
+  writeDiagnosticSettings(o);
   renderParamTable();
 }
 
@@ -674,6 +735,7 @@ function clearForm() {
   lastDrawn = null;
   showMessage('');
   setStatus($('fit-status'), 'Ready');
+  document.dispatchEvent(new CustomEvent('rootfit:reset'));
 }
 
 /** Buttons that only make sense once there is a plot / a result. */
@@ -700,9 +762,14 @@ function buildPayload(inputs) {
   const name = datasets[activeIdx].name;
   if (cols.x.length === 0) throw new Error(`Paste some X values first (${name} is empty).`);
   if (cols.y.length === 0) throw new Error('Paste some Y values first.');
-  if (cols.x.length !== cols.y.length) throw new Error(`X has ${cols.x.length} points but Y has ${cols.y.length}. They must match.`);
-  if (cols.ex.length && cols.ex.length !== cols.x.length) throw new Error(`X errors: ${cols.ex.length} values for ${cols.x.length} points. Give one per point or leave the column empty.`);
-  if (cols.ey.length && cols.ey.length !== cols.x.length) throw new Error(`Y errors: ${cols.ey.length} values for ${cols.x.length} points. Give one per point or leave the column empty.`);
+  if (cols.x.length !== cols.y.length) throw new Error(`X has ${cols.x.length} points but Y has ${cols.y.length}. Each point needs an X and a Y value. Add the missing values or remove the extra ones.`);
+  for (const c of ['ex', 'ey']) {
+    if (cols[c].some((v) => v < 0)) throw new Error(`${COLUMN_LABEL[c]} describe a size, so use zero or a positive number.`);
+    if (cols[c].length === 1) cols[c] = Array(cols.x.length).fill(cols[c][0]);
+    else if (cols[c].length && cols[c].length !== cols.x.length) {
+      throw new Error(`${COLUMN_LABEL[c]}: ${cols[c].length} values for ${cols.x.length} points. Enter one value for the whole axis, ${cols.x.length} values for individual points, or leave it blank.`);
+    }
+  }
   if (!inputs.formula.trim()) throw new Error('Type a fit function, e.g. [0]*x+[1].');
 
   const o = inputs.options || {};
@@ -728,9 +795,27 @@ function buildPayload(inputs) {
     x_title: inputs.x_title,
     y_title: inputs.y_title,
     x_range,
-    plot: { logx: !!o.logx, logy: !!o.logy, grid: o.grid !== false, residuals: o.residuals || 'residual' },
+    plot: { logx: !!o.logx, logy: !!o.logy, grid: o.grid !== false, diagnostics: diagnosticPayload(o), residuals: o.residuals || 'none' },
     dataset_name: name,
   };
+}
+
+/** A log-linear estimate supplies a useful start for the decay example. */
+function decayStartingGuesses(inputs) {
+  const x = parseColumn(inputs.data.x), y = parseColumn(inputs.data.y);
+  if (x.bad.length || y.bad.length || x.values.length !== y.values.length) return '';
+  const o = inputs.options || {};
+  const lo = numberOrNull(o.x_min), hi = numberOrNull(o.x_max);
+  const points = x.values.map((v, i) => [v, y.values[i]])
+    .filter(([v, w]) => w > 0 && (lo === null || v >= lo) && (hi === null || v <= hi));
+  if (points.length < 2) return '';
+  const mx = points.reduce((s, [v]) => s + v, 0) / points.length;
+  const my = points.reduce((s, [, w]) => s + Math.log(w), 0) / points.length;
+  const variance = points.reduce((s, [v]) => s + (v - mx) ** 2, 0);
+  const slope = points.reduce((s, [v, w]) => s + (v - mx) * (Math.log(w) - my), 0) / variance;
+  const amplitude = Math.exp(my - slope * mx), tau = -1 / slope;
+  return slope < 0 && amplitude > 0 && Number.isFinite(amplitude) && Number.isFinite(tau)
+    ? `${Number(amplitude.toPrecision(4))}, ${Number(tau.toPrecision(4))}` : '';
 }
 
 // ================================================================ 6. parameters
@@ -825,10 +910,10 @@ async function callBackend(path, options = {}, timeoutMs = 60000) {
   try { body = JSON.parse(text); } catch (_) { /* not JSON */ }
 
   if (!response.ok) {
-    const msg = body && body.error ? body.error : `HTTP ${response.status} ${response.statusText}`;
+    const msg = body && body.error ? body.error : 'The fitting service could not finish this request. Your inputs are still here; please try Fit again.';
     throw new Error(msg);
   }
-  if (body === null) throw new Error(`The backend replied with something that is not JSON:\n${text.slice(0, 200)}`);
+  if (body === null) throw new Error('The fitting service sent a response the app could not read. Your inputs are still here. Please try Fit again; if this continues, restart the backend.');
   return body;
 }
 
@@ -847,6 +932,7 @@ let lastResult = null;    // the last successful /fit response (used by save & e
 let lastPayload = null;   // what was sent for it
 
 async function runFit() {
+  if ($('btn-fit').disabled) return;
   showMessage('');
   hideHelp();
   let payload;
@@ -871,22 +957,14 @@ async function runFit() {
     renderReport(result);
     await drawPlot(result);
     autosave();
+    const plotNote = result.plot_notes?.length ? result.plot_notes.join('\n') : (result.residuals?.note || '');
     if (!result.converged) {
-      let advice = 'Try better initial guesses.';
-      const stuckAtZero = result.params.filter((p) => p.value === 0 && p.error === 0).length;
-      if (payload.initial_guesses.length === 0) {
-        advice = 'You gave no initial guesses, so every parameter started at 0 — for a non-linear function that is ' +
-                 'often a dead end. Read rough values off the plot (peak height, position, width, decay constant…) ' +
-                 'and enter them under "Initial guesses".';
-      } else if (stuckAtZero > 0) {
-        advice = `${stuckAtZero} parameter(s) never moved away from 0. Give them a non-zero starting value.`;
-      }
-      showMessage('warn', `The fit did not converge cleanly: ${result.status_message} ${advice}`);
-    }
-    setStatus($('fit-status'), `Fit done — ${payload.dataset_name}`, 'ok');
+      showMessage('warn', `The fitter has not found a stable result yet. ${result.status_message} The curve and uncertainties are provisional. A different starting point or a narrower fit range may help.` + (plotNote ? '\n' + plotNote : ''));
+    } else if (plotNote) showMessage('info', plotNote);
+    setStatus($('fit-status'), result.converged ? `Fit done — ${payload.dataset_name}` : 'Fit needs another look', result.converged ? 'ok' : 'warn');
   } catch (e) {
-    showMessage('error', e.message);
-    setStatus($('fit-status'), 'Fit failed', 'err');
+    showMessage('error', e.message + (lastResult ? ' The plot and report below are from the previous fit.' : ''));
+    setStatus($('fit-status'), 'Fit not completed', 'err');
   } finally {
     btn.disabled = false;
   }
@@ -935,8 +1013,9 @@ function renderReport(r) {
 
 /** One line about the residuals: RMS, and the worst pull if errors exist. */
 function residualSummary(r) {
+  if (Array.isArray(r.diagnostics)) return r.diagnostics.length ? `<p class="fine">Optional plots: ${r.diagnostics.map(p => `${escapeHtml(p.title)} (${p.n_points} points)`).join('; ')}.</p>` : '';
   const R = r.residuals;
-  if (!R || !Array.isArray(R.values) || !R.values.length) return '';
+  if (!R || R.kind === 'none' || !Array.isArray(R.values) || !R.values.length) return '';
   const n = R.values.length;
   const rms = Math.sqrt(R.values.reduce((a, v) => a + v * v, 0) / n);
   let text = `Residuals (data − fit): RMS ${fmtNum(rms, 3)}`;
@@ -963,7 +1042,7 @@ function clearReport() {
 /** The report as plain text (for the clipboard and .txt export). */
 function reportText(r) {
   const L = [];
-  L.push(`ROOT Fit report — ${$('doc-title').value || 'untitled'}`);
+  L.push(`GAUSS-O-MATIC 3000 report — ${$('doc-title').value || 'untitled'}`);
   L.push(`Date:      ${new Date().toISOString()}`);
   if (lastPayload) L.push(`Dataset:   ${lastPayload.dataset_name} (${r.n_points} points)`);
   L.push(`Function:  ${r.formula}`);
@@ -1068,7 +1147,10 @@ function drawableFrom(result) {
 }
 
 async function drawPlot(result) {
+  document.dispatchEvent(new CustomEvent('rootfit:draw'));
   const plot = $('plot');
+  const configuredHeight = loadLayout().plotH;
+  plot.style.height = result.plot_height ? `${result.plot_height}px` : configuredHeight ? `${configuredHeight}px` : '';
   const src = drawableFrom(result);
   setPngEnabled(false);
   lastDrawn = null;
@@ -1268,7 +1350,7 @@ function saveDocument() {
 
 function applyDocument(doc) {
   if (!doc || typeof doc !== 'object' || Array.isArray(doc)) {
-    throw new Error('This is not a ROOT Fit document (expected a JSON object with "version" and "inputs").');
+    throw new Error('This is not a GAUSS-O-MATIC 3000 document (expected a JSON object with "version" and "inputs").');
   }
   if (doc.version !== DOC_VERSION) {
     throw new Error(`Unsupported document version "${doc.version}" — this page understands version ${DOC_VERSION}.`);
@@ -1288,6 +1370,7 @@ function applyDocument(doc) {
     renderReport(lastResult);
     drawPlot(lastResult);
   } else {
+    document.dispatchEvent(new CustomEvent('rootfit:reset'));
     clearReport();
     $('plot').innerHTML = '<p class="placeholder">The plot appears here after a fit.</p>';
     setPngEnabled(false);
@@ -1337,12 +1420,34 @@ function autosave() {
 }
 window.addEventListener('pagehide', () => { if (autosaveTimer) { clearTimeout(autosaveTimer); autosaveNow(); } });
 
+function prepareAutosave(doc) {
+  const options = doc?.inputs?.options;
+  // The original single-panel UI defaulted to residuals. An old autosave
+  // cannot tell that default apart from an explicit choice. New selections
+  // use diagnostics; manually opened documents still restore their settings.
+  if (options?.residuals !== 'residual' || Array.isArray(options.diagnostics)) return doc;
+  return {
+    ...doc,
+    inputs: { ...doc.inputs, options: { ...options, residuals: 'none', diagnostics: [] } },
+    // Do not pair unchecked controls with an old canvas containing residuals.
+    results: null,
+    results_payload: null,
+  };
+}
+
 function restoreAutosave() {
   const text = storageGet(AUTOSAVE_KEY);
   if (!text) return false;
   try {
-    applyDocument(JSON.parse(text));
-    showMessage('info', 'Restored your previous session from this browser (autosave). Use "Save document" to keep a file.');
+    const saved = JSON.parse(text);
+    const restored = prepareAutosave(saved);
+    applyDocument(restored);
+    if (restored !== saved) {
+      autosave();
+      showMessage('info', 'Restored your data and settings. Residuals are now off by default. Run Fit to update the plot, or select Residuals under Optional plots to include them.');
+    } else {
+      showMessage('info', 'Restored your previous session from this browser (autosave). Use "Save document" to keep a file.');
+    }
     return true;
   } catch (_) {
     return false;
@@ -1455,7 +1560,7 @@ function initMenus() {
 
 function init() {
   initMenus();
-  initResizers();
+  if ($('splitter')) initResizers();
   for (const el of document.querySelectorAll('[data-action]')) {
     const fn = ACTIONS[el.dataset.action];
     if (fn) el.addEventListener('click', (ev) => { ev.stopPropagation(); fn(el); });
@@ -1498,11 +1603,14 @@ function init() {
     const [formula, names, guesses] = v.split('|');
     $('formula').value = formula;
     $('param-names').value = names || '';
-    $('initial-guesses').value = guesses || '';
+    $('initial-guesses').value = formula === '[0]*exp(-x/[1])' ? decayStartingGuesses(readForm()) || guesses || '' : guesses || '';
     ev.target.value = '';
     renderParamTable();
     autosave();
   });
+
+  for (const kind of DIAGNOSTIC_TYPES) $('diag-' + kind).addEventListener('change', syncDiagnosticControls);
+  syncDiagnosticControls();
 
   // parameter table <-> comma lists
   for (const id of ['formula', 'param-names', 'initial-guesses']) $(id).addEventListener('input', renderParamTable);

@@ -234,9 +234,9 @@ button.expand { margin-left: auto; }
   border-left-width: 5px; line-height: 1.45;
 }
 .message.error { border-left-color: var(--err); color: var(--err); }
-.message.error::before { content: "Error  "; font-weight: bold; }
+.message.error::before { content: "Let’s take a look  "; font-weight: bold; }
 .message.warn { border-left-color: #d29a00; color: var(--warn); }
-.message.warn::before { content: "Warning  "; font-weight: bold; }
+.message.warn::before { content: "Fit note  "; font-weight: bold; }
 .message.info { border-left-color: var(--ok); color: var(--ok); }
 
 .canvas-frame { background: var(--entry); padding: 3px; }
@@ -334,3 +334,22 @@ dialog.resizable .titlebar { flex: none; }
 .import-panel textarea { width: 100%; }
 #import-mapping .field { margin: 4px 0; min-width: 150px; }
 #import-mapping select { width: 100%; }
+
+/* Navigation preserves the compact Classic workspace. */
+.workspace-home { font-weight: bold; text-decoration: none; margin-right: 12px; }
+.workspace-switch { font-size: 12px; white-space: nowrap; }
+
+/* Optional diagnostic plots: shared controls, compact in Classic. */
+.optional-plots { border: 0; padding: 0; margin: 14px 0 0; min-width: 0; }
+.optional-plots > legend { padding: 0; font-weight: bold; }
+.optional-choices { display: grid; gap: 8px; margin: 12px 0; }
+.optional-choice { display: flex; gap: 8px; align-items: flex-start; cursor: pointer; }
+.optional-choice input { margin-top: 4px; accent-color: var(--accent); }
+.optional-choice small { display: block; color: var(--muted); font-size: 11px; }
+.diagnostic-config { border-top: 1px solid var(--shadow); padding: 10px 0; }
+.diagnostic-config > summary { cursor: pointer; color: var(--accent); }
+.diagnostic-fields { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 0 12px; }
+.diagnostic-fields .field { min-width: 0; }
+.diagnostic-fields select { width: 100%; }
+.diagnostic-fields input[type=number] { width: 100%; min-height: 30px; font: inherit; padding: 5px 8px; border: 1px solid var(--shadow); background: var(--entry); color: var(--ink); }
+.diagnostic-config > .check { margin: 5px 12px 5px 0; }

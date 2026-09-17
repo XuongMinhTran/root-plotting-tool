@@ -14,6 +14,7 @@ import json
 
 import numpy as np
 import ROOT
+import diagnostics
 
 ROOT.gROOT.SetBatch(True)                 # never open a graphics window
 ROOT.gErrorIgnoreLevel = ROOT.kError      # hide ROOT "Warning:" chatter in the server log
@@ -49,17 +50,19 @@ def run_fit(x, y, ex=None, ey=None, formula="pol1",
     Fit a function to (x, y) data with optional errors.
 
     x, y        : lists of floats
-    ex, ey      : lists of errors, or None/[] (treated as zero)
+    ex, ey      : one error for the whole axis, a list per point, or None/[] (zero)
     formula     : TFormula string ("[0]*x+[1]") or named function ("gaus", "pol2", ...)
     par_names   : list of str, may be shorter than the number of parameters
     par_guesses : list of float (or None entries), may be shorter than the number of parameters
     x_range     : (xmin, xmax) or None -> use the data range
     title, x_title, y_title : plot labels
     plot        : dict of drawing options: {"logx": bool, "logy": bool, "grid": bool,
-                  "residuals": "residual" | "pull" | "none"}
+                  "diagnostics": list of per-panel settings; legacy "residuals" is also accepted}
 
     Returns a plain dict (JSON-serialisable). Raises ValueError for bad input.
     """
+    plot = plot or {}
+    configs = diagnostics.configurations(plot)
     x = np.asarray(x, dtype=float)
     y = np.asarray(y, dtype=float)
     n = len(x)
@@ -68,6 +71,10 @@ def run_fit(x, y, ex=None, ey=None, formula="pol1",
 
     ex = np.zeros(n) if ex is None or len(ex) == 0 else np.asarray(ex, dtype=float)
     ey = np.zeros(n) if ey is None or len(ey) == 0 else np.asarray(ey, dtype=float)
+    if len(ex) == 1:
+        ex = np.full(n, ex[0])
+    if len(ey) == 1:
+        ey = np.full(n, ey[0])
     if len(ex) != n or len(ey) != n:
         raise ValueError("error columns must have the same number of points as x and y")
     if (ex < 0).any() or (ey < 0).any():
@@ -147,84 +154,117 @@ def run_fit(x, y, ex=None, ey=None, formula="pol1",
     fitted = graph.GetListOfFunctions().FindObject("fit")
     if not fitted:
         raise RuntimeError("ROOT did not attach the fitted function to the graph")
-    resid = np.array([y[i] - fitted.Eval(float(x[i])) for i in range(n)])
-    slope = np.array([fitted.Derivative(float(x[i])) for i in range(n)])
-    sigma = np.sqrt(ey ** 2 + (slope * ex) ** 2)
-    have_errors = bool((sigma > 0).all())
+    panels, plot_notes, residuals = diagnostics.calculate(configs, x, y, ex, ey, fitted, xmin, xmax)
 
-    plot = plot or {}
-    resid_kind = str(plot.get("residuals", "residual") or "none")
-    if resid_kind == "pull" and not have_errors:
-        resid_kind = "residual"           # pulls need an error for every point
-    if resid_kind == "pull":
-        resid_y, resid_e, resid_title = resid / sigma, np.ones(n), "(data - fit) / #sigma"
-    else:
-        resid_y, resid_e, resid_title = resid, sigma, "data - fit"
+    # Give each selected diagnostic its own pad and physical height. The main
+    # fit remains readable even when all optional panels are selected.
+    keep = []
+    main_height = 500
+    total_height = main_height + sum(p['height'] for p in panels) if panels else 600
+    canvas = ROOT.TCanvas("c1", "fit", 900, total_height)
 
-    # --- the picture -------------------------------------------------------
-    # Draw on a canvas in batch mode. Painting is what makes ROOT create the
-    # title and the statistics box (fit parameters, chi2/ndf, prob), so we
-    # call Update() before serialising. The fitted TF1 is attached to the
-    # graph by Fit(), so JSROOT draws the curve on top of the points.
-    # With residuals, the canvas holds two pads stacked vertically that share
-    # the x range: the main plot (top 70 %) and the residual plot (bottom 30 %).
-    keep = []                              # Python must keep drawn objects alive until ToJSON
-    canvas = ROOT.TCanvas("c1", "fit", 900, 700 if resid_kind != "none" else 600)
+    def style_pad(pad, logx=False, logy=False, grid=True):
+        pad.SetGrid(int(grid), int(grid))
+        pad.SetLogx(int(bool(logx)))
+        pad.SetLogy(int(bool(logy)))
 
-    def style_pad(pad, logx, logy):
-        if plot.get("grid", True):
-            pad.SetGrid()
-        # Log axes are a property of the pad. ROOT cannot place x <= 0 (or y <= 0)
-        # points on a log axis; they are skipped, not an error.
-        if logx:
-            pad.SetLogx(1)
-        if logy:
-            pad.SetLogy(1)
-
-    if resid_kind == "none":
-        style_pad(canvas, plot.get("logx"), plot.get("logy"))
-        graph.Draw("AP")                  # A = draw axes, P = draw points/markers
-    else:
-        pad1 = ROOT.TPad("pad1", "fit", 0.0, 0.30, 1.0, 1.0)
-        pad2 = ROOT.TPad("pad2", "residuals", 0.0, 0.0, 1.0, 0.30)
-        keep += [pad1, pad2]
-        pad1.SetBottomMargin(0.03)        # the two frames touch; x labels only on the lower pad
-        pad2.SetTopMargin(0.04)
-        pad2.SetBottomMargin(0.34)
-        style_pad(pad1, plot.get("logx"), plot.get("logy"))
-        style_pad(pad2, plot.get("logx"), False)
-        pad1.Draw()
-        pad2.Draw()
-
-        pad1.cd()
+    if not panels:
+        style_pad(canvas, plot.get('logx'), plot.get('logy'), plot.get('grid', True))
         graph.Draw("AP")
-        xaxis = graph.GetXaxis()          # exists once the graph has been drawn
-        xaxis.SetLabelSize(0)             # hide the top pad's x labels and title
-        xaxis.SetTitleSize(0)
-        xlow, xhigh = xaxis.GetXmin(), xaxis.GetXmax()
-
-        pad2.cd()
-        rgraph = ROOT.TGraphErrors(n, x, resid_y, ex, resid_e)
-        rgraph.SetName("residuals")
-        rgraph.SetTitle(f";{_safe_title(x_title)};{resid_title}")
-        rgraph.SetMarkerStyle(20)
-        rgraph.SetMarkerSize(0.8)
-        rgraph.Draw("AP")
-        rgraph.GetXaxis().SetLimits(xlow, xhigh)   # same x range as the main plot
-        # the lower pad is 30 % of the height, so text sizes (fractions of the
-        # pad) must be scaled up by ~1/0.3 to look the same as on top
-        for ax in (rgraph.GetXaxis(), rgraph.GetYaxis()):
-            ax.SetLabelSize(0.10)
-            ax.SetTitleSize(0.11)
-        rgraph.GetXaxis().SetTitleOffset(1.2)
-        rgraph.GetYaxis().SetTitleOffset(0.42)
-        rgraph.GetYaxis().SetNdivisions(505)
-        rgraph.GetYaxis().CenterTitle(True)
-        zero = ROOT.TLine(xlow, 0.0, xhigh, 0.0)
-        zero.SetLineColor(ROOT.kRed)
-        zero.SetLineStyle(2)
-        zero.Draw()
-        keep += [rgraph, zero]
+    else:
+        split = 1.0 - main_height / total_height
+        main_pad = ROOT.TPad('main_plot', 'Fit', 0, split, 1, 1)
+        main_pad.SetLeftMargin(.14)
+        main_pad.SetBottomMargin(.14)
+        style_pad(main_pad, plot.get('logx'), plot.get('logy'), plot.get('grid', True))
+        main_pad.Draw()
+        main_pad.cd()
+        graph.Draw('AP')
+        keep.append(main_pad)
+        xlow, xhigh = graph.GetXaxis().GetXmin(), graph.GetXaxis().GetXmax()
+        top = split
+        for panel in panels:
+            canvas.cd()
+            bottom = top - panel['height'] / total_height
+            pad = ROOT.TPad('panel_' + panel['kind'], panel['title'], 0, max(0, bottom), 1, top)
+            pad.SetLeftMargin(.14)
+            pad.SetRightMargin(.06)
+            pad.SetTopMargin(.16)
+            pad.SetBottomMargin(.23)
+            histogram = panel['kind'] == 'histogram'
+            style_pad(pad, plot.get('logx') and not histogram, False, panel['grid'])
+            pad.Draw()
+            pad.cd()
+            xtitle = panel['x_title'] or ('data - fit' if histogram else x_title)
+            obj_title = f";{_safe_title(xtitle)};{_safe_title(panel['y_title'])}"
+            if histogram:
+                obj = ROOT.TH1D('diagnostic_' + panel['kind'], obj_title, panel['bins'], panel['edges'][0], panel['edges'][-1])
+                obj.SetDirectory(0)
+                obj.SetStats(False)
+                for i, count in enumerate(panel['counts'], 1):
+                    obj.SetBinContent(i, count)
+                obj.SetEntries(panel['n_points'])
+                obj.SetLineColor(ROOT.kBlue + 1)
+                obj.SetLineWidth(2)
+                auto_low, auto_high = 0.0, max(1, max(panel['counts']) * 1.15)
+                obj.Draw('HIST')
+                low, high = panel['edges'][0], panel['edges'][-1]
+            else:
+                px = np.asarray(panel['x'], dtype=float)
+                py = np.asarray(panel['values'], dtype=float)
+                pex = np.asarray(panel['x_errors'], dtype=float) if panel['errors'] else np.zeros(len(px))
+                pey = np.asarray(panel['errors_values'], dtype=float) if panel['errors'] else np.zeros(len(px))
+                obj = ROOT.TGraphErrors(len(px), px, py, pex, pey)
+                obj.SetName('diagnostic_' + panel['kind'])
+                obj.SetTitle(obj_title)
+                obj.SetMarkerStyle(20)
+                obj.SetMarkerSize(.65)
+                # Include the reference line in the automatic Y range.
+                lo, hi = float(np.min(py-pey)), float(np.max(py+pey))
+                if panel['reference']:
+                    lo, hi = min(lo, panel['baseline']), max(hi, panel['baseline'])
+                margin = (hi-lo)*.12 if hi > lo else max(abs(lo)*.1, 1)
+                auto_low, auto_high = lo-margin, hi+margin
+                obj.SetMinimum(auto_low)
+                obj.SetMaximum(auto_high)
+                obj.Draw('AP')
+                obj.GetXaxis().SetLimits(xlow, xhigh)
+                low, high = xlow, xhigh
+            lower = panel['y_min'] if panel['y_min'] is not None else auto_low
+            upper = panel['y_max'] if panel['y_max'] is not None else auto_high
+            if lower >= upper:
+                if panel['y_max'] is None:
+                    upper = lower + max(abs(lower) * .1, 1)
+                else:
+                    lower = upper - max(abs(upper) * .1, 1)
+            obj.SetMinimum(lower)
+            obj.SetMaximum(upper)
+            for axis in (obj.GetXaxis(), obj.GetYaxis()):
+                axis.SetLabelSize(16 / panel['height'])
+                axis.SetTitleSize(18 / panel['height'])
+            obj.GetXaxis().SetTitleOffset(1.0)
+            obj.GetYaxis().SetTitleOffset(.85)
+            obj.GetYaxis().SetNdivisions(505)
+            # Explicit pad title keeps each panel's custom name legible.
+            heading = ROOT.TLatex(.14, .91, _safe_title(panel['title']))
+            heading.SetNDC(True)
+            heading.SetTextFont(42)
+            heading.SetTextSize(18 / panel['height'])
+            heading.Draw()
+            if panel['reference']:
+                if histogram:
+                    line = ROOT.TLine(0, lower, 0, upper)
+                    visible = low <= 0 <= high
+                else:
+                    line = ROOT.TLine(low, panel['baseline'], high, panel['baseline'])
+                    visible = (panel['y_min'] is None or panel['y_min'] <= panel['baseline']) and (panel['y_max'] is None or panel['y_max'] >= panel['baseline'])
+                if visible:
+                    line.SetLineColor(ROOT.kRed)
+                    line.SetLineStyle(2)
+                    line.Draw()
+                    keep.append(line)
+            keep += [pad, obj, heading]
+            top = bottom
         canvas.cd()
 
     canvas.Update()
@@ -250,13 +290,10 @@ def run_fit(x, y, ex=None, ey=None, formula="pol1",
         "chi2_ndf": (chi2 / ndf) if ndf > 0 else None,
         "prob": float(result.Prob()),          # p-value of chi2 for ndf degrees of freedom
         "covariance": cov,
-        "residuals": {
-            "kind": resid_kind,                       # "residual", "pull" or "none"
-            "pull_available": have_errors,
-            "values": [float(v) for v in resid],      # y - f(x), always the plain residual
-            "sigma": [float(v) for v in sigma],       # effective error used in chi2
-            "fit_values": [float(fitted.Eval(float(v))) for v in x],
-        },
+        "residuals": residuals,
+        "diagnostics": panels,
+        "plot_notes": plot_notes,
+        "plot_height": total_height if panels else None,
         # ROOT objects serialised for JSROOT
         "canvas_json": to_dict(canvas),
         "graph_json": to_dict(graph),

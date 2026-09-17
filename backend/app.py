@@ -23,6 +23,7 @@ Run directly:   python3 app.py        (listens on 0.0.0.0:8000)
 In Docker:      see Dockerfile
 """
 
+import math
 import threading
 import traceback
 
@@ -105,10 +106,31 @@ def guess_list(payload, key):
             out.append(None)                      # "leave this one at ROOT's default"
             continue
         try:
-            out.append(float(v))
+            value = float(v)
+            if not math.isfinite(value):
+                raise ValueError()
+            out.append(value)
         except (TypeError, ValueError):
-            raise BadRequest(f"Initial guess {i + 1} ({v!r}) is not a number.")
+            raise BadRequest(f"Initial guess {i + 1} ({v!r}) needs a finite number, or can be left blank.")
     return out
+
+
+def require_finite_result(value):
+    """Reject unusable fits before Flask emits non-standard NaN/Infinity JSON."""
+    if isinstance(value, float) and not math.isfinite(value):
+        raise BadRequest(
+            "The fitter could not find a stable curve with these starting values, "
+            "so it cannot report reliable uncertainties yet. Your data are still here. "
+            "For exponential decay, the Examples menu estimates initial guesses from the data. "
+            "For other functions, try starting values based on the curve's height and width, "
+            "or a narrower fit range."
+        )
+    if isinstance(value, dict):
+        for item in value.values():
+            require_finite_result(item)
+    elif isinstance(value, (list, tuple)):
+        for item in value:
+            require_finite_result(item)
 
 
 @app.route("/health", methods=["GET"])
@@ -142,17 +164,17 @@ def do_fit():
         # Explain length mismatches precisely: this is the most common mistake.
         if len(x) != len(y):
             raise BadRequest(f"x has {len(x)} points but y has {len(y)}.")
-        if ex and len(ex) != len(x):
-            raise BadRequest(f"x errors: {len(ex)} values, but there are {len(x)} data points "
-                             "(leave the column empty for no x errors).")
-        if ey and len(ey) != len(x):
-            raise BadRequest(f"y errors: {len(ey)} values, but there are {len(x)} data points "
-                             "(leave the column empty for no y errors).")
+        for label, errors in (("X", ex), ("Y", ey)):
+            if len(errors) not in (0, 1, len(x)):
+                raise BadRequest(f"The {label} error column has {len(errors)} values for {len(x)} points. "
+                                 f"Enter one value for the whole axis, {len(x)} values for individual points, or leave it blank.")
+            if any(v < 0 for v in errors):
+                raise BadRequest(f"{label} errors describe a size, so use zero or a positive number.")
 
         formula = str(payload.get("formula") or "").strip()
         ok, message = check_formula(formula)
         if not ok:
-            raise BadRequest(f"Fit function rejected: {message}")
+            raise BadRequest(f"The fitting service could not read this function: {message}")
 
         par_names = string_list(payload, "param_names")
         par_guesses = guess_list(payload, "initial_guesses")
@@ -175,6 +197,7 @@ def do_fit():
                 y_title=payload.get("y_title", ""),
                 plot=payload.get("plot") if isinstance(payload.get("plot"), dict) else None,
             )
+        require_finite_result(result)
         return jsonify(result)
 
     except BadRequest as e:
@@ -183,7 +206,7 @@ def do_fit():
         return jsonify({"error": str(e)}), 400
     except Exception as e:                         # anything else is our problem
         traceback.print_exc()
-        return jsonify({"error": f"Server error during fit: {type(e).__name__}: {e}"}), 500
+        return jsonify({"error": "The fitting service ran into a problem. Your inputs are still here; please try Fit again. If this continues, restart the backend."}), 500
 
 
 if __name__ == "__main__":
