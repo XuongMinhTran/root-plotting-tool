@@ -91,8 +91,9 @@ Both interfaces provide **Paste data…** beside the dataset selector. Paste a r
 You can also open `frontend/classic.html` or `frontend/modern.html` directly.
 Serving the pages from one address (which `./start` does) keeps autosave shared
 when you switch between Classic and Modern. The page uses whichever origin
-served it if that origin answers `/health`, and otherwise
-`http://localhost:8000`; the "Backend URL" setting overrides both.
+served it if that origin answers `/health`, and otherwise the Cloudflare
+deployment (`DEFAULT_BACKEND` in `frontend/app.js`); the "Backend URL" setting
+overrides both.
 
 ### Using the page
 
@@ -207,6 +208,43 @@ equal to the individual fits including X uncertainties, NDF with fixed
 parameters and exclusions, refused requests, canvas contents).
 `python3 backend/simultaneous_reference.py` is the ROOT-free reference
 minimizer the ROOT test compares against.
+
+## Deploy on Cloudflare
+
+The public site runs on Cloudflare as one Worker (`wrangler.jsonc`,
+`cloudflare/worker.js`):
+
+- the pages in `frontend/` are static assets;
+- `/health`, `/allowed`, `/fit`, `/histogram` and `/simultaneous-fit` go to a
+  **Cloudflare Container** built from `backend/Dockerfile` (Flask + CERN ROOT).
+
+Pages and API share one address, so the page finds the API on its own origin.
+The container sleeps after 15 minutes without requests and Cloudflare stops
+charging for it; the first fit after that waits several seconds while ROOT
+loads. Containers need the **Workers Paid** plan ($5/month; the `standard-1`
+instance used here includes about 6 awake hours per month, then costs a few
+cents per awake hour — see Cloudflare's Containers pricing).
+
+Workers Builds deploys on every push to `main`. Its settings (Worker →
+Settings → Builds) must be:
+
+| | |
+|---|---|
+| Root directory | *(empty — the repository root, where `wrangler.jsonc` is)* |
+| Build command | `npm ci` |
+| Deploy command | `npx wrangler deploy` |
+
+The Worker name in the dashboard must stay `root-plotting-tool` (the `name` in
+`wrangler.jsonc`). The first deploy builds and uploads the ROOT image and then
+provisions the container, so allow several minutes before fits work; after
+that, `https://root-plotting-tool.tranxuongminh.workers.dev/health` shows the
+backend version and its `features`. To deploy from your own computer instead:
+`npm ci && npx wrangler login && npx wrangler deploy`, with Docker running
+(Wrangler builds the image for `linux/amd64`).
+
+`node tests/cloudflare_worker_test.cjs` checks the Worker's routing and error
+messages, and that the Worker, `wrangler.jsonc` and Flask list the same API
+routes.
 
 ## Talk to the backend directly
 

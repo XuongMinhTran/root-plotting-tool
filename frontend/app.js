@@ -26,8 +26,9 @@
 
 const $ = (id) => document.getElementById(id);
 
-const DEFAULT_BACKEND = 'https://root-plotting-tool.onrender.com';
-const RENDER_BACKEND = 'https://root-plotting-tool.onrender.com';
+// The Cloudflare deployment serves the pages and the fitting API from one address
+// (see wrangler.jsonc). Pages opened from disk or another host use it as well.
+const DEFAULT_BACKEND = 'https://root-plotting-tool.tranxuongminh.workers.dev';
 const LOCAL_BACKEND = 'http://localhost:8000';
 const BACKEND_KEY = 'rootfit.backendUrl';
 
@@ -1570,6 +1571,9 @@ async function callBackend(path, options = {}, timeoutMs = 60000) {
     if (body && body.error) throw new Error(body.error);
     // 404/405 without a JSON error: the server does not have this endpoint at all. Usually the
     // backend is an older deployment, or the backend URL points at a site that only hosts the pages.
+    if ([502, 503, 504].includes(response.status)) {
+      throw new Error(`The fitting service is starting or temporarily unavailable (HTTP ${response.status}). If it was asleep, the first request can take up to a minute; please try again. Your inputs are still here.`);
+    }
     if (response.status === 404 || response.status === 405) {
       let host = url;
       try { host = new URL(url).host; } catch (_) { /* keep the full URL */ }
@@ -1584,12 +1588,16 @@ async function callBackend(path, options = {}, timeoutMs = 60000) {
 async function checkHealth() {
   const el = $('health-status');
   setStatus(el, 'Backend: checking', 'busy');
+  // A fitting server that was asleep (Cloudflare Containers, Render) takes a while to answer.
+  const slow = setTimeout(() => setStatus(el, 'Backend: starting', 'busy'), 4000);
   try {
     await resolveBackend();
-    await callBackend('/health', {}, 8000);
+    await callBackend('/health', {}, 90000);
     setStatus(el, 'Backend: connected', 'ok');
   } catch (e) {
     setStatus(el, 'Backend: disconnected', 'err');
+  } finally {
+    clearTimeout(slow);
   }
 }
 

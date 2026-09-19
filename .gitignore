@@ -34,3 +34,6 @@ coverage/
 *.tmp
 *.swp
 *~
+
+# Cloudflare wrangler local state
+.wrangler/
