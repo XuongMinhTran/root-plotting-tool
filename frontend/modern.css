@@ -2,12 +2,12 @@
  *
  * The visual language follows the official ROOT website (root.cern): a flat
  * ROOT-blue masthead (#346295), warm sand hairlines (#e9dcbe) instead of
- * shadows, a pale blue-grey footer (#e5ebf2), dark Material-Ocean code
+ * shadows, a pale blue-gray footer (#e5ebf2), dark Material-Ocean code
  * surfaces (#263238), a uniform 4px radius, no gradients, and the system
  * font stack. The sizing is looser than root.cern's because this is a form a
  * student works in, not a page they read.
  *
- * Layout: one worksheet column of numbered steps on the left, and a results
+ * Layout: three pages for measurements, fit settings, and results. Previously a results
  * rail on the right that stays in view while you scroll, so changing a
  * setting and re-fitting never hides the plot.
  *
@@ -81,10 +81,9 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 .brand-name, .masthead nav a { white-space: nowrap; }
 .masthead .brand { display: flex; align-items: center; gap: 12px; color: #fff; text-decoration: none; overflow: hidden; }
 .masthead .brand:hover { text-decoration: none; }
-.brand-mark { width: 30px; height: 30px; flex: none; display: block; }
 .brand-text { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; overflow: hidden; }
 .brand-name { font-size: 15px; font-weight: 700; letter-spacing: .04em; overflow: hidden; text-overflow: ellipsis; }
-.brand-sub { font-size: 11.5px; color: #cfe0f1; letter-spacing: .02em; }
+
 
 .masthead nav { margin-left: auto; display: flex; gap: 4px; height: 100%; align-items: stretch; }
 .masthead nav a {
@@ -92,7 +91,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
   color: #e6eef7; font-size: 14px; text-decoration: none;
 }
 .masthead nav a:hover { color: #fff; text-decoration: none; }
-/* ROOT's nav motif: a 4px bar that wipes in from the left, not a colour change */
+/* ROOT's nav motif: a 4px bar that wipes in from the left, not a color change */
 .masthead nav a::after {
   content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 4px; background: #fff;
   transform: scaleX(0); transform-origin: left; transition: transform .18s ease-in-out;
@@ -103,22 +102,20 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 /* ============================================================ worksheet bar */
 
 .worksheet-bar {
-  border-bottom: 1px solid var(--sand); background: var(--paper);
-  padding: 14px clamp(16px, 3vw, 40px);
-  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  display: flex; align-items: end; gap: 24px; flex-wrap: wrap;
+  margin-bottom: 24px; padding: 0 0 24px; border-bottom: 1px solid var(--line);
 }
-.worksheet-bar .title-field { flex: 1 1 320px; min-width: 0; display: flex; align-items: center; gap: 10px; }
-.title-icon { color: var(--muted); flex: none; }
-#doc-title {
-  flex: 1; min-width: 0; font-size: 19px; font-weight: 600; color: var(--ink);
-  border: 1px solid transparent; background: transparent; padding: 7px 10px;
-  border-radius: var(--radius); min-height: 0; box-shadow: none;
+.worksheet-bar .title-field { flex: 1 1 280px; min-width: 0; max-width: 580px; }
+.worksheet-bar label { display: block; margin-bottom: 6px; font-weight: 600; font-size: 14px; }
+body.modern #doc-title {
+  width: 100%; min-height: 42px; padding: 9px 12px;
+  border: 1px solid #9dabb9; border-radius: var(--radius); background: #fff; color: var(--ink);
+  font-size: 16px; font-weight: 400;
 }
-#doc-title:hover { border-color: var(--line); }
-#doc-title:focus { border-color: var(--blue); background: #fff; outline: none; box-shadow: 0 0 0 3px #d7e4f2; }
-#doc-title::placeholder { color: #a9b3bd; font-weight: 400; }
-
+body.modern #doc-title::placeholder { color: #647382; opacity: 1; }
 .doc-actions { display: flex; align-items: center; gap: 8px; }
+.example-actions { max-width: 440px; margin-bottom: 24px; }
+.example-actions > span { font-size: 14px; font-weight: 600; margin-right: 4px; }
 
 /* ============================================================ buttons */
 
@@ -150,39 +147,19 @@ body.modern .help-btn {
 }
 body.modern .help-btn:hover:not(:disabled) { background: var(--blue); color: #fff; border-color: var(--blue); }
 
-/* the "More" menu in the worksheet bar */
-.utilities { position: relative; }
-.utilities > summary {
-  list-style: none; cursor: pointer; font-size: 14px; padding: 9px 16px; min-height: 40px;
-  border: 1px solid var(--line); border-radius: var(--radius); display: flex; align-items: center; gap: 8px;
-}
-.utilities > summary::-webkit-details-marker { display: none; }
-.utilities > summary::after { content: "▾"; font-size: 11px; color: var(--muted); }
-.utilities > summary:hover { background: var(--blue-soft); border-color: #b9cde2; }
-.utility-menu {
-  position: absolute; right: 0; top: calc(100% + 6px); z-index: 50; width: 268px;
-  background: #fff; border: 1px solid var(--sand); border-radius: var(--radius);
-  box-shadow: 0 2px 4px rgba(0,0,0,.16), 0 2px 10px rgba(0,0,0,.12); padding: 6px;
-}
-.utility-menu button {
-  display: block; width: 100%; text-align: left; border: 0; border-radius: 3px;
-  padding: 10px 12px; min-height: 0; font-size: 14px;
-}
-.utility-menu hr { border: 0; border-top: 1px solid var(--line); margin: 6px 4px; }
-
 /* ============================================================ workspace grid */
 
 .workspace {
   flex: 1; width: min(var(--page), calc(100% - 48px)); margin: 0 auto;
   padding: 28px 0 40px;
-  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 32px;
-  align-items: start;
+  display: block;
+  max-width: 1060px;
 }
-@media (min-width: 1500px) { .workspace { grid-template-columns: minmax(0, 560px) minmax(0, 1fr); } }
-@media (max-width: 1099px) { .workspace { grid-template-columns: minmax(0, 1fr); gap: 28px; width: min(760px, calc(100% - 40px)); } }
+.worksheet { width: 100%; }
+[hidden] { display: none !important; }
 
 /* ---- step navigation ---- */
-.steps { display: flex; gap: 8px; margin-bottom: 22px; flex-wrap: wrap; }
+.steps { scroll-margin-top: calc(var(--masthead-h) + 18px); display: flex; gap: 8px; margin-bottom: 22px; flex-wrap: wrap; }
 .step-chip {
   flex: 1 1 0; min-width: 150px; display: flex; align-items: flex-start; gap: 10px;
   text-align: left; padding: 10px 12px; background: #fff; border: 1px solid var(--line);
@@ -194,10 +171,7 @@ body.modern .help-btn:hover:not(:disabled) { background: var(--blue); color: #ff
 }
 .step-chip[aria-current="step"]::after { transform: scaleX(1); }
 .step-chip[aria-current="step"] { border-color: #b9cde2; background: var(--blue-soft); }
-.step-chip .n {
-  flex: none; width: 22px; height: 22px; border-radius: 50%; background: var(--blue); color: #fff;
-  font-size: 12px; font-weight: 700; display: grid; place-items: center; margin-top: 1px;
-}
+
 .step-chip .label { display: flex; flex-direction: column; line-height: 1.3; min-width: 0; }
 .step-chip .label b { font-size: 13.5px; font-weight: 600; }
 .step-chip .label span { font-size: 12px; color: var(--muted); line-height: 1.35; overflow-wrap: anywhere; }
@@ -209,10 +183,7 @@ body.modern .help-btn:hover:not(:disabled) { background: var(--blue); color: #ff
 }
 .card:last-of-type { margin-bottom: 0; }
 .card > header { display: flex; align-items: center; gap: 12px; margin-bottom: 4px; }
-.card > header .n {
-  width: 26px; height: 26px; border-radius: 50%; background: var(--blue-soft); color: var(--blue);
-  border: 1px solid #c3d5e8; font-size: 13px; font-weight: 700; display: grid; place-items: center; flex: none;
-}
+
 .card > header h2 { font-size: 19px; flex: 1; }
 .card .lede { color: var(--ink-soft); font-size: 14px; margin: 0 0 20px; max-width: 62ch; }
 
@@ -251,7 +222,7 @@ body.modern details.fold > summary {
 body.modern details.fold > summary::-webkit-details-marker { display: none; }
 body.modern details.fold > summary::before { content: "▸"; font-size: 11px; transition: transform .15s; }
 body.modern details.fold[open] > summary::before { transform: rotate(90deg); }
-body.modern details.fold > summary .tag { margin-left: auto; font-weight: 400; font-size: 12px; color: var(--muted); }
+
 body.modern details.fold > .fold-body { padding: 4px 0 18px; }
 
 /* ============================================================ step 1: data */
@@ -282,12 +253,8 @@ body.modern details.fold > .fold-body { padding: 4px 0 18px; }
 .formula-field { position: relative; }
 .formula-field label { display: block; font-size: 14px; font-weight: 600; margin-bottom: 6px; }
 body.modern #formula {
-  background: var(--code-bg); color: var(--code-ink); border-color: #1c262b;
-  font-family: var(--mono); font-size: 17px; letter-spacing: .01em;
-  padding: 14px 16px; min-height: 54px; caret-color: var(--code-accent);
+  font-family: var(--mono);
 }
-body.modern #formula::placeholder { color: #7f9aa8; }
-body.modern #formula:focus { border-color: var(--code-accent); box-shadow: 0 0 0 3px rgba(130,170,255,.3); }
 
 .preset-label { font-size: 13px; color: var(--muted); margin: 18px 0 8px; }
 .presets { display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: 8px; }
@@ -367,11 +334,6 @@ body.modern #formula:focus { border-color: var(--code-accent); box-shadow: 0 0 0
 /* ============================================================ results rail */
 
 .rail { min-width: 0; }
-@media (min-width: 1100px) {
-  .rail { position: sticky; top: calc(var(--masthead-h) + 18px); max-height: calc(100svh - var(--masthead-h) - 36px); overflow: auto; padding-right: 4px; }
-  .rail::-webkit-scrollbar { width: 10px; }
-  .rail::-webkit-scrollbar-thumb { background: #ccd6e0; border-radius: 10px; border: 3px solid #fff; }
-}
 .rail-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
 .rail-head h2 { font-size: 17px; }
 .rail-head .export-actions { margin-left: auto; display: flex; gap: 6px; }
@@ -384,9 +346,9 @@ body.modern .message {
 }
 body.modern .message::before { font-weight: 700; display: block; margin-bottom: 2px; }
 body.modern .message.error { background: #fdefef; border-color: #f4cfce; border-left-color: var(--danger); color: #8f2320; }
-body.modern .message.error::before { content: "Let’s take a look"; }
+body.modern .message.error::before { content: "Error"; }
 body.modern .message.warn { background: #fbf2e6; border-color: #eedcc0; border-left-color: var(--warn); color: #7a4a05; }
-body.modern .message.warn::before { content: "Fit note"; }
+body.modern .message.warn::before { content: "Warning"; }
 body.modern .message.info { background: #ebf5f8; border-color: #cfe4ec; border-left-color: #3b9cba; color: #1f5062; }
 body.modern .message.info::before { content: ""; display: none; }
 
@@ -471,7 +433,7 @@ body.modern .help-body code { font-size: 12.5px; }
 
 body.modern .drop-overlay { background: rgba(234, 240, 247, .9); border: 3px dashed var(--blue); color: var(--blue); font-size: 19px; }
 
-/* spreadsheet-style table editor keeps its dense grid, in ROOT colours */
+/* spreadsheet-style table editor keeps its dense grid, in ROOT colors */
 body.modern .tabs { border-bottom: 1px solid var(--line); gap: 4px; }
 body.modern .tab { border: 1px solid var(--line); border-bottom-color: var(--line); border-radius: var(--radius) var(--radius) 0 0; background: #f7f9fb; min-height: 34px; font-size: 13.5px; }
 body.modern .tab.active { background: #fff; border-bottom-color: #fff; color: var(--blue); }
@@ -491,15 +453,14 @@ body.modern .import-panel { background: #f7f9fb; border: 1px solid var(--line); 
 @media (max-width: 760px) {
   :root { --masthead-h: 52px; }
   .masthead { gap: 10px; }
-  .brand-sub { display: none; }
+
   .brand-name { font-size: 13px; letter-spacing: .02em; }
-  .brand-mark { width: 26px; height: 26px; }
   .masthead nav { gap: 0; }
   .masthead nav a { padding: 0 8px; font-size: 13px; }
   /* you are already on this page, so the link only costs space */
   .masthead nav a[aria-current] { display: none; }
   .step-chip .label b { font-size: 12.5px; line-height: 1.25; }
-  .step-chip .n { width: 19px; height: 19px; font-size: 11px; }
+
   .workspace { width: calc(100% - 32px); padding: 20px 0 32px; }
   .card { padding: 18px 16px 20px; }
   .card > header h2 { font-size: 17px; }
@@ -528,7 +489,7 @@ body.modern .import-panel { background: #f7f9fb; border: 1px solid var(--line); 
 
 /* ============================================================ shared workspace chrome
  * cli.html (the console) loads this file for its page frame. These are the
- * generic pieces it uses — a header bar, a centred column, section headings
+ * generic pieces it uses — a header bar, a centered column, section headings
  * and a footer — in the same ROOT palette as the worksheet above.
  */
 
@@ -598,3 +559,59 @@ body.modern .import-panel { background: #f7f9fb; border: 1px solid var(--line); 
 
 #dataset-type-dialog { width: min(440px, 92vw); }
 #dataset-type-dialog .row { gap: 10px; margin-top: 16px; }
+
+/* Keep the table usable when fit settings exceed the available dialog height. */
+body.modern #table-dialog {
+  width: min(1000px, 94vw);
+  min-width: min(520px, 94vw);
+  max-width: 96vw;
+  max-height: 94dvh;
+}
+body.modern #table-dialog .table-body {
+  display: block;
+  overflow: auto;
+  min-height: 0;
+  padding-bottom: 0;
+}
+body.modern #table-dialog .grid-wrap {
+  height: clamp(200px, 32vh, 360px);
+  min-height: 200px;
+  overflow: auto;
+}
+body.modern #table-dialog .table-body > .actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  background: #fff;
+  border-top: 1px solid var(--line);
+  padding: 12px 0;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
+/* Equation input shares the worksheet's typography, borders and blue controls. */
+.equation-editor { margin: 18px 0 24px; }
+body.modern .equation-mode-field { border: 0; padding: 0; margin: 0 0 20px; min-width: 0; }
+body.modern .equation-mode-field legend { padding: 0; margin-bottom: 8px; font-size: 14px; font-weight: 600; }
+.equation-mode-options { position: relative; display: inline-flex; flex-wrap: wrap; gap: 8px; }
+.equation-mode-options input { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+body.modern .equation-mode-options label { display: flex; align-items: center; justify-content: center; min-height: 44px; padding: 10px 18px; border: 1px solid #8ca5be; border-radius: 4px; background: #fff; color: #27496f; cursor: pointer; font-size: 14px; font-weight: 400; }
+body.modern .equation-mode-options label:hover { background: #eaf0f7; }
+body.modern .equation-mode-options input:checked + label { background: #346295; border-color: #346295; color: #fff; font-weight: 600; }
+body.modern .equation-mode-options input:focus-visible + label { outline: 3px solid #205f96; outline-offset: 3px; }
+@media (forced-colors: active) { .equation-mode-options input:checked + label { outline: 2px solid Highlight; } }
+#equation-label { display: block; font-size: 14px; font-weight: 600; margin-bottom: 8px; }
+#fit-equation { display: block; width: 100%; min-height: 82px; padding: 14px; font-size: 26px; background: #fff; color: #24384a; border: 1px solid #bacbdc; border-radius: 4px; --caret-color: #346295; --selection-background-color: #dbe8f5; --contains-highlight-background-color: #edf3f9; }
+#fit-equation:focus-within { outline: 2px solid #346295; outline-offset: 2px; }
+#fit-equation::part(virtual-keyboard-toggle), #fit-equation::part(menu-toggle) { display: none; }
+.equation-help, #equation-translation { margin-top: 14px; font-size: 14px; line-height: 1.65; }
+.equation-help summary, #equation-translation summary { cursor: pointer; color: #346295; }
+#equation-root-preview { display: block; margin-top: 8px; padding: 12px; overflow-wrap: anywhere; white-space: pre-wrap; }
+.equation-error { border-left: 3px solid #a12e26; padding: 8px 12px; color: #92251e; background: #fff5f3; line-height: 1.5; }
+body.modern .param-table td.idx { width: auto; min-width: 100px; overflow-wrap: anywhere; }
+
+body.modern .analyze-results-button{background:var(--blue);border:1px solid var(--blue);border-radius:4px;color:white;padding:8px 16px;font-size:14px;min-height:38px}
+body.modern .analyze-results-button:hover{background:var(--blue-dark);border-color:var(--blue-dark)}
+.rail-head .export-actions{flex-wrap:wrap;align-items:center}
+
+.parameter-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}.parameter-heading .preset-label{margin:0}.parameter-guide-button{display:inline-block;padding:8px 14px;border:1px solid var(--line);border-radius:4px;background:white;color:var(--blue);font-size:14px;text-decoration:none;min-height:38px}.parameter-guide-button:hover{background:var(--blue-soft);border-color:#b9cde2}

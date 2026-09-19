@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Analyze Data · ROOT-A-TRON 3000</title>
+<link rel="stylesheet" href="analysis.css?v=20260919-action-groups">
+<script defer src="vendor/mathlive/mathlive.min.js"></script>
+<script defer src="equation-parser.js?v=20260919-units"></script>
+<script defer src="units.js?v=1"></script><script defer src="analysis-core.js?v=20260919-units"></script><script defer src="workspace-store.js?v=1"></script><script defer src="analysis.js?v=20260919-action-groups"></script>
+<link rel="stylesheet" href="site-brand.css?v=1">
+<link rel="stylesheet" href="analysis-features.css?v=20260919-export">
+<script defer src="analysis-export.js?v=20260919-pdf"></script>
+<script defer src="analysis-features.js?v=20260919-export"></script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to analysis</a>
+<header class="masthead"><a class="brand" href="index.html">ROOT-A-TRON 3000</a><nav aria-label="Main"><a href="modern.html">Make a Plot</a><a href="index.html">Home</a></nav></header>
+<main id="main">
+<div class="page-heading"><label class="title-label">Analysis title<input id="analysis-title" placeholder="Untitled analysis"></label></div>
+<div class="toolbar" aria-label="Analysis document"><button id="open">Open…</button><button id="save">Save</button><button id="export-analysis">Export</button><button id="undo" disabled>Undo</button><button id="reload-session">Reload session</button><span id="save-state">Not saved to a file</span><button id="clear" class="danger">Clear all</button></div>
+<p id="notice" role="status" hidden></p>
+<div class="analysis-workspace">
+<aside class="sources" aria-labelledby="sources-title"><h2 id="sources-title">Datasets</h2><div class="source-actions"><button id="add-source">Paste data…</button></div><div id="object-list"></div><button id="example" class="text-button">Load example analysis</button></aside>
+<section class="viewer" aria-labelledby="object-title">
+<div id="empty"><h2>No datasets in this session</h2><p>Open a saved session, paste measurements, or enter data in Make a Plot. Datasets and their fit results appear here automatically.</p><p>Compact, Standard, and Analyze Data use the same session. Save from any workspace to keep the complete analysis in one JSON file.</p></div>
+<div id="object-content" hidden><div class="object-heading"><div><p id="object-kind" class="eyebrow"></p><h2 id="object-title"></h2></div><div class="dataset-heading-actions"><button id="plot-selected" disabled>Open in plotting</button><button id="rename">Rename</button></div></div>
+<nav id="dataset-views" aria-label="Dataset content" hidden></nav>
+<div class="calculation-navigation"><nav id="dataset-calculations" aria-label="Dataset calculations" hidden></nav><button id="edit-calculation" hidden>Edit calculation</button></div>
+<nav id="views" aria-label="Data representation"></nav><div id="representation"></div></div>
+</section>
+<aside class="inspector" aria-labelledby="operation-title"><h2 id="operation-title">Analysis tools</h2><button id="calculate" class="primary" disabled>Calculate quantity or column</button><h2 id="edit-data-heading" class="data-actions-title">Edit data</h2><button id="edit-source" hidden>Edit source data</button><button id="edit-exclusions" hidden>Point exclusions…</button><h2 class="data-actions-title">Manage data</h2><button id="export" disabled>Export table</button><button id="delete" class="danger" disabled>Delete</button><section id="relationships"></section></aside>
+</div>
+<section id="calculation-page" class="calculation-page" aria-labelledby="calculation-heading" hidden tabindex="-1"><form id="calculation-form"><h2 id="calculation-heading">Calculate quantity or column</h2><p>Calculate from measurement columns or fitted parameters. Source uncertainties and fit covariance are propagated to the result.</p><h3>Source quantities</h3><p class="note">Select a column or fitted parameter to insert it into the expression. Columns contain one value per row; fitted parameters are single values with uncertainties. Parameter [0], [1], etc. refer to the indices in the fit function.</p><div id="calculation-sources" class="calculation-sources"></div><h3>Calculation</h3><label>Result type<select id="calculation-kind"><option value="quantity">Quantity (single value)</option><option value="column">Calculated column (one value per row)</option></select></label>
+<div class="two-fields"><label>Name<input id="calculation-name" required maxlength="120"></label><label>Result unit<input id="calculation-unit" placeholder="e.g. s" maxlength="40"></label></div>
+<label for="calculation-expression">Expression</label><math-field id="calculation-expression" math-virtual-keyboard-policy="manual" aria-label="Calculation expression"></math-field>
+<p class="note">Type an expression, then assign its symbols to source values or columns. For example, <code>t ln(2)</code> or <code>V/I</code>. Type <code>\tau</code> for τ and <code>\sqrt</code> for a square root.</p>
+<details class="equation-help"><summary>Typing reference</summary><p>Type <code>\alpha</code>, <code>\lambda</code>, <code>\sigma</code>, <code>\tau</code>, or <code>\pi</code> followed by Space for Greek symbols. Use <code>^</code> for powers, <code>_</code> for subscripts, <code>/</code> for fractions, and <code>\sqrt</code> for a square root. Use arrow keys to leave an exponent or fraction.</p><p>Functions require parentheses: <code>exp(x)</code>, <code>ln(x)</code>, <code>sin(x)</code>. Adjacent symbols multiply. Assign each variable to a source quantity below; inserted quantities are assigned automatically. Example: <code>t ln(2)</code>. Assign units to each input and select a result unit. Compatible units are converted automatically; enter 1 for dimensionless quantities.</p></details><details><summary>Unit reference</summary><p>Units are case-sensitive. Examples: <code>mm</code>, <code>cm</code>, <code>nm</code>, <code>mm^-1</code>, <code>m/s^2</code>, <code>J/(mol*K)</code>, <code>V/A</code>, <code>eV</code>. Use <code>*</code>, <code>/</code>, parentheses, and numerical powers. Enter <code>1</code> for dimensionless quantities. Angles accept <code>rad</code> or <code>deg</code>. Celsius, Fahrenheit, and decibels are unsupported.</p><p>For a wavelength calculated as πd/(kD), assign d in mm, D in cm, k in mm^-1 if the fitted position was in mm, and the result in nm. Source unit assignments describe the existing numbers; they do not change the fitted data.</p></details><h3>Symbol assignments</h3><p id="binding-help" class="note">Inserted quantities are assigned automatically. For symbols you type, choose the corresponding source below.</p><div id="bindings"></div><h3>Result preview</h3><div id="calculation-preview" aria-live="polite"></div>
+<details><summary>Uncertainty method</summary><p>First-order propagation using numerical partial derivatives. Imported fit covariance and shared inputs are retained through subsequent calculations. Separate sources are assumed independent. Rows are paired by position; a scalar applies to every row. If an input uncertainty is unspecified, the result uncertainty is left unspecified.</p><p>Units and uncertainties are converted together, with dimensional consistency checked. Linear propagation may be inadequate near singularities or for large uncertainties and strongly nonlinear expressions.</p></details>
+<p id="calculation-error" class="form-error" role="alert"></p><div class="dialog-actions"><button type="button" id="cancel-calculation">Cancel</button><button type="submit" class="primary">Save calculation</button></div></form></section>
+
+</main>
+<footer><span>ROOT-A-TRON 3000</span><span>Powered by CERN ROOT</span></footer>
+<input id="file" type="file" accept=".json,application/json" hidden>
+<dialog id="source-dialog" aria-labelledby="source-heading"><form id="source-form"><h2 id="source-heading">Add data</h2>
+<label>Name<input id="source-name" required maxlength="120"></label>
+<label>Data type<select id="source-type"><option value="measurements">Measurement columns</option><option value="values">Quantities with uncertainties</option></select></label>
+<p id="paste-help"></p><label>Data<textarea id="source-text" rows="8" spellcheck="false" required></textarea></label>
+<p class="note">Paste tab-separated columns from a spreadsheet. Uncertainties are standard uncertainties. Source values are treated as independent unless imported with fit covariance. Include units in column headers to use automatic conversion in calculations.</p>
+<p class="form-error" id="source-error" role="alert"></p><div class="dialog-actions"><button type="button" data-close="source-dialog">Cancel</button><button class="primary" type="submit">Add data</button></div></form></dialog>
+<dialog id="prompt-dialog" aria-labelledby="prompt-title"><form id="prompt-form"><h2 id="prompt-title"></h2><p id="prompt-message"></p><label id="prompt-label">Name<input id="prompt-input" maxlength="150"></label><div class="dialog-actions"><button type="button" id="prompt-cancel">Cancel</button><button type="submit" id="prompt-accept" class="primary">Continue</button></div></form></dialog>
+</body></html>

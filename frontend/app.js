@@ -1,5 +1,5 @@
 /*
- * app.js — shared behaviour for classic.html and modern.html.
+ * app.js — shared behavior for classic.html and modern.html.
  *
  * Sections:
  *   1. helpers            element lookup, number formatting, downloads
@@ -27,7 +27,29 @@
 const $ = (id) => document.getElementById(id);
 
 const DEFAULT_BACKEND = 'http://localhost:8000';
+const RENDER_BACKEND = 'https://root-plotting-tool.onrender.com';
+const LOCAL_BACKEND = 'http://localhost:8000';
 const BACKEND_KEY = 'rootfit.backendUrl';
+
+// When the backend serves these pages itself (the one-port setup started by
+// ./start), the API lives on this same origin. When the page comes from
+// file:// or a separate static server, fall back to the standalone backend.
+// resolveBackend() decides once at start-up; an explicit setting always wins.
+let resolvedBackend = null;
+
+async function resolveBackend() {
+  const saved = (storageGet(BACKEND_KEY) || '').trim();
+  if (saved) { resolvedBackend = saved.replace(/\/+$/, ''); return resolvedBackend; }
+  const origin = window.location?.origin || '';
+  if (/^https?:$/.test(window.location?.protocol || '') && origin && origin !== 'null') {
+    try {
+      const probe = await fetch(origin + '/health', { signal: AbortSignal.timeout(4000) });
+      if (probe.ok) { resolvedBackend = origin.replace(/\/+$/, ''); return resolvedBackend; }
+    } catch (e) { /* not served by the backend; use the default below */ }
+  }
+  resolvedBackend = DEFAULT_BACKEND;
+  return resolvedBackend;
+}
 const LAYOUT_KEY = 'rootfit.layout' + (window.location?.pathname.endsWith('/modern.html') ? '.modern' : '');
 
 /** Round `value` so that its uncertainty shows two significant figures,
@@ -82,6 +104,89 @@ function downloadText(text, filename, mime = 'text/plain') {
   setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
 
+/** Modal prompts use the active interface's dialog styles and native focus handling. */
+let dialogSequence = 0;
+function askDialog({title, message = '', label, value = '', accept = 'OK', cancel = 'Cancel', destructive = false, emphasizeMessage = false, primaryCancel = false, validate}) {
+  return new Promise(resolve => {
+    const id = `app-dialog-${++dialogSequence}`;
+    const dialog = document.createElement('dialog');
+    dialog.className = 'tframe app-dialog' + (emphasizeMessage ? ' save-notice' : '');
+    dialog.setAttribute('aria-labelledby', id + '-title');
+    dialog.setAttribute('aria-describedby', id + '-message');
+    dialog.innerHTML = `<form novalidate>
+      <div class="titlebar" id="${id}-title"></div>
+      <div class="dialog-body">
+        <p id="${id}-message" class="dialog-message"></p>
+        <div class="field" ${label ? '' : 'hidden'}>
+          <label for="${id}-input"></label>
+          <input id="${id}-input" type="text" autocomplete="off" spellcheck="false" aria-describedby="${id}-error">
+        </div>
+        <p id="${id}-error" class="dialog-error" role="alert" hidden></p>
+        <div class="row actions">
+          <button type="submit" class="${destructive ? 'danger' : 'primary'}"></button>
+          <button type="button" class="dialog-cancel">Cancel</button>
+        </div>
+      </div>
+    </form>`;
+    const input = dialog.querySelector('input');
+    const error = dialog.querySelector('.dialog-error');
+    dialog.querySelector('.titlebar').textContent = title;
+    dialog.querySelector('.dialog-message').textContent = message;
+    dialog.querySelector('.dialog-message').hidden = !message;
+    dialog.querySelector('label').textContent = label || '';
+    dialog.querySelector('[type="submit"]').textContent = accept;
+    if (primaryCancel) {
+      dialog.querySelector('[type="submit"]').classList.remove('primary');
+      dialog.querySelector('.dialog-cancel').classList.add('primary');
+    }
+    input.value = value;
+    dialog.querySelector('.dialog-cancel').textContent = cancel || '';
+    dialog.querySelector('.dialog-cancel').hidden = !cancel;
+    let answer = null;
+    dialog.querySelector('form').addEventListener('submit', event => {
+      event.preventDefault();
+      try {
+        answer = label ? (validate ? validate(input.value) : input.value.trim()) : true;
+        dialog.close();
+      } catch (e) {
+        error.textContent = e.message;
+        error.hidden = false;
+        input.setAttribute('aria-invalid', 'true');
+        input.focus();
+      }
+    });
+    input.addEventListener('input', () => { error.hidden = true; input.removeAttribute('aria-invalid'); });
+    dialog.querySelector('.dialog-cancel').addEventListener('click', () => dialog.close());
+    dialog.addEventListener('close', () => { dialog.remove(); resolve(answer); }, {once:true});
+    document.body.appendChild(dialog);
+    dialog.showModal();
+    if (label) { input.focus(); input.select(); }
+    else dialog.querySelector(destructive || primaryCancel ? '.dialog-cancel' : '[type="submit"]').focus();
+  });
+}
+
+// Remember acknowledgement across interfaces, but repeat the reminder after a reload.
+const SAVE_NOTICE_KEY = 'rootfit.saveNoticeSeen.v1';
+async function showFirstVisitSaveNotice() {
+  const navigation = window.performance?.getEntriesByType?.('navigation')?.[0];
+  const reloaded = navigation ? navigation.type === 'reload' : window.performance?.navigation?.type === 1;
+  if (!reloaded && storageGet(SAVE_NOTICE_KEY) === '1') return;
+  await askDialog({
+    title: 'Save your analysis',
+    message: 'Your data is not saved to a file automatically. Use Save to keep your data, fit settings, and results. Browser autosave is not a permanent backup.',
+    accept: 'Understood', cancel: null, emphasizeMessage: true,
+  });
+  storageSet(SAVE_NOTICE_KEY, '1');
+}
+
+function requestDatasetName(value) {
+  return askDialog({title:'Rename dataset', label:'Dataset name', value, accept:'Rename',
+    validate: name => { if (!name.trim()) throw new Error('Enter a dataset name.'); return name.trim(); }});
+}
+function confirmDatasetDeletion(name, n, unit = 'points') {
+  return askDialog({title:'Delete dataset', message:`Delete “${name}” (${n} ${unit}) and its fit settings, results, and dependent calculations from the shared session?`, accept:'Delete', destructive:true});
+}
+
 /** A safe file name from the document title (or graph title), e.g. "pendulum-lab-3". */
 function fileBaseName() {
   const raw = ($('doc-title').value || $('graph-title').value || 'rootfit').trim();
@@ -96,6 +201,20 @@ function storageRemove(key) { try { localStorage.removeItem(key); } catch (_) { 
 // ================================================================ 2. help pop-overs
 
 const HELP = {
+  histogram_data: {
+    title: 'Entering histogram data',
+    html: `<p>Choose individual measurements to create bins, or pre-binned counts when the binning is already known. Separate values with spaces, commas, tabs or new lines.</p>
+      <p>Pre-binned counts require one more edge than counts: edges 0, 1, 3 describe two bins, [0, 1) and [1, 3]. The last right edge is included. Counts must be nonnegative whole numbers, before weighting or background subtraction.</p>
+      <p>For measurements, leave the bin count blank to use the range width, rounded up to a whole number (at least one bin). The range comes from the measurements unless you enter limits. You can also enter a bin count or custom edges. Measurements outside the edges are counted separately. The plot shows counts divided by bin width, so unequal-width bins remain comparable.</p>
+      <p>Use Plot histogram to inspect the distribution without a fit. To fit it, choose a function and a histogram fitting method in Fit settings.</p>`,
+  },
+  histogram_report: {
+    title: 'Histogram fit results',
+    html: `<p>The fitted function is a count density. ROOT integrates it over each selected bin to predict that bin’s count. A fit range selects bins by their centers and includes the full selected bins.</p>
+      <p>Poisson likelihood includes empty bins. Its report shows Poisson deviance, not a least-squares χ²; no χ² p-value is reported because that approximation may be unreliable for sparse counts.</p>
+      <p>χ² uses √count uncertainties and excludes empty bins. Its p-value relies on the usual χ² approximation. Prefer Poisson likelihood when counts are small.</p>
+      <p>Optional diagnostics compare counts with integrated predictions, even though the main plot displays counts per unit X. Convergence alone does not establish that the model describes the data.</p>`,
+  },
   data: {
     title: 'Entering data',
     html: `
@@ -131,17 +250,12 @@ const HELP = {
       <p>For safety the server only accepts this vocabulary; anything else is rejected with a message.</p>`,
   },
   guesses: {
-    title: 'Why initial guesses matter',
+    title: 'Initial guesses',
     html: `
-      <p>Minuit finds the χ² minimum by walking downhill from the starting point. For a straight line or a polynomial
-      the χ² surface is a simple bowl, so any start works. For most other functions there are flat regions and
-      local minima, so the fitter sometimes needs a different starting point to find a stable result.</p>
-      <p>Without guesses every parameter starts at <b>0</b>. ROOT computes its own starting values only for a lone
-      <code>gaus</code>, <code>expo</code>, <code>landau</code> or <code>polN</code> — not for sums like
-      <code>gaus(0)+pol0(3)</code>.</p>
-      <p>Read rough values off your data: a peak's height, position and width; a decay's starting value and the time
-      it takes to drop by ⅔; an oscillation's amplitude and period (ω = 2π/T). Being within a factor of 2–3 is usually enough.</p>
-      <p>Leave a slot empty (<code>1,,3</code>) to keep ROOT's default for that parameter.</p>`,
+      <p>Initial guesses specify the parameter values used to initialize minimization. Enter values in parameter-index order: <code>[0]</code>, <code>[1]</code>, …, using the units defined by the model.</p>
+      <p>For <code>[0]*exp(-x/[1])</code>, [0] is the amplitude at x = 0 and [1] is the decay time constant. For <code>gaus</code>, the parameters are peak height, mean, and standard deviation.</p>
+      <p>Blank entries retain the model’s default or automatic estimate. Automatic initialization depends on the function and analysis type; custom functions may require explicit guesses. In a comma-separated list, <code>1,,3</code> specifies [0] and [2] while leaving [1] unspecified.</p>
+      <p>For nonlinear models, different initial guesses may converge to different local minima. Check the fit status, parameter uncertainties, and residuals.</p><p><a href="documentation.html#initial-parameters" target="_blank" rel="noopener">Guide to choosing initial values</a></p>`,
   },
   range: {
     title: 'Fit range',
@@ -163,29 +277,23 @@ const HELP = {
       <p><b>Advanced optional plot settings</b> lets you rename each panel, set axis labels and Y limits, choose its height and point range, and adjust the grid, uncertainty bars, reference line, or histogram bins. Settings are saved with the document. Fit again to apply changes.</p>`,
   },
   report: {
-    title: 'Reading the fit report',
+    title: 'Fit statistics',
     html: `
-      <p><b>Value ± uncertainty</b>: the best-fit parameter and its 1σ (68 %) uncertainty from the covariance matrix
-      that Minuit builds at the minimum. Quoted to two significant figures on the uncertainty; the full-precision
-      numbers are in the next columns.</p>
-      <p><b>χ²</b> = Σ ((y<sub>i</sub> − f(x<sub>i</sub>)) / σ<sub>i</sub>)² — the sum of squared distances between data and
-      curve, each measured in units of that point's error.</p>
-      <p><b>NDF</b> (degrees of freedom) = number of fitted points − number of free parameters.</p>
-      <p><b>χ²/NDF</b> is the headline number. Roughly 1 means the curve passes within the error bars as often as it
-      should. Much larger than 1: either the model is wrong or the errors are underestimated. Much smaller than 1:
-      the errors are probably overestimated (or the data were smoothed). Meaningless without Y errors.</p>
-      <p><b>p-value</b> (ROOT's "Prob"): the probability of getting a χ² at least this large by chance if the model
-      and the errors were right. Below ~0.05 is suspicious; astronomically small (1e-30) means "not this model".</p>
-      <p><b>Status</b>: "converged" means Minuit reached a proper minimum and the uncertainties can be trusted.
-      Other messages mean try better starting values, or that the model has parameters the data cannot pin down.</p>
-      <p><b>Residual panel</b>: the lower plot shows data − fit (or pulls). Random scatter around the dashed zero line
-      is what a correct model looks like; any shape (a bow, a wave, a trend) means the function is wrong or incomplete.</p>`,
+      <p><b>Value ± uncertainty</b>: fitted parameter and its standard uncertainty from the parameter covariance matrix. Displayed uncertainties have two significant figures; the adjacent columns retain additional precision.</p>
+      <p><b>χ²</b>: the sum of squared residuals divided by their variances. When X uncertainties are supplied, ROOT includes their contribution through the model derivative.</p>
+      <p><b>NDF</b>: number of fitted points minus the number of free parameters.</p>
+      <p><b>χ²/NDF</b>: reduced chi-square. Interpretation requires an appropriate model and uncertainty estimates; a value near one does not by itself establish model validity.</p>
+      <p><b>p-value</b>: the upper-tail probability of the observed χ² under the assumed model and error distribution.</p>
+      <p><b>Status</b>: minimizer convergence status. Convergence alone does not establish model validity or reliable parameter uncertainties; inspect the covariance and diagnostics.</p>
+      <p><b>Residuals</b>: measured Y minus the model prediction. Pulls divide this difference by the effective measurement uncertainty.</p>`,
   },
 };
 
 let helpOpen = null;
 
 function showHelp(key, anchor) {
+  if (key === 'data' && $('analysis-type').value === 'histogram') key = 'histogram_data';
+  if (key === 'report' && lastResult?.analysis_type === 'histogram') key = 'histogram_report';
   const pop = $('help-pop');
   const h = HELP[key];
   if (!h) return;
@@ -194,7 +302,7 @@ function showHelp(key, anchor) {
   pop.hidden = false;
   helpOpen = key;
   pop.querySelector('.help-close').addEventListener('click', hideHelp);
-  // position: under the anchor if there is one, else centred
+  // position: under the anchor if there is one, else centered
   const w = Math.min(420, window.innerWidth - 24);
   pop.style.width = w + 'px';
   if (anchor && anchor.getBoundingClientRect) {
@@ -216,15 +324,58 @@ function hideHelp() { $('help-pop').hidden = true; helpOpen = null; }
 
 // ================================================================ 3. datasets
 
-// ROOT's classic colours: kBlack, kRed, kBlue, kGreen+2, kMagenta+1, kOrange+7, kCyan+2, kBrown
+// ROOT's classic colors: kBlack, kRed, kBlue, kGreen+2, kMagenta+1, kOrange+7, kCyan+2, kBrown
 const DATASET_COLORS = ['#000000', '#d62728', '#1f5fbf', '#2a8f3c', '#8e44ad', '#e08a00', '#17a2b8', '#7f4f24'];
 const COLUMNS = ['x', 'y', 'ex', 'ey'];
 const COLUMN_LABEL = { x: 'X', y: 'Y', ex: 'X errors', ey: 'Y errors' };
 
-let datasets = [newDataset('Dataset 1')];
+let datasets = [newDataset('Dataset 1', '')];
 let activeIdx = 0;
 
-function newDataset(name) { return { name, x: '', y: '', ex: '', ey: '' }; }
+function defaultFitSettings() { return {formula:'[0]*x+[1]', param_names:'', initial_guesses:'', x_min:'', x_max:''}; }
+function normalizeFitSettings(settings = {}) {
+  const defaults = defaultFitSettings();
+  const fit = Object.fromEntries(Object.keys(defaults).map(key => [key, String(settings[key] ?? defaults[key])]));
+  if (settings.equation && typeof settings.equation === 'object' && settings.equation.formula === fit.formula) {
+    fit.equation = JSON.parse(JSON.stringify(settings.equation));
+  }
+  return fit;
+}
+function newDataset(name, type = 'xy') {
+  const fit = defaultFitSettings();
+  if (type === 'histogram') Object.assign(fit, {formula:'gausn', param_names:'norm, mean, sigma'});
+  return {id:window.WorkspaceStore?.id(), name, analysis_type:type, x:'', y:'', ex:'', ey:'', fit};
+}
+function readDatasetFit() {
+  const fit = {formula:$('formula').value, param_names:$('param-names').value,
+    initial_guesses:$('initial-guesses').value, x_min:$('fit-xmin').value, x_max:$('fit-xmax').value};
+  const equation = window.RootEquationEditor?.snapshot() || datasets[activeIdx]?.fit?.equation;
+  if (equation && equation.formula === fit.formula) fit.equation = JSON.parse(JSON.stringify(equation));
+  return fit;
+}
+function syncDatasetFit() {
+  datasets[activeIdx].fit = readDatasetFit();
+}
+function writeDatasetFit(settings) {
+  const fit = normalizeFitSettings(settings);
+  for (const [key,id] of Object.entries({formula:'formula',param_names:'param-names',initial_guesses:'initial-guesses',x_min:'fit-xmin',x_max:'fit-xmax'})) $(id).value = fit[key];
+  window.RootEquationEditor?.load(fit);
+  renderParamTable();
+}
+function readTableFit() {
+  if (!tableDatasets) return;
+  const previous = tableDatasets[tableActive].fit;
+  const fit = Object.fromEntries(Object.keys(defaultFitSettings()).map(key => [key,$('table-fit-' + key).value]));
+  if (previous?.equation && previous.equation.formula === fit.formula) fit.equation = JSON.parse(JSON.stringify(previous.equation));
+  tableDatasets[tableActive].fit = fit;
+}
+function writeTableFit() {
+  const d = tableDatasets[tableActive];
+  const settings = normalizeFitSettings(d.fit);
+  $('table-fit-label').textContent = 'Fit settings for ' + d.name;
+  for (const key of Object.keys(defaultFitSettings())) $('table-fit-' + key).value = settings[key];
+}
+
 function datasetColor(i) { return DATASET_COLORS[i % DATASET_COLORS.length]; }
 
 /** Parse one column of text. Returns { values: [numbers], bad: [non-numeric tokens] }. */
@@ -244,17 +395,257 @@ function tokens(text) {
   return String(text || '').split(/[\s,;]+/).filter((t) => t !== '');
 }
 
+const HISTOGRAM_FIELDS = ['source', 'samples', 'counts', 'bins', 'min', 'max', 'edges', 'method'];
+function readHistogramControls() {
+  return Object.fromEntries(HISTOGRAM_FIELDS.map(key => [key, $('hist-' + key).value]));
+}
+// Presets are shared by both interfaces; changing analysis type only changes the menu.
+const FUNCTION_EXAMPLES = {
+  "xy": [
+    [
+      "Straight line  [0]*x+[1]",
+      "[0]*x+[1]",
+      "slope, intercept",
+      "1, 0"
+    ],
+    [
+      "Quadratic  pol2",
+      "pol2",
+      "a, b, c",
+      ""
+    ],
+    [
+      "Exponential decay  [0]*exp(-x/[1])",
+      "[0]*exp(-x/[1])",
+      "amplitude, tau",
+      "1, 1"
+    ],
+    [
+      "Saturating rise  [0]*(1-TMath::Exp(-x/[1]))",
+      "[0]*(1-TMath::Exp(-x/[1]))",
+      "A, tau",
+      "1, 1"
+    ],
+    [
+      "Gaussian  gaus",
+      "gaus",
+      "constant, mean, sigma",
+      ""
+    ],
+    [
+      "Normalized Gaussian (area)  gausn",
+      "gausn",
+      "norm, mean, sigma",
+      ""
+    ],
+    [
+      "Gaussian + flat background  gaus(0)+pol0(3)",
+      "gaus(0)+pol0(3)",
+      "constant, mean, sigma, background",
+      ""
+    ],
+    [
+      "Exponential  expo",
+      "expo",
+      "constant, slope",
+      ""
+    ],
+    [
+      "Landau  landau",
+      "landau",
+      "constant, mpv, sigma",
+      ""
+    ],
+    [
+      "Sine  [0]*sin([1]*x+[2])+[3]",
+      "[0]*sin([1]*x+[2])+[3]",
+      "amplitude, omega, phase, offset",
+      "1, 1, 0, 0"
+    ],
+    [
+      "Power law  [0]*pow(x,[1])",
+      "[0]*pow(x,[1])",
+      "A, n",
+      "1, 1"
+    ]
+  ],
+  "histogram": [
+    [
+      "Gaussian (area)  gausn",
+      "gausn",
+      "norm, mean, sigma",
+      ""
+    ],
+    [
+      "Gaussian (peak height)  gaus",
+      "gaus",
+      "height, mean, sigma",
+      ""
+    ],
+    [
+      "Gaussian + flat background",
+      "gaus(0)+pol0(3)",
+      "height, mean, sigma, background",
+      ""
+    ],
+    [
+      "Landau  landau",
+      "landau",
+      "amplitude, location, width",
+      ""
+    ],
+    [
+      "Exponential  expo",
+      "expo",
+      "log amplitude, slope",
+      ""
+    ],
+    [
+      "Constant background  pol0",
+      "pol0",
+      "background",
+      ""
+    ]
+  ]
+};
+let functionExamplesMode = null;
+function syncFunctionExamples(histogram) {
+  const mode = histogram ? 'histogram' : 'xy';
+  if (functionExamplesMode === mode) return;
+  const select = $('quick-pick');
+  select.innerHTML = '';
+  const placeholder = document.createElement('option');
+  placeholder.value = '';
+  placeholder.textContent = histogram ? 'Histogram functions…' : 'Examples…';
+  select.appendChild(placeholder);
+  for (const [label, formula, names, guesses] of FUNCTION_EXAMPLES[mode]) {
+    const option = document.createElement('option');
+    option.value = [formula, names, guesses].join('|');
+    option.textContent = label;
+    select.appendChild(option);
+  }
+  select.value = '';
+  functionExamplesMode = mode;
+}
+function applyFunctionExample(value) {
+  if (!value) return;
+  const [formula, names, guesses] = value.split('|');
+  $('formula').value = formula;
+  $('param-names').value = names || '';
+  $('initial-guesses').value = $('analysis-type').value !== 'histogram' && formula === '[0]*exp(-x/[1])'
+    ? decayStartingGuesses(readForm()) || guesses || '' : guesses || '';
+  $('quick-pick').value = '';
+  syncDatasetFit();
+  window.RootEquationEditor?.fromRoot();
+  renderParamTable();
+  autosave();
+}
+
+function syncAnalysisControls() {
+  const type = $('analysis-type').value;
+  const histogram = type === 'histogram';
+  $('btn-histogram').disabled = !histogram || fitBusy;
+  for (const id of ['dataset-select', 'fit-dataset-select', 'btn-fit', 'modern-next']) {
+    const el = $(id); if (el) el.disabled = !type || (id === 'btn-fit' && fitBusy);
+  }
+  for (const el of document.querySelectorAll('[data-action="dataset-duplicate"], [data-action="dataset-rename"]')) el.disabled = !type;
+  syncFunctionExamples(histogram);
+  const samples = $('hist-source').value === 'samples';
+  $('xy-data').hidden = type !== 'xy';
+  $('histogram-data').hidden = !histogram;
+  $('hist-fit-options').hidden = !histogram;
+  $('hist-samples-group').hidden = !samples;
+  $('hist-counts-group').hidden = samples;
+  $('hist-binning').hidden = !samples;
+  $('hist-bins-help').hidden = !samples;
+  if (!samples) $('hist-edges-details').open = true;
+  const custom = !!$('hist-edges').value.trim();
+  for (const id of ['hist-bins', 'hist-min', 'hist-max']) $(id).disabled = custom;
+  for (const button of document.querySelectorAll('[data-action="table"], #btn-table')) button.disabled = type !== 'xy';
+  const values = parseColumn($(samples ? 'hist-samples' : 'hist-counts').value);
+  $('hist-summary').textContent = values.bad.length ? `${values.bad.length} entries need a number.` : samples ? `${values.values.length} measurements entered.` : `${values.values.length} bin counts entered.`;
+  // Keep the XY-specific introduction out of histogram mode.
+  const intro = document.querySelector('#panel-data .section-description');
+  if (intro) intro.textContent = !type ? 'Select an analysis type to get started.' : histogram ? 'Enter individual measurements to group into bins, or provide existing bin edges and counts.' : 'Paste columns from a spreadsheet, or use the table editor to enter several columns at once. Each point needs an X and a Y value.';
+}
+function buildHistogramPayload(inputs, fitModel = true) {
+  const h = inputs.histogram || {}, options = inputs.options || {};
+  const histogram = {source:h.source || 'samples', method:h.method || 'poisson'};
+  for (const key of ['samples', 'counts', 'edges']) {
+    // Preserve inactive input in documents, but do not send it for analysis.
+    if ((key === 'samples' && histogram.source !== 'samples') || (key === 'counts' && histogram.source !== 'counts')) continue;
+    const parsed = parseColumn(h[key] || '');
+    if (parsed.bad.length) throw new Error(`Histogram ${key}: "${parsed.bad[0]}" needs a finite number.`);
+    histogram[key] = parsed.values;
+  }
+  if (histogram.source === 'samples') {
+    if (!histogram.samples.length) throw new Error('Enter measurements before plotting the histogram.');
+    if (!histogram.edges.length) {
+      if (String(h.bins ?? '').trim()) {
+        histogram.bins = Number(h.bins);
+        if (!Number.isInteger(histogram.bins) || histogram.bins < 1 || histogram.bins > 2000) throw new Error('Enter a whole number of bins from 1 to 2000, or leave it blank to use the range width.');
+      }
+      const lo = numberOrNull(h.min), hi = numberOrNull(h.max);
+      if (lo !== null || hi !== null) {
+        if (!Number.isFinite(lo) || !Number.isFinite(hi) || lo >= hi) throw new Error('Histogram range: enter both limits, with the lower one first, or leave both blank.');
+        histogram.range = [lo,hi];
+      }
+    }
+  } else {
+    if (!histogram.counts.length) throw new Error('Enter bin counts before plotting the histogram.');
+    if (histogram.counts.some(v => v < 0 || !Number.isInteger(v))) throw new Error('Use nonnegative whole counts, before normalization or background subtraction.');
+    if (histogram.edges.length !== histogram.counts.length + 1) throw new Error(`${histogram.counts.length} bin counts need ${histogram.counts.length + 1} edges.`);
+  }
+  if (histogram.edges.length && (histogram.edges.length < 2 || histogram.edges.some((v,i,a) => i && v <= a[i-1]))) throw new Error('Enter at least two bin edges in strictly increasing order.');
+  if (fitModel && !inputs.formula.trim()) throw new Error('Choose a histogram fit function, such as gaus, or use Plot histogram without a fit.');
+  const lo = fitModel ? numberOrNull(options.x_min) : null, hi = fitModel ? numberOrNull(options.x_max) : null;
+  if (Number.isNaN(lo) || Number.isNaN(hi) || (lo !== null && hi !== null && lo >= hi)) throw new Error('The fit range needs increasing numeric limits, or can be left blank.');
+  return {
+    analysis_type:'histogram', histogram, fit_model:fitModel,
+    formula:inputs.formula.trim(), param_names:fitModel ? splitList(inputs.param_names) : [],
+    initial_guesses:fitModel ? splitList(inputs.initial_guesses).map(g => g === '' ? null : g) : [],
+    title:inputs.graph_title, x_title:inputs.x_title, y_title:inputs.y_title,
+    x_range:lo === null && hi === null ? null : [lo,hi],
+    plot:{logx:!!options.logx, logy:!!options.logy, grid:options.grid !== false, diagnostics:fitModel ? diagnosticPayload(options) : []},
+    dataset_name:datasets[activeIdx].name,
+  };
+}
+
 /** The four text boxes -> the active dataset object. */
 function syncActiveFromColumns() {
   const d = datasets[activeIdx];
   for (const c of COLUMNS) d[c] = $('col-' + c).value;
+  // Analysis type filters datasets; it does not convert an existing dataset.
+  d.histogram = readHistogramControls();
+  d.fit = readDatasetFit();
 }
 
 /** The active dataset object -> the four text boxes. */
 function showActiveInColumns() {
+  setTimeout(() => window.AnalysisFeatures?.refresh(), 0);
+  if (window.WorkspaceStore && workspaceDocument) {
+    if (window.WorkspaceStore.reconcileDatasets) {
+      workspaceDocument = window.WorkspaceStore.reconcileDatasets(workspaceDocument, datasets);
+      datasets = workspaceDocument.inputs.datasets;
+      if (!datasets.length) datasets = [newDataset('Dataset 1', '')];
+      activeIdx = Math.min(activeIdx, datasets.length - 1);
+    }
+    window.WorkspaceStore.materialize({...workspaceDocument, inputs:{datasets}});
+  }
   const d = datasets[activeIdx];
-  for (const c of COLUMNS) $('col-' + c).value = d[c] || '';
+  for (const c of COLUMNS) {
+    $('col-' + c).value = d[c] || '';
+    $('col-' + c).readOnly = !!d.derivedFrom && (c === 'y' || c === 'ey');
+    $('col-' + c).title = d.derivedFrom ? 'Calculated data. Edit its expression or sources in Analyze Data.' : '';
+  }
+  d.analysis_type = d.analysis_type ?? 'xy';
+  $('analysis-type').value = d.analysis_type;
+  const defaults = {source:'samples', bins:'', method:'poisson'};
+  for (const key of HISTOGRAM_FIELDS) $('hist-' + key).value = d.histogram?.[key] ?? defaults[key] ?? '';
+  writeDatasetFit(d.fit);
+  syncAnalysisControls();
   updateCounts();
+  showDatasetResult();
 }
 
 /** Update the "n=8" badges and flag columns that do not match X. */
@@ -275,17 +666,63 @@ function renderDatasetSelector() {
   const current = sel.value;
   sel.innerHTML = '';
   datasets.forEach((d, i) => {
-    const n = (i === activeIdx) ? parseColumn($('col-x').value).values.length : parseColumn(d.x).values.length;
+    if (!d.analysis_type || d.analysis_type !== $('analysis-type').value) return;
+    const histogram = (i === activeIdx ? $('analysis-type').value : d.analysis_type) === 'histogram';
+    const h = i === activeIdx ? readHistogramControls() : d.histogram || {};
+    const source = h.source || 'samples';
+    const n = histogram ? parseColumn(h[source === 'counts' ? 'counts' : 'samples'] || '').values.length : (i === activeIdx) ? parseColumn($('col-x').value).values.length : parseColumn(d.x).values.length;
+    const unit = histogram ? (source === 'counts' ? 'bins' : 'measurements') : 'points';
     const opt = document.createElement('option');
     opt.value = String(i);
-    opt.textContent = `${d.name}  (${n} point${n === 1 ? '' : 's'})`;
+    opt.textContent = `${d.name} — ${histogram ? 'Histogram' : 'XY'} (${n} ${unit})`;
     sel.appendChild(opt);
   });
   sel.value = String(activeIdx);
-  $('dataset-swatch').style.background = datasetColor(activeIdx);
+  const fitSelect = $('fit-dataset-select');
+  if (fitSelect) {
+  fitSelect.innerHTML = '';
+  datasets.forEach((d, i) => {
+    if (!d.analysis_type || d.analysis_type !== $('analysis-type').value) return;
+    const option = document.createElement('option');
+    option.value = String(i);
+    option.textContent = d.name + ' — ' + (d.analysis_type === 'histogram' ? 'Histogram' : 'XY');
+    fitSelect.appendChild(option);
+  });
+  fitSelect.value = String(activeIdx);
+  }
+  const summary = $('modern-data-summary');
+  if (summary) {
+    const d = datasets[activeIdx];
+    summary.textContent = d.analysis_type ? d.name + ' — ' + (d.analysis_type === 'histogram' ? 'Histogram' : 'XY') : 'Select an analysis type to get started.';
+  }
+  if ($('fit-dataset-label')) $('fit-dataset-label').textContent = 'These settings belong to ' + datasets[activeIdx].name + '. The expanded data table edits the same settings; choose Done there to apply changes.';
   const removeBtns = document.querySelectorAll('[data-action="dataset-remove"]');
-  for (const b of removeBtns) b.disabled = datasets.length <= 1;
+  for (const b of removeBtns) b.disabled = !datasets[activeIdx].analysis_type;
   if (current !== sel.value) { /* nothing else to do */ }
+}
+
+// Each dataset retains its latest result; selection never reruns a fit.
+function showDatasetResult() {
+  const saved = datasets[activeIdx]?.result;
+  if (!saved && !lastResult && !fitBusy) return;
+  fitRequestVersion++;
+  fitBusy = false;
+  lastResult = saved?.response || null;
+  lastPayload = saved ? {...saved.payload, dataset_name:datasets[activeIdx].name} : null;
+  showMessage('');
+  if (lastResult) {
+    renderReport(lastResult);
+    drawPlot(lastResult, true);
+    setStatus($('fit-status'), 'Stored result — ' + datasets[activeIdx].name);
+  } else {
+    plotDrawVersion++;
+    clearReport();
+    $('plot').innerHTML = '<p class="placeholder">No result for this dataset. Run a fit to display its plot.</p>';
+    lastDrawn = null;
+    lastPainter = null;
+    setPngEnabled(false);
+    setStatus($('fit-status'), 'Ready');
+  }
 }
 
 function setActiveDataset(i) {
@@ -296,32 +733,108 @@ function setActiveDataset(i) {
   autosave();
 }
 
-function addDataset() {
+let addingInTable = false;
+function addDataset() { openDatasetTypeChooser(false); }
+function openDatasetTypeChooser(inTable) {
+  addingInTable = inTable;
+  $('dataset-type-dialog').showModal();
+}
+async function requestNewDataset(type, inTable = addingInTable) {
+  if (!['xy', 'histogram'].includes(type)) return;
+  const name = await askDialog({title:'New dataset', label:'Dataset name', value:'', accept:'Create',
+    validate: value => { if (!value.trim()) throw new Error('Enter a dataset name.'); return value.trim(); }});
+  if (name === null) {
+    if (!inTable) { $('analysis-type').value = datasets[activeIdx].analysis_type || ''; syncAnalysisControls(); }
+    return;
+  }
+  addingInTable = inTable;
+  createTypedDataset(type, name);
+}
+function createTypedDataset(type, name) {
+  if (!['xy', 'histogram'].includes(type)) return;
+  if (addingInTable) {
+    if (readGridToDataset() === false) return;
+    if (!tableDatasets[tableActive].analysis_type) tableDatasets.splice(tableActive, 1);
+    tableDatasets.push(newDataset(name || `Dataset ${tableDatasets.length + 1}`, type));
+    tableActive = tableDatasets.length - 1;
+    renderTabs(); renderGrid();
+  } else {
+    syncActiveFromColumns();
+    if (!datasets[activeIdx].analysis_type) datasets[activeIdx] = newDataset(name || datasets[activeIdx].name, type);
+    else {
+      datasets.push(newDataset(name || `Dataset ${datasets.length + 1}`, type));
+      activeIdx = datasets.length - 1;
+    }
+    showActiveInColumns();
+    autosave();
+  }
+  $('dataset-type-dialog').close();
+}
+function changeAnalysisType(type) {
+  if (!['xy', 'histogram'].includes(type)) return;
   syncActiveFromColumns();
-  datasets.push(newDataset(`Dataset ${datasets.length + 1}`));
-  activeIdx = datasets.length - 1;
+  let next = datasets.findIndex(d => d.analysis_type === type);
+  if (next < 0) {
+    if (!datasets[activeIdx].analysis_type) {
+      datasets[activeIdx] = newDataset(datasets[activeIdx].name, type);
+      next = activeIdx;
+    } else {
+      datasets.push(newDataset(`Dataset ${datasets.length + 1}`, type));
+      next = datasets.length - 1;
+    }
+  }
+  activeIdx = next;
   showActiveInColumns();
-  $('col-x').focus();
   autosave();
 }
 
-function renameDataset() {
+function duplicateDatasetInto(list, index) {
+  const original = list[index];
+  const base = original.name + ' (copy)';
+  let name = base, suffix = 2;
+  while (list.some(d => d.name === name)) name = original.name + ' (copy ' + suffix++ + ')';
+  const copy = JSON.parse(JSON.stringify(original));
+  if (window.WorkspaceStore) copy.id = window.WorkspaceStore.id();
+  delete copy.derivedFrom;
+  if (copy.result) delete copy.result.objectId;
+  copy.name = name;
+  list.splice(index + 1, 0, copy);
+  return index + 1;
+}
+function duplicateDataset() {
+  syncActiveFromColumns();
+  activeIdx = duplicateDatasetInto(datasets, activeIdx);
+  showActiveInColumns();
+  autosave();
+}
+function tableDuplicateDataset() {
+  if (readGridToDataset() === false) return;
+  tableActive = duplicateDatasetInto(tableDatasets, tableActive);
+  renderTabs();
+  renderGrid();
+}
+
+async function renameDataset() {
   const d = datasets[activeIdx];
-  const name = prompt('Name for this dataset:', d.name);
+  const name = await requestDatasetName(d.name);
   if (name === null) return;
   d.name = name.trim() || d.name;
   renderDatasetSelector();
   autosave();
 }
 
-function removeDataset() {
-  if (datasets.length <= 1) return;
+async function removeDataset() {
+  if (!datasets[activeIdx].analysis_type) return;
   syncActiveFromColumns();
   const d = datasets[activeIdx];
-  const n = parseColumn(d.x).values.length;
-  if (n > 0 && !confirm(`Remove "${d.name}" (${n} points)?`)) return;
+  const histogram = d.analysis_type === 'histogram';
+  const n = parseColumn(histogram ? (d.histogram?.[d.histogram.source === 'counts' ? 'counts' : 'samples'] || '') : d.x).values.length;
+  if (n > 0 && !await confirmDatasetDeletion(d.name, n, histogram ? 'histogram entries' : 'points')) return;
   datasets.splice(activeIdx, 1);
-  activeIdx = Math.min(activeIdx, datasets.length - 1);
+  if (!datasets.length) datasets = [newDataset('Dataset 1', '')];
+  const sameType = datasets.findIndex(item => item.analysis_type === d.analysis_type);
+  activeIdx = sameType >= 0 ? sameType : Math.min(activeIdx, datasets.length - 1);
+  resetResult();
   showActiveInColumns();
   autosave();
 }
@@ -331,14 +844,19 @@ function removeDataset() {
 // The dialog edits a *copy* of the datasets; "Done" commits, "Cancel" discards.
 let tableDatasets = null;
 let tableActive = 0;
+let tableDeleted = false;
+let renderedGridSnapshot = '[]';
 // Grid column order: Y errors before X errors, so a pasted "x y yerr" block lands right.
 const GRID_COLS = ['x', 'y', 'ey', 'ex'];
 const MIN_ROWS = 12;
 
 function openTable() {
+  if (datasets[activeIdx]?.derivedFrom) { showMessage('info', 'This dataset is calculated. Edit its expression or sources in Analyze Data.'); return; }
+  if ($('analysis-type').value !== 'xy') { showMessage('info', 'Enter histogram measurements or bin counts in the Data section. The table editor is for XY datasets.'); return; }
   syncActiveFromColumns();
-  tableDatasets = datasets.map((d) => ({ ...d }));
+  tableDatasets = datasets.map((d) => ({ ...d, fit:{...d.fit} }));
   tableActive = activeIdx;
+  tableDeleted = false;
   $('import-panel').hidden = true;
   renderTabs();
   renderGrid();
@@ -350,18 +868,17 @@ function renderTabs() {
   const box = $('dataset-tabs');
   box.innerHTML = '';
   tableDatasets.forEach((d, i) => {
+    if (!d.analysis_type || d.analysis_type !== tableDatasets[tableActive].analysis_type) return;
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'tab' + (i === tableActive ? ' active' : '');
-    b.innerHTML = `<span class="swatch" style="background:${datasetColor(i)}"></span><span class="tab-name">${escapeHtml(d.name)}</span>` +
-                  (tableDatasets.length > 1 ? `<span class="tab-x" title="Remove this dataset">×</span>` : '');
+    b.innerHTML = `<span class="swatch" style="background:${datasetColor(i)}"></span><span class="tab-name">${escapeHtml(d.name)}</span>`;
     b.title = 'Click to edit · double-click to rename';
     b.addEventListener('click', (ev) => {
-      if (ev.target.classList.contains('tab-x')) { tableRemoveDataset(i); return; }
       tableSwitch(i);
     });
-    b.addEventListener('dblclick', () => {
-      const name = prompt('Name for this dataset:', tableDatasets[i].name);
+    b.addEventListener('dblclick', async () => {
+      const name = await requestDatasetName(tableDatasets[i].name);
       if (name !== null) { tableDatasets[i].name = name.trim() || tableDatasets[i].name; renderTabs(); }
     });
     box.appendChild(b);
@@ -369,53 +886,78 @@ function renderTabs() {
   const add = document.createElement('button');
   add.type = 'button';
   add.className = 'tab add';
-  add.textContent = '+ dataset';
-  add.addEventListener('click', () => {
-    readGridToDataset();
-    tableDatasets.push(newDataset(`Dataset ${tableDatasets.length + 1}`));
-    tableActive = tableDatasets.length - 1;
-    renderTabs(); renderGrid();
-  });
+  add.textContent = 'New plot';
+  add.addEventListener('click', () => openDatasetTypeChooser(true));
   box.appendChild(add);
 }
 
 function tableSwitch(i) {
   if (i === tableActive) return;
-  readGridToDataset();
+  if (readGridToDataset() === false) return;
   tableActive = i;
   renderTabs(); renderGrid();
 }
 
-function tableRemoveDataset(i) {
-  if (tableDatasets.length <= 1) return;
-  const n = tokens(tableDatasets[i].x).length;
-  if (n > 0 && !confirm(`Remove "${tableDatasets[i].name}" (${n} points)?`)) return;
-  if (i !== tableActive) readGridToDataset();
+async function tableRemoveDataset(i) {
+  if (!tableDatasets[i].analysis_type) return;
+  const n = i === tableActive && tableDatasets[i].analysis_type === 'xy'
+    ? [...$('grid').querySelectorAll('tbody tr')].filter(tr => [...tr.querySelectorAll('input')].some(input => input.value.trim())).length
+    : tokens(tableDatasets[i].x).length;
+  if (n > 0 && !await confirmDatasetDeletion(tableDatasets[i].name, n)) return;
+  if (i !== tableActive && readGridToDataset() === false) return;
+  const type = tableDatasets[i].analysis_type;
+  tableDeleted = true;
   tableDatasets.splice(i, 1);
+  if (!tableDatasets.length) tableDatasets = [newDataset('Dataset 1', '')];
   tableActive = Math.min(tableActive > i ? tableActive - 1 : tableActive, tableDatasets.length - 1);
+  const sameType = tableDatasets.findIndex(d => d.analysis_type === type);
+  if (sameType >= 0) tableActive = sameType;
   renderTabs(); renderGrid();
 }
 
 /** Build the grid from the active table dataset. */
 function renderGrid(extraRows = 3) {
+  writeTableFit();
   const d = tableDatasets[tableActive];
-  const cols = GRID_COLS.map((c) => tokens(d[c]));
+  const histogram = d.analysis_type === 'histogram';
+  $('grid-wrap').hidden = d.analysis_type !== 'xy';
+  $('table-histogram-note').hidden = !histogram;
+  for (const button of document.querySelectorAll('[data-taction]')) {
+    if (['add-rows','delete-empty','import'].includes(button.dataset.taction)) button.disabled = d.analysis_type !== 'xy';
+    if (['duplicate','delete'].includes(button.dataset.taction)) button.disabled = !d.analysis_type;
+  }
+  for (const input of document.querySelectorAll('.table-fit-settings input')) input.disabled = !d.analysis_type;
+  if (d.analysis_type !== 'xy') { renderedGridSnapshot = '[]'; return; }
+  const cols = GRID_COLS.map(c => tableColumnCells(d[c]));
   const n = Math.max(MIN_ROWS, Math.max(...cols.map((c) => c.length)) + extraRows);
   const tbody = $('grid').querySelector('tbody');
   const frag = document.createDocumentFragment();
   for (let r = 0; r < n; r++) frag.appendChild(gridRow(r, cols.map((c) => c[r] ?? '')));
   tbody.innerHTML = '';
   tbody.appendChild(frag);
+  renderedGridSnapshot = gridSnapshot();
   updateTableCount();
+}
+
+function gridSnapshot() {
+  return JSON.stringify([...$('grid').querySelectorAll('tbody tr')]
+    .map(tr => [...tr.querySelectorAll('input')].map(input => input.value.trim()))
+    .filter(row => row.some(value => value !== '')));
+}
+
+function tableColumnCells(text) {
+  return String(text || '').trimEnd().split(/\r?\n/).flatMap(line => line.trim() ? tokens(line) : ['']);
 }
 
 function gridRow(r, values) {
   const tr = document.createElement('tr');
   tr.innerHTML = `<td class="rownum">${r + 1}</td>` +
-    values.map((v, c) => `<td><input type="text" inputmode="decimal" spellcheck="false" data-r="${r}" data-c="${c}" value="${escapeHtml(v)}"></td>`).join('') +
-    `<td class="rowdel"><button type="button" class="rowdel-btn" tabindex="-1" title="Delete this row">×</button></td>`;
+    values.map((v, c) => `<td><input type="text" inputmode="decimal" spellcheck="false" aria-label="Row ${r + 1}, ${['X','Y','Y uncertainty','X uncertainty'][c]}" data-r="${r}" data-c="${c}" value="${escapeHtml(v)}"></td>`).join('') +
+    `<td class="rowdel"><button type="button" class="rowdel-btn" aria-label="Delete row ${r + 1}" title="Delete this row">×</button></td>`;
   return tr;
 }
+
+
 
 function gridInput(r, c) { return $('grid').querySelector(`input[data-r="${r}"][data-c="${c}"]`); }
 function gridRowCount() { return $('grid').querySelectorAll('tbody tr').length; }
@@ -429,15 +971,34 @@ function appendGridRows(k) {
 function renumberGrid() {
   $('grid').querySelectorAll('tbody tr').forEach((tr, r) => {
     tr.querySelector('.rownum').textContent = r + 1;
-    tr.querySelectorAll('input').forEach((inp) => { inp.dataset.r = r; });
+    tr.querySelector('.rowdel-btn').setAttribute('aria-label', `Delete row ${r + 1}`);
+    tr.querySelectorAll('input').forEach((inp, c) => { inp.dataset.r = r; inp.setAttribute('aria-label', `Row ${r + 1}, ${['X','Y','Y uncertainty','X uncertainty'][c]}`); });
   });
 }
 
-/** The grid -> the active table dataset (as column text). Rows without both
- *  X and Y are skipped; one error value applies to every point; blanks among multiple errors count as 0. */
+/** The grid -> the active table dataset (as column text). Incomplete X/Y rows remain in the editor until corrected; one uncertainty value applies to every point; incomplete uncertainty columns remain editable. */
 function readGridToDataset() {
+  readTableFit();
+  if (tableDatasets[tableActive].derivedFrom) {
+    if (gridSnapshot() !== renderedGridSnapshot) { $('table-count').textContent = 'Calculated values are linked to Analyze Data. Edit their sources or expression there.'; return false; }
+    return true;
+  }
+  if (tableDatasets[tableActive].analysis_type !== 'xy') return;
   const rows = [...$('grid').querySelectorAll('tbody tr')].map((tr) => [...tr.querySelectorAll('input')].map((i) => i.value.trim()));
+  const incomplete = rows.findIndex(r => r.some(v => v !== '') && (r[0] === '' || r[1] === ''));
+  if (incomplete >= 0) {
+    $('table-count').textContent = `Row ${incomplete + 1}: enter both X and Y, or delete the row. No rows have been discarded.`;
+    gridInput(incomplete, rows[incomplete][0] === '' ? 0 : 1)?.focus();
+    return false;
+  }
   const kept = rows.filter((r) => r[0] !== '' && r[1] !== '');
+  for (const c of [2, 3]) {
+    const count = kept.filter(r => r[c] !== '').length;
+    if (count > 1 && count < kept.length) {
+      $('table-count').textContent = `${c === 2 ? 'Y' : 'X'} uncertainty: enter one value for the axis, one per point, or leave the column empty. Missing uncertainties have not been set to zero.`;
+      return false;
+    }
+  }
   const d = tableDatasets[tableActive];
   GRID_COLS.forEach((col, c) => {
     if (c < 2) { d[col] = kept.map((r) => r[c]).join('\n'); return; }
@@ -454,7 +1015,7 @@ function updateTableCount() {
   const kept = rows.filter((r) => r[0] !== '' && r[1] !== '').length;
   const bad = rows.flat().filter((v) => v !== '' && !Number.isFinite(Number(v))).length;
   let text = `${kept} point${kept === 1 ? '' : 's'}`;
-  if (filled > kept) text += ` · ${filled - kept} row${filled - kept === 1 ? '' : 's'} missing X or Y (skipped)`;
+  if (filled > kept) text += ` · ${filled - kept} row${filled - kept === 1 ? '' : 's'} missing X or Y`;
   if (bad) text += ` · ${bad} cell${bad === 1 ? '' : 's'} not a number`;
   $('table-count').textContent = text;
 }
@@ -467,7 +1028,7 @@ function gridPaste(ev) {
   const text = (ev.clipboardData || window.clipboardData).getData('text');
   const lines = text.split(/\r?\n/).filter((l) => l.trim() !== '');
   if (lines.length === 0) return;
-  const rows = lines.map((l) => l.trim().split(/\t|;|,\s*|\s+/).filter((c) => c !== ''));
+  const rows = lines.map(splitTableRow);
   if (rows.length === 1 && rows[0].length === 1) return;          // a single value: normal paste
   ev.preventDefault();
   const r0 = parseInt(target.dataset.r, 10);
@@ -520,9 +1081,13 @@ function tableDeleteEmpty() {
 // --- import from text with a column mapping ---
 const IMPORT_TARGETS = [['x', 'X'], ['y', 'Y'], ['ey', 'Y err'], ['ex', 'X err'], ['', 'ignore']];
 
+/** Explicit delimiters preserve empty cells so uncertainty columns cannot shift. */
+function splitTableRow(line) {
+  const separator = line.includes('\t') ? '\t' : line.includes(',') ? ',' : line.includes(';') ? ';' : null;
+  return separator ? line.split(separator).map(cell => cell.trim()) : line.trim().split(/\s+/);
+}
 function importRows() {
-  return $('import-text').value.split(/\r?\n/).map((l) => l.trim()).filter((l) => l !== '')
-    .map((l) => l.split(/\t|;|,\s*|\s+/).filter((c) => c !== ''));
+  return $('import-text').value.split(/\r?\n/).filter(line => line.trim() !== '').map(splitTableRow);
 }
 
 function renderImportMapping() {
@@ -553,13 +1118,14 @@ function renderImportMapping() {
 }
 
 function importApply() {
+  if (tableDatasets[tableActive]?.derivedFrom) { showMessage('info', 'Calculated data is linked to Analyze Data. Paste into a new dataset instead.'); return; }
   const rows = importRows();
   if (!rows.length) return;
   const mapping = [...$('import-mapping').querySelectorAll('select')].map((s) => s.value);
   const d = tableDatasets[tableActive];
   const out = { x: [], y: [], ex: [], ey: [] };
   rows.forEach((r, i) => {
-    mapping.forEach((target, c) => { if (target && r[c] !== undefined) out[target].push(r[c]); });
+    mapping.forEach((target, c) => { if (target) out[target].push(r[c] ?? ''); });
     if (!mapping.includes('x')) out.x.push(String(i + 1));
   });
   for (const c of GRID_COLS) d[c] = out[c].join('\n');
@@ -568,7 +1134,10 @@ function importApply() {
 }
 
 function tableDone() {
-  readGridToDataset();
+  readTableFit();
+  if (readGridToDataset() === false) return;
+  if (tableDeleted) resetResult();
+  tableDeleted = false;
   datasets = tableDatasets;
   activeIdx = Math.min(tableActive, datasets.length - 1);
   tableDatasets = null;
@@ -578,14 +1147,16 @@ function tableDone() {
 }
 
 function tableCancel() {
+  tableDeleted = false;
   tableDatasets = null;
   $('table-dialog').close();
 }
 
 const TABLE_ACTIONS = {
+  'duplicate': tableDuplicateDataset,
   'add-rows': () => { appendGridRows(10); updateTableCount(); },
   'delete-empty': tableDeleteEmpty,
-  'clear': () => { if (confirm('Clear every cell of this dataset?')) { const d = tableDatasets[tableActive]; for (const c of GRID_COLS) d[c] = ''; renderGrid(); } },
+  'delete': () => tableRemoveDataset(tableActive),
   'import': () => { $('import-panel').hidden = false; renderImportMapping(); $('import-text').focus(); },
   'import-apply': importApply,
   'import-cancel': () => { $('import-panel').hidden = true; },
@@ -674,6 +1245,8 @@ function readForm() {
   return {
     datasets: datasets.map((d) => ({ ...d })),
     active: activeIdx,
+    analysis_type: active.analysis_type ?? 'xy',
+    histogram: active.histogram,
     data: { x: active.x, y: active.y, ex: active.ex, ey: active.ey },   // the active dataset, for older readers
     formula: $('formula').value,
     param_names: $('param-names').value,
@@ -695,27 +1268,29 @@ function readForm() {
 
 function writeForm(inputs) {
   inputs = inputs || {};
+  const legacyFit = normalizeFitSettings({formula:inputs.formula ?? '', param_names:inputs.param_names ?? '', initial_guesses:inputs.initial_guesses ?? '', x_min:inputs.options?.x_min ?? '', x_max:inputs.options?.x_max ?? ''});
   if (Array.isArray(inputs.datasets) && inputs.datasets.length) {
     datasets = inputs.datasets.map((d, i) => ({
+      ...d,
+      id: d?.id || window.WorkspaceStore?.id(),
       name: String((d && d.name) || `Dataset ${i + 1}`),
+      analysis_type: d?.analysis_type === '' ? '' : d?.analysis_type === 'histogram' ? 'histogram' : 'xy',
+      result: d?.result?.response && Array.isArray(d.result.response.params) ? d.result : null,
+      histogram: d?.histogram && typeof d.histogram === 'object' ? {...d.histogram} : {},
+      fit: normalizeFitSettings(d?.fit && typeof d.fit === 'object' ? d.fit : legacyFit),
       x: String((d && d.x) || ''), y: String((d && d.y) || ''), ex: String((d && d.ex) || ''), ey: String((d && d.ey) || ''),
     }));
     activeIdx = Math.max(0, Math.min(datasets.length - 1, parseInt(inputs.active, 10) || 0));
   } else {
     const d = inputs.data || {};
-    datasets = [{ name: 'Dataset 1', x: String(d.x || ''), y: String(d.y || ''), ex: String(d.ex || ''), ey: String(d.ey || '') }];
+    datasets = [{ id:window.WorkspaceStore?.id(), name: 'Dataset 1', fit:{...legacyFit}, x: String(d.x || ''), y: String(d.y || ''), ex: String(d.ex || ''), ey: String(d.ey || '') }];
     activeIdx = 0;
   }
   showActiveInColumns();
-  $('formula').value = inputs.formula || '';
-  $('param-names').value = inputs.param_names || '';
-  $('initial-guesses').value = inputs.initial_guesses || '';
   $('graph-title').value = inputs.graph_title || '';
   $('x-title').value = inputs.x_title || '';
   $('y-title').value = inputs.y_title || '';
   const o = inputs.options || {};
-  $('fit-xmin').value = o.x_min ?? '';
-  $('fit-xmax').value = o.x_max ?? '';
   $('opt-logx').checked = !!o.logx;
   $('opt-logy').checked = !!o.logy;
   $('opt-grid').checked = o.grid === undefined ? true : !!o.grid;
@@ -723,10 +1298,31 @@ function writeForm(inputs) {
   renderParamTable();
 }
 
+async function clearAll() {
+  const confirmed = await askDialog({title:'Clear all',
+    message:'Clear all datasets, fit settings, plots, results, and analysis notes? Saved files will not be deleted.',
+    accept:'Clear all', destructive:true});
+  if (!confirmed) return;
+  clearTimeout(autosaveTimer);
+  autosaveTimer = null;
+  clearForm();
+  documentCreated = null;
+  clearAutosave();
+  markAnalysisSaved();
+}
+
 function clearForm() {
-  writeForm({ formula: '[0]*x+[1]' });
+  if (window.WorkspaceStore) workspaceDocument = {...window.WorkspaceStore.empty(), revision:workspaceDocument?.revision || null};
+  writeForm({ datasets: [newDataset('Dataset 1', '')], formula: '[0]*x+[1]' });
   $('doc-title').value = '';
   $('doc-notes').value = '';
+  resetResult();
+}
+
+function resetResult() {
+  fitRequestVersion++;
+  plotDrawVersion++;
+  fitBusy = false;
   clearReport();
   $('plot').innerHTML = '<p class="placeholder">The plot appears here after a fit.</p>';
   setPngEnabled(false);
@@ -746,11 +1342,25 @@ function setPngEnabled(on) {
 function setResultEnabled(on) {
   for (const el of document.querySelectorAll('[data-needs-result]')) el.disabled = !on;
   $('report-tools').hidden = !on;
+  window.AnalysisFeatures?.renderResult(on ? lastResult : null);
+  const d = datasets[activeIdx];
+  const hasData = d?.analysis_type === 'histogram'
+    ? parseColumn(d.histogram?.[d.histogram.source === 'counts' ? 'counts' : 'samples'] || '').values.length > 0
+    : !!(d && parseColumn(d.x || '').values.length && parseColumn(d.y || '').values.length);
+  for (const el of document.querySelectorAll('[data-classic-analysis]')) {
+    el.hidden = !(on && hasData && lastResult?.params?.length);
+  }
 }
 
 /** Turn the form into the JSON body the backend expects. Throws an Error with
  *  a human-readable message if the data cannot be used. */
-function buildPayload(inputs) {
+function buildPayload(inputs, fitModel = true) {
+  if (inputs.analysis_type === '') throw new Error('Select an analysis type in Data to get started.');
+  if (inputs.analysis_type === 'histogram') {
+    const payload = buildHistogramPayload(inputs, fitModel);
+    payload.plot.confidence_level = datasets[activeIdx].confidenceLevel || null;
+    return payload;
+  }
   const cols = {};
   for (const c of COLUMNS) {
     const { values, bad } = parseColumn(inputs.data[c]);
@@ -770,12 +1380,17 @@ function buildPayload(inputs) {
       throw new Error(`${COLUMN_LABEL[c]}: ${cols[c].length} values for ${cols.x.length} points. Enter one value for the whole axis, ${cols.x.length} values for individual points, or leave it blank.`);
     }
   }
+  const excluded = (datasets[activeIdx].exclusions || []).filter(p => cols.x[p.index] === p.x && cols.y[p.index] === p.y);
+  if (excluded.length !== (datasets[activeIdx].exclusions || []).length) throw new Error('Some excluded measurements have changed position or value. Review Point exclusions and apply them again before fitting.');
+  const omit = new Set(excluded.map(p => p.index));
+  for (const c of COLUMNS) cols[c] = cols[c].filter((_, i) => !omit.has(i));
+  if (cols.x.length < 2) throw new Error('Include at least two measurements before fitting. Review Point exclusions.');
   if (!inputs.formula.trim()) throw new Error('Type a fit function, e.g. [0]*x+[1].');
 
   const o = inputs.options || {};
   const xmin = numberOrNull(o.x_min);
   const xmax = numberOrNull(o.x_max);
-  if (Number.isNaN(xmin) || Number.isNaN(xmax)) throw new Error('The fit range must be two numbers (or both blank).');
+  if (Number.isNaN(xmin) || Number.isNaN(xmax)) throw new Error('Each fit-range limit must be a number or blank.');
   let x_range = null;
   if (xmin !== null || xmax !== null) {
     const lo = xmin === null ? Math.min(...cols.x) : xmin;
@@ -795,7 +1410,7 @@ function buildPayload(inputs) {
     x_title: inputs.x_title,
     y_title: inputs.y_title,
     x_range,
-    plot: { logx: !!o.logx, logy: !!o.logy, grid: o.grid !== false, diagnostics: diagnosticPayload(o), residuals: o.residuals || 'none' },
+    plot: { confidence_level:datasets[activeIdx].confidenceLevel || null, excluded_points:excluded, logx: !!o.logx, logy: !!o.logy, grid: o.grid !== false, diagnostics: diagnosticPayload(o), residuals: o.residuals || 'none' },
     dataset_name: name,
   };
 }
@@ -849,7 +1464,7 @@ let paramTableBusy = false;
 /** Rebuild the parameter table from the formula + the two comma lists. */
 function renderParamTable() {
   if (paramTableBusy) return;
-  const n = countParams($('formula').value);
+  const n = window.RootEquationEditor?.parameterCount?.() ?? countParams($('formula').value);
   const names = splitList($('param-names').value);
   const guesses = splitList($('initial-guesses').value);
   const tbody = $('param-table').querySelector('tbody');
@@ -857,8 +1472,8 @@ function renderParamTable() {
   for (let i = 0; i < n; i++) {
     const tr = document.createElement('tr');
     tr.innerHTML = `<td class="idx">[${i}]</td>` +
-      `<td><input type="text" data-pname="${i}" value="${escapeHtml(names[i] || '')}" placeholder="p${i}" spellcheck="false"></td>` +
-      `<td><input type="text" class="mono" inputmode="decimal" data-pguess="${i}" value="${escapeHtml(guesses[i] || '')}" placeholder="0"></td>`;
+      `<td><input type="text" aria-label="Parameter ${i} name" data-pname="${i}" value="${escapeHtml(names[i] || '')}" placeholder="p${i}" spellcheck="false"></td>` +
+      `<td><input type="text" class="mono" inputmode="decimal" aria-label="Parameter ${i} initial guess" data-pguess="${i}" value="${escapeHtml(guesses[i] || '')}" placeholder="Default"></td>`;
     tbody.appendChild(tr);
   }
   const note = $('param-table-note');
@@ -867,6 +1482,7 @@ function renderParamTable() {
     const extra = Math.max(names.length, guesses.length) - n;
     note.textContent = `${n} parameter${n === 1 ? '' : 's'} in the formula.` + (extra > 0 ? ` (${extra} extra value${extra === 1 ? '' : 's'} in the lists are ignored.)` : '');
   }
+  window.RootEquationEditor?.sync();
 }
 
 /** The table -> the comma lists (the lists remain the source of truth). */
@@ -878,13 +1494,16 @@ function paramTableToLists() {
   $('param-names').value = trimEnd(names).join(', ');
   $('initial-guesses').value = trimEnd(guesses).join(', ');
   paramTableBusy = false;
+  syncDatasetFit();
   autosave();
 }
 
 // ================================================================ 7. backend
 
 function backendUrl() {
-  return ($('backend-url').value || DEFAULT_BACKEND).trim().replace(/\/+$/, '');
+  const saved = (storageGet(BACKEND_KEY) || '').trim();
+  if (saved) return saved.replace(/\/+$/, '');
+  return (resolvedBackend || DEFAULT_BACKEND).replace(/\/+$/, '');
 }
 
 /** fetch() with a timeout and errors translated into plain-language messages. */
@@ -897,13 +1516,12 @@ async function callBackend(path, options = {}, timeoutMs = 60000) {
     response = await fetch(url, { ...options, signal: controller.signal });
   } catch (e) {
     clearTimeout(timer);
-    if (e.name === 'AbortError') throw new Error(`The backend at ${url} did not answer within ${timeoutMs / 1000} s.`);
-    throw new Error(
-      `Could not reach the backend at ${backendUrl()}.\n` +
-      'Is the Docker container running?  (docker run --rm -p 8000:8000 rootfit-backend)\n' +
-      'If it runs on another machine, change the Backend URL under Options.');
+    setStatus($('health-status'), 'Backend: disconnected', 'err');
+    if (e.name === 'AbortError') throw new Error('The backend did not respond in time. Your input is still here; please try again.');
+    throw new Error('The backend is unavailable. Your input is still here; please try again shortly.');
   }
   clearTimeout(timer);
+  setStatus($('health-status'), 'Backend: connected', 'ok');
 
   let body = null;
   const text = await response.text();
@@ -913,7 +1531,7 @@ async function callBackend(path, options = {}, timeoutMs = 60000) {
     const msg = body && body.error ? body.error : 'The fitting service could not finish this request. Your inputs are still here; please try Fit again.';
     throw new Error(msg);
   }
-  if (body === null) throw new Error('The fitting service sent a response the app could not read. Your inputs are still here. Please try Fit again; if this continues, restart the backend.');
+  if (body === null) throw new Error('The fitting service sent a response the app could not read. Your inputs are still here. Please try Fit again; if this continues, contact the site maintainer.');
   return body;
 }
 
@@ -921,66 +1539,97 @@ async function checkHealth() {
   const el = $('health-status');
   setStatus(el, 'Backend: checking', 'busy');
   try {
-    const h = await callBackend('/health', {}, 8000);
-    setStatus(el, `Backend: connected, ROOT ${h.root_version}`, 'ok');
+    await resolveBackend();
+    await callBackend('/health', {}, 8000);
+    setStatus(el, 'Backend: connected', 'ok');
   } catch (e) {
-    setStatus(el, 'Backend: ' + e.message.split('\n')[0], 'err');
+    setStatus(el, 'Backend: disconnected', 'err');
   }
 }
 
+let fitRequestVersion = 0;
+let fitBusy = false;
 let lastResult = null;    // the last successful /fit response (used by save & export)
 let lastPayload = null;   // what was sent for it
 
-async function runFit() {
-  if ($('btn-fit').disabled) return;
+async function runFit(fitModel = true) {
+  fitModel = fitModel !== false;
+  if ($('btn-fit').disabled || fitBusy) return;
   showMessage('');
   hideHelp();
   let payload;
   try {
-    payload = buildPayload(readForm());
+    if (fitModel) window.RootEquationEditor?.validate();
+    if (datasets[activeIdx]?.calculationError) throw new Error(datasets[activeIdx].calculationError);
+    payload = buildPayload(readForm(), fitModel);
+    payload.plot.confidence_level = datasets[activeIdx].confidenceLevel || null;
   } catch (e) {
     showMessage('error', e.message);
     return;
   }
 
+  const requestVersion = ++fitRequestVersion;
+  fitBusy = true;
   const btn = $('btn-fit');
   btn.disabled = true;
-  setStatus($('fit-status'), 'Fitting', 'busy');
+  $('btn-histogram').disabled = true;
+  setStatus($('fit-status'), fitModel ? 'Fitting' : 'Plotting histogram', 'busy');
   try {
-    const result = await callBackend('/fit', {
+    const result = await callBackend(payload.analysis_type === 'histogram' ? '/histogram' : '/fit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
+    if (requestVersion !== fitRequestVersion) return;
+    datasets[activeIdx].result = {response:result, payload, sourceSignature:window.WorkspaceStore?.signature(datasets[activeIdx])};
     lastResult = result;
     lastPayload = payload;
     renderReport(result);
     await drawPlot(result);
+    if (requestVersion !== fitRequestVersion) return;
     autosave();
-    const plotNote = result.plot_notes?.length ? result.plot_notes.join('\n') : (result.residuals?.note || '');
+    const plotNote = result.analysis_type === 'histogram'
+      ? ((result.histogram.underflow || result.histogram.overflow) ? result.plot_notes[0] : '')
+      : result.plot_notes?.length ? result.plot_notes.join('\n') : (result.residuals?.note || '');
     if (!result.converged) {
-      showMessage('warn', `The fitter has not found a stable result yet. ${result.status_message} The curve and uncertainties are provisional. A different starting point or a narrower fit range may help.` + (plotNote ? '\n' + plotNote : ''));
+      showMessage('warn', `Fit did not converge. ${result.status_message} Check initial guesses, parameter identifiability, and the fit range before interpreting the result.` + (plotNote ? '\n' + plotNote : ''));
     } else if (plotNote) showMessage('info', plotNote);
-    setStatus($('fit-status'), result.converged ? `Fit done — ${payload.dataset_name}` : 'Fit needs another look', result.converged ? 'ok' : 'warn');
+    setStatus($('fit-status'), result.converged ? `${result.fit_performed === false ? 'Histogram plotted' : 'Fit done'} — ${payload.dataset_name}` : 'Fit not converged', result.converged ? 'ok' : 'warn');
   } catch (e) {
+    if (requestVersion !== fitRequestVersion) return;
     showMessage('error', e.message + (lastResult ? ' The plot and report below are from the previous fit.' : ''));
     setStatus($('fit-status'), 'Fit not completed', 'err');
   } finally {
-    btn.disabled = false;
+    if (requestVersion === fitRequestVersion) {
+      fitBusy = false;
+      syncAnalysisControls();
+      $('btn-histogram').disabled = false;
+    }
   }
 }
 
 // ================================================================ 8. fit report
 
 function chi2Class(r) {
-  if (r.chi2_ndf === null || !lastPayload || !lastPayload.ey || lastPayload.ey.length === 0) return '';
-  const v = r.chi2_ndf;
-  if (v >= 0.5 && v <= 2) return 'good';
-  if (v >= 0.2 && v <= 5) return 'meh';
-  return 'bad';
+  // Reduced chi-square alone cannot classify a fit as good or bad.
+  return '';
+}
+
+function renderHistogramReport(r) {
+  const h = r.histogram;
+  const rows = r.params.map(p => `<tr><td>${escapeHtml(p.name)}</td><td class="num">${fmtPair(p.value,p.error)}</td><td class="num">${fmtNum(p.value,8)}</td><td class="num">${fmtNum(p.error,4)}</td></tr>`).join('');
+  const fitted = r.fit_performed !== false;
+  $('report').innerHTML = `<p>${escapeHtml(lastPayload?.dataset_name || 'Histogram')}: ${h.counts.length} bins, ${h.total} counts inside the edges. ${escapeHtml(r.status_message)}</p>
+    <p class="fine">Outside the edges: ${h.underflow} below, ${h.overflow} above. Display: counts per unit X.</p>
+    ${fitted ? `<p>Function <code>${escapeHtml(r.formula)}</code>; ${r.method === 'poisson' ? 'Poisson likelihood' : 'χ² with √count uncertainties'}; fit range [${fmtNum(r.range[0])}, ${fmtNum(r.range[1])}], ${r.n_points} usable bins.</p>
+    <table class="report-table"><thead><tr><th>Parameter</th><th>Value ± uncertainty</th><th>Value (8 s.f.)</th><th>Uncertainty (4 s.f.)</th></tr></thead><tbody>${rows}</tbody></table>
+    <div class="summary"><div class="stat"><span class="k">${escapeHtml(r.statistic_name)}</span><span class="v">${fmtNum(r.statistic)}</span></div><div class="stat"><span class="k">NDF</span><span class="v">${r.ndf}</span></div>${r.method === 'chi2' ? `<div class="stat"><span class="k">χ² / NDF</span><span class="v">${fmtNum(r.chi2_ndf)}</span></div><div class="stat"><span class="k">p-value</span><span class="v">${fmtNum(r.prob)}</span></div>` : ''}</div>` : '<p>No model fitted. Choose a function in Fit settings to fit these bins.</p>'}
+    ${residualSummary(r)}<p class="fine">${(r.plot_notes || []).map(escapeHtml).join('<br>')}</p>`;
+  setResultEnabled(true);
 }
 
 function renderReport(r) {
+  if (r.analysis_type === 'histogram') { renderHistogramReport(r); return; }
   const rows = r.params.map((p) => `
     <tr>
       <td>${escapeHtml(p.name)}</td>
@@ -999,7 +1648,7 @@ function renderReport(r) {
     <p>Function <code>${escapeHtml(r.formula)}</code> on${ds} x ∈ [${fmtNum(r.range[0])}, ${fmtNum(r.range[1])}], ${r.n_points} points. ${conv}${weighted}</p>
     ${residualSummary(r)}
     <table class="report-table">
-      <thead><tr><th>Parameter</th><th>Value ± uncertainty</th><th>Full value</th><th>Full error</th></tr></thead>
+      <thead><tr><th>Parameter</th><th>Value ± uncertainty</th><th>Value (8 s.f.)</th><th>Uncertainty (4 s.f.)</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
     <div class="summary">
@@ -1042,7 +1691,7 @@ function clearReport() {
 /** The report as plain text (for the clipboard and .txt export). */
 function reportText(r) {
   const L = [];
-  L.push(`GAUSS-O-MATIC 3000 report — ${$('doc-title').value || 'untitled'}`);
+  L.push(`ROOT-A-TRON 3000 report — ${$('doc-title').value || 'untitled'}`);
   L.push(`Date:      ${new Date().toISOString()}`);
   if (lastPayload) L.push(`Dataset:   ${lastPayload.dataset_name} (${r.n_points} points)`);
   L.push(`Function:  ${r.formula}`);
@@ -1053,10 +1702,18 @@ function reportText(r) {
   L.push(`${'Parameter'.padEnd(w)}  ${'Value'.padStart(16)}  ${'Uncertainty'.padStart(16)}`);
   for (const p of r.params) L.push(`${p.name.padEnd(w)}  ${String(p.value).padStart(16)}  ${String(p.error).padStart(16)}`);
   L.push('');
-  L.push(`chi2     = ${r.chi2}`);
-  L.push(`NDF      = ${r.ndf}`);
-  L.push(`chi2/NDF = ${r.chi2_ndf}`);
-  L.push(`p-value  = ${r.prob}`);
+  if (r.analysis_type === 'histogram') {
+    L.push(`Histogram counts: ${r.histogram.total}; bins: ${r.histogram.counts.length}; underflow: ${r.histogram.underflow}; overflow: ${r.histogram.overflow}`);
+    L.push(`Fit performed: ${r.fit_performed}; method: ${r.method}`);
+    if (r.fit_performed) L.push(`${r.statistic_name} = ${r.statistic}`);
+    L.push(...r.plot_notes);
+  }
+  if (r.fit_performed !== false) L.push(`NDF      = ${r.ndf}`);
+  if (r.analysis_type !== 'histogram' || (r.fit_performed && r.method === 'chi2')) {
+    L.push(`chi2     = ${r.chi2}`);
+    L.push(`chi2/NDF = ${r.chi2_ndf}`);
+    L.push(`p-value  = ${r.prob}`);
+  }
   if (r.covariance && r.covariance.length) {
     L.push('');
     L.push('Covariance matrix:');
@@ -1071,14 +1728,25 @@ function reportCsv(r) {
   for (const p of r.params) L.push(`${q(p.name)},${p.value},${p.error}`);
   L.push('');
   L.push('quantity,value');
-  L.push(`chi2,${r.chi2}`);
-  L.push(`ndf,${r.ndf}`);
-  L.push(`chi2_ndf,${r.chi2_ndf}`);
-  L.push(`prob,${r.prob}`);
+  if (r.analysis_type === 'histogram') {
+    L.push(`analysis_type,histogram`, `fit_performed,${r.fit_performed}`, `method,${r.method}`, `statistic_name,${q(r.statistic_name)}`, `statistic,${r.statistic}`, `total_counts,${r.histogram.total}`, `underflow,${r.histogram.underflow}`, `overflow,${r.histogram.overflow}`);
+    for (const note of r.plot_notes) L.push(`note,${q(note)}`);
+  }
+  if (r.fit_performed !== false) L.push(`ndf,${r.ndf}`);
+  if (r.analysis_type !== 'histogram' || (r.fit_performed && r.method === 'chi2')) {
+    L.push(`chi2,${r.chi2}`);
+    L.push(`chi2_ndf,${r.chi2_ndf}`);
+    L.push(`prob,${r.prob}`);
+  }
   L.push(`status,${q(r.status_message)}`);
   L.push(`formula,${q(r.formula)}`);
   L.push(`x_min,${r.range[0]}`);
   L.push(`x_max,${r.range[1]}`);
+  if (r.analysis_type === 'histogram') {
+    L.push('', 'bin_lower,bin_upper,count,count_density,expected_count');
+    const h = r.histogram;
+    h.counts.forEach((count,i) => L.push(`${h.edges[i]},${h.edges[i+1]},${count},${count/(h.edges[i+1]-h.edges[i])},${h.expected[i] ?? ''}`));
+  }
   return L.join('\n') + '\n';
 }
 
@@ -1146,8 +1814,10 @@ function drawableFrom(result) {
   return null;
 }
 
-async function drawPlot(result) {
-  document.dispatchEvent(new CustomEvent('rootfit:draw'));
+let plotDrawVersion = 0;
+async function drawPlot(result, selection = false) {
+  const drawVersion = ++plotDrawVersion;
+  if (!selection) document.dispatchEvent(new CustomEvent('rootfit:draw'));
   const plot = $('plot');
   const configuredHeight = loadLayout().plotH;
   plot.style.height = result.plot_height ? `${result.plot_height}px` : configuredHeight ? `${configuredHeight}px` : '';
@@ -1162,21 +1832,30 @@ async function drawPlot(result) {
   let jsroot;
   try {
     jsroot = await loadJSROOT();
+    if (drawVersion !== plotDrawVersion) return;
   } catch (e) {
+    if (drawVersion !== plotDrawVersion) return;
     plot.innerHTML = `<p class="placeholder">${escapeHtml(e.message)}<br>The fit report below is still valid.</p>`;
     return;
   }
   try {
+    const surface = document.createElement('div');
+    surface.style.width = '100%';
+    surface.style.height = '100%';
+    surface.dataset.plotSurface = 'true';
+    // JSROOT measures its container during drawing. It must be attached first.
     jsroot.cleanup(plot);
-    plot.innerHTML = '';
+    plot.replaceChildren(surface);
     const obj = jsroot.parse(JSON.stringify(src.json));      // parse() edits its input: give it a copy
-    const painter = await jsroot.draw(plot, obj, src.option);
+    const painter = await jsroot.draw(surface, obj, src.option);
+    if (drawVersion !== plotDrawVersion) { jsroot.cleanup(surface); return; }
     jsroot.registerForResize(painter);
     lastDrawn = src;
     lastPainter = painter;
     setPngEnabled(true);
     setStatus($('jsroot-status'), `JSROOT ${jsroot.version}`);
   } catch (e) {
+    if (drawVersion !== plotDrawVersion) return;
     plot.innerHTML = `<p class="placeholder">JSROOT could not draw the result: ${escapeHtml(e.message)}</p>`;
   }
 }
@@ -1184,7 +1863,7 @@ async function drawPlot(result) {
 /** Tell JSROOT the plot box changed size (after dragging the handle). */
 function replotToSize() {
   if (window.JSROOT && lastDrawn) {
-    try { window.JSROOT.resize($('plot'), true); } catch (_) { /* ignore */ }
+    try { window.JSROOT.resize($('plot').querySelector('[data-plot-surface]') || $('plot'), true); } catch (_) { /* ignore */ }
   }
 }
 
@@ -1323,11 +2002,13 @@ const DOC_VERSION = 1;
 const APP_VERSION = '0.2.0';
 const AUTOSAVE_KEY = 'rootfit.autosave';
 let documentCreated = null;
+let workspaceDocument = null;
 
 function buildDocument() {
   const now = new Date().toISOString();
   if (!documentCreated) documentCreated = now;
   return {
+    ...(workspaceDocument || {}),
     version: DOC_VERSION,
     app: 'rootfit',
     app_version: APP_VERSION,
@@ -1342,15 +2023,146 @@ function buildDocument() {
   };
 }
 
-function saveDocument() {
-  const text = JSON.stringify(buildDocument(), null, 1);
-  downloadText(text, fileBaseName() + '.json', 'application/json');
-  showMessage('info', 'Document saved to your downloads folder.');
+let savedAnalysisSnapshot = null;
+let restoredUnsavedChanges = false;
+function analysisSnapshot(doc = buildDocument()) {
+  const inputs = JSON.parse(JSON.stringify(doc.inputs || {}));
+  // Active-dataset controls duplicate the settings already stored with each dataset.
+  if (inputs.datasets) {
+    for (const key of ['active','analysis_type','histogram','data','formula','param_names','initial_guesses']) delete inputs[key];
+    if (inputs.options) { delete inputs.options.x_min; delete inputs.options.x_max; }
+  }
+  return JSON.stringify({title:doc.title || '', notes:doc.notes || '', inputs,
+    results:doc.results || null, results_payload:doc.results_payload || null, objects:doc.objects || []});
+}
+function markAnalysisSaved(doc) {
+  savedAnalysisSnapshot = analysisSnapshot(doc);
+  restoredUnsavedChanges = false;
+}
+function hasUnsavedAnalysis(doc) {
+  return restoredUnsavedChanges || (savedAnalysisSnapshot !== null && analysisSnapshot(doc) !== savedAnalysisSnapshot);
+}
+function hasPendingTableEdits() {
+  return !!tableDatasets && (JSON.stringify(tableDatasets) !== JSON.stringify(datasets)
+    || (tableDatasets[tableActive]?.analysis_type === 'xy' && gridSnapshot() !== renderedGridSnapshot));
+}
+let internalNavigation = false;
+function isWorkspaceDestination(href) {
+  try {
+    const here = new URL(window.location.href);
+    const target = new URL(href, here);
+    const directory = here.pathname.slice(0, here.pathname.lastIndexOf('/') + 1);
+    return target.protocol === here.protocol && target.host === here.host
+      && ['index.html','classic.html','modern.html','contact.html','about.html','uncertainties.html',''].some(page => target.pathname === directory + page);
+  } catch (_) { return false; }
+}
+function prepareWorkspaceNavigation(href) {
+  if (!isWorkspaceDestination(href) || hasPendingTableEdits()) return;
+  clearTimeout(autosaveTimer);
+  internalNavigation = autosaveNow() === true;
+  setTimeout(() => { internalNavigation = false; }, 1000);
+}
+function handleWorkspaceLink(event) {
+  if (event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+  const link = event.target?.closest?.('a[href]');
+  if (!link || (link.target && link.target !== '_self') || link.hasAttribute('download') || link.getAttribute('href').startsWith('#')) return;
+  if (document.body.classList.contains('modern') && /(?:^|\/)uncertainties\.html(?:[?#]|$)/.test(link.getAttribute('href'))
+      && !datasets[activeIdx]?.result?.response?.params?.length) {
+    event.preventDefault();
+    askDialog({title:'No fit results yet',
+      message:'The selected dataset has no fit results. Run a fit here first, or continue to Analyze Data to work with the raw data.',
+      accept:'Analyze raw data', cancel:'Make plot first', primaryCancel:true,
+    }).then(accepted => {
+      if (!accepted) return;
+      const dataset = datasets[activeIdx];
+      if (dataset?.id) workspaceDocument = {...workspaceDocument, workspace:{...workspaceDocument?.workspace, selected:dataset.derivedFrom || dataset.id}};
+      prepareWorkspaceNavigation(link.href);
+      if (internalNavigation) window.location.href = link.href;
+    });
+    return;
+  }
+  if (link.hasAttribute('data-analyze-results')) {
+    const dataset = datasets[activeIdx];
+    if (dataset?.id) {
+      workspaceDocument = {...workspaceDocument, workspace: {
+        ...workspaceDocument?.workspace,
+        selected: dataset.result ? (dataset.result.objectId || dataset.id + ':fit') : (dataset.derivedFrom || dataset.id),
+      }};
+    }
+  }
+  prepareWorkspaceNavigation(link.href);
+}
+// Chrome exposes destinations for history navigation as well as link clicks.
+window.navigation?.addEventListener('navigate', event => {
+  if (event.navigationType !== 'reload' && !event.destination.sameDocument) prepareWorkspaceNavigation(event.destination.url);
+});
+window.addEventListener('pageshow', () => { internalNavigation = false; });
+function warnBeforeLeaving(event) {
+  if (internalNavigation) { internalNavigation = false; return; }
+  if (!hasUnsavedAnalysis() && !hasPendingTableEdits()) return;
+  event.preventDefault();
+  event.returnValue = ''; // Chrome supplies its own standard unsaved-changes message.
+}
+window.addEventListener('beforeunload', warnBeforeLeaving);
+
+function documentFilename(value) {
+  const name = value.trim();
+  if (!name || /^\.+$/.test(name)) throw new Error('Enter a filename.');
+  if (/[<>:"/\\|?*\x00-\x1f]/.test(name)) throw new Error('The filename cannot contain /, \\, :, *, ?, ", <, >, |, or control characters.');
+  if (name.endsWith('.')) throw new Error('The filename cannot end with a period.');
+  if (/^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(name)) throw new Error('That filename is reserved by the operating system. Choose another name.');
+  const filename = /\.json$/i.test(name) ? name : name + '.json';
+  if (new TextEncoder().encode(filename).length > 240) throw new Error('Use a shorter filename (at most 240 bytes including .json).');
+  return filename;
+}
+
+const DOWNLOAD_NAMES_KEY = 'rootfit.downloadNames';
+function knownDownloadNames() {
+  try { const names = JSON.parse(storageGet(DOWNLOAD_NAMES_KEY) || '[]'); return Array.isArray(names) ? names.filter(n => typeof n === 'string') : []; }
+  catch (_) { return []; }
+}
+let savingDocument = false;
+async function saveDocument() {
+  if (savingDocument) return;
+  savingDocument = true;
+  try {
+    const nativeSave = typeof window.showSaveFilePicker === 'function';
+    const filename = await askDialog({title:'Save analysis', label:'Filename', value:fileBaseName() + '.json', accept:'Save',
+      message:nativeSave ? 'Choose a save location next. The analysis is saved as a JSON document.' : 'The analysis is saved as a JSON document. Your browser controls the download location and duplicate filenames.',
+      validate:documentFilename});
+    if (filename === null) return;
+    const text = JSON.stringify(buildDocument(), null, 1);
+    if (nativeSave) {
+      const handle = await window.showSaveFilePicker({suggestedName:filename, types:[{description:'Analysis document',accept:{'application/json':['.json']}}]});
+      const existing = await handle.getFile();
+      if (existing.size > 0 && !await askDialog({title:'Replace file', message:`“${handle.name}” already contains data. Replace it with this analysis?`, accept:'Replace', destructive:true})) return;
+      const writable = await handle.createWritable();
+      try { await writable.write(text); await writable.close(); }
+      catch (error) { try { await writable.abort(); } catch (_) {} throw error; }
+      markAnalysisSaved(JSON.parse(text));
+      autosave();
+      showMessage('info', `Saved “${handle.name}”.`);
+    } else {
+      const names = knownDownloadNames();
+      if (names.includes(filename) && !await askDialog({title:'Download another copy', message:`A download named “${filename}” was already requested in this browser. The page cannot check whether that file still exists or replace it. Your browser will handle the duplicate filename.`, accept:'Download copy'})) return;
+      downloadText(text, filename, 'application/json');
+      storageSet(DOWNLOAD_NAMES_KEY, JSON.stringify([...new Set([...names, filename])].slice(-100)));
+      markAnalysisSaved(JSON.parse(text));
+      autosave();
+      showMessage('info', `Download requested: “${filename}”.`);
+    }
+  } catch (error) {
+    if (error.name !== 'AbortError') await askDialog({title:'File not saved', message:`The file could not be saved. ${error.message}`, accept:'Close', cancel:null});
+  } finally { savingDocument = false; }
 }
 
 function applyDocument(doc) {
+  if (window.WorkspaceStore) {
+    doc = window.WorkspaceStore.materialize(window.WorkspaceStore.normalize(doc));
+    workspaceDocument = JSON.parse(JSON.stringify(doc));
+  }
   if (!doc || typeof doc !== 'object' || Array.isArray(doc)) {
-    throw new Error('This is not a GAUSS-O-MATIC 3000 document (expected a JSON object with "version" and "inputs").');
+    throw new Error('This is not a ROOT-A-TRON 3000 document (expected a JSON object with "version" and "inputs").');
   }
   if (doc.version !== DOC_VERSION) {
     throw new Error(`Unsupported document version "${doc.version}" — this page understands version ${DOC_VERSION}.`);
@@ -1358,6 +2170,8 @@ function applyDocument(doc) {
   if (!doc.inputs || typeof doc.inputs !== 'object') {
     throw new Error('The document has no "inputs" section.');
   }
+  fitRequestVersion++;
+  fitBusy = false;
   writeForm(doc.inputs);
   $('doc-title').value = doc.title || '';
   $('doc-notes').value = doc.notes || '';
@@ -1365,6 +2179,13 @@ function applyDocument(doc) {
 
   lastResult = (doc.results && Array.isArray(doc.results.params)) ? doc.results : null;
   lastPayload = lastResult ? (doc.results_payload || null) : null;
+  if (lastResult && !datasets.some(d => d.result)) {
+    const owner = datasets.find(d => d.name === lastPayload?.dataset_name) || datasets[activeIdx];
+    owner.result = {response:lastResult, payload:lastPayload};
+  }
+  const selectedResult = datasets[activeIdx].result;
+  lastResult = selectedResult?.response || null;
+  lastPayload = selectedResult ? {...selectedResult.payload, dataset_name:datasets[activeIdx].name} : null;
   showMessage('');
   if (lastResult) {
     renderReport(lastResult);
@@ -1376,6 +2197,7 @@ function applyDocument(doc) {
     setPngEnabled(false);
     lastDrawn = null;
   }
+  markAnalysisSaved();
 }
 
 function loadDocumentText(text, sourceName) {
@@ -1387,6 +2209,7 @@ function loadDocumentText(text, sourceName) {
     return false;
   }
   try {
+    if (window.WorkspaceStore) doc.revision = window.WorkspaceStore.read(localStorage).revision;
     applyDocument(doc);
   } catch (e) {
     showMessage('error', e.message);
@@ -1409,9 +2232,15 @@ let autosaveTimer = null;
 function autosaveNow() {
   autosaveTimer = null;
   try {
-    localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(buildDocument()));
-  } catch (_) {
-    try { localStorage.setItem(AUTOSAVE_KEY, JSON.stringify({ ...buildDocument(), results: null })); } catch (__) { /* give up */ }
+    const doc = buildDocument();
+    if (window.WorkspaceStore) {
+      workspaceDocument = window.WorkspaceStore.write(localStorage, {...doc, unsaved_changes:hasUnsavedAnalysis(doc)});
+    } else localStorage.setItem(AUTOSAVE_KEY, JSON.stringify({...doc, unsaved_changes:hasUnsavedAnalysis(doc)}));
+    return true;
+  } catch (error) {
+    if (window.WorkspaceStore) { showMessage('error', error.message + ' Use Save to keep a complete copy of this session.'); return false; }
+    try { localStorage.setItem(AUTOSAVE_KEY, JSON.stringify({ ...buildDocument(), results: null, unsaved_changes:true })); } catch (__) { /* give up */ }
+    return false;
   }
 }
 function autosave() {
@@ -1436,17 +2265,22 @@ function prepareAutosave(doc) {
 }
 
 function restoreAutosave() {
+  if (window.WorkspaceStore) {
+    try { workspaceDocument = window.WorkspaceStore.migrate(localStorage); }
+    catch (error) { showMessage('error', error.message); }
+  }
   const text = storageGet(AUTOSAVE_KEY);
   if (!text) return false;
   try {
     const saved = JSON.parse(text);
     const restored = prepareAutosave(saved);
     applyDocument(restored);
+    restoredUnsavedChanges = restored.unsaved_changes !== false;
     if (restored !== saved) {
       autosave();
       showMessage('info', 'Restored your data and settings. Residuals are now off by default. Run Fit to update the plot, or select Residuals under Optional plots to include them.');
     } else {
-      showMessage('info', 'Restored your previous session from this browser (autosave). Use "Save document" to keep a file.');
+      showMessage('info', 'Restored your previous session from this browser (autosave). Use "Save" to keep a file.');
     }
     return true;
   } catch (_) {
@@ -1454,7 +2288,23 @@ function restoreAutosave() {
   }
 }
 
-function clearAutosave() { storageRemove(AUTOSAVE_KEY); }
+function clearAutosave() {
+  if (window.WorkspaceStore) autosaveNow();
+  else storageRemove(AUTOSAVE_KEY);
+}
+window.addEventListener('storage', event => {
+  if (!window.WorkspaceStore || event.key !== AUTOSAVE_KEY) return;
+  if (autosaveTimer || hasPendingTableEdits() || document.querySelector('dialog[open]')) {
+    showMessage('warn', 'This session changed in another tab. Save any local edits, then reload to use the latest shared session.');
+    return;
+  }
+  try {
+    const incoming = window.WorkspaceStore.read(localStorage);
+    applyDocument(incoming);
+    restoredUnsavedChanges = incoming.unsaved_changes !== false;
+    showMessage('info', 'Updated from the shared session.');
+  } catch (error) { showMessage('error', error.message); }
+});
 
 // ================================================================ 11. menus & actions
 
@@ -1486,24 +2336,38 @@ const EXAMPLES = {
   },
 };
 
-function loadExample(key) {
+EXAMPLES.histogram = {"version": 1, "title": "Count histogram", "notes": "A count distribution fitted with a normalized Gaussian. Norm is the model\u2019s total area over the full real line.", "inputs": {"datasets": [{"name": "Count distribution", "analysis_type": "histogram", "x": "", "y": "", "ex": "", "ey": "", "histogram": {"source": "counts", "counts": "1 3 12 40 80 80 40 12 3 1", "edges": "0 1 2 3 4 5 6 7 8 9 10", "samples": "", "bins": "", "min": "", "max": "", "method": "poisson"}}], "active": 0, "formula": "gausn", "param_names": "norm, mean, sigma", "initial_guesses": "", "graph_title": "Count distribution", "x_title": "Measurement", "y_title": "Counts / unit X", "options": {"grid": true, "diagnostics": []}}};
+
+async function loadExample(key) {
   const ex = EXAMPLES[key];
   if (!ex) return;
-  applyDocument({ version: DOC_VERSION, title: ex.title, notes: ex.notes, inputs: ex.inputs, results: null });
+  const proceed = await askDialog({title:'Load example dataset',
+    message:'Loading this example will replace the current datasets, fit settings, and results. Save your analysis first if you want to keep it.',
+    accept:'Continue', cancel:'Cancel', destructive:true});
+  if (!proceed) return;
+  applyDocument({ revision:workspaceDocument?.revision || null, version: DOC_VERSION, title: ex.title, notes: ex.notes, inputs: ex.inputs, results: null });
   documentCreated = null;
+  restoredUnsavedChanges = true;
   showMessage('info', `Loaded the example "${ex.title}". Press Fit.`);
   autosave();
 }
 
-function clearEverything() {
-  if (!confirm('Clear the whole form? (Save the document first if you want to keep it.)')) return;
-  clearForm();
-  documentCreated = null;
-  clearAutosave();
+function handleWorkspaceKeydown(ev) {
+  if (ev.defaultPrevented || ev.isComposing || ev.repeat || document.querySelector('dialog[open]')) return;
+  const modified = ev.ctrlKey || ev.metaKey;
+  if (modified && !ev.altKey && ev.key.toLowerCase() === 'e') {
+    ev.preventDefault(); openTable(); return;
+  }
+  if (ev.key !== 'Enter' || ev.altKey || ev.shiftKey) return;
+  // Keep native activation and multiline editing; Ctrl/Cmd+Enter remains available.
+  if (!modified && ev.target?.closest?.('textarea, select, button, a, summary, [contenteditable], [role="button"], .menu-title')) return;
+  const fit = $('btn-fit');
+  if (!fit || fit.disabled || fit.hidden) return;
+  ev.preventDefault();
+  runFit();
 }
 
 function openLoadDialog() { $('paste-area').value = ''; $('paste-dialog').showModal(); }
-function openSettings() { $('settings-dialog').showModal(); $('backend-url').focus(); }
 function openAbout() {
   const v = [`Document format version ${DOC_VERSION}`, `page ${APP_VERSION}`];
   if (window.JSROOT) v.push(`JSROOT ${window.JSROOT.version}`);
@@ -1515,16 +2379,16 @@ function openAbout() {
 const ACTIONS = {
   load: openLoadDialog,
   save: saveDocument,
+  'clear-all': clearAll,
   png: exportPng,
   svg: exportSvg,
-  clear: clearEverything,
   fit: runFit,
   example: (el) => loadExample(el.dataset.example),
-  settings: openSettings,
   health: checkHealth,
   about: openAbout,
   table: openTable,
   'dataset-add': addDataset,
+  'dataset-duplicate': duplicateDataset,
   'dataset-rename': renameDataset,
   'dataset-remove': removeDataset,
   'reset-layout': resetLayout,
@@ -1534,7 +2398,7 @@ const ACTIONS = {
   help: (el) => showHelp(el.dataset.help, null),
 };
 
-/** Menu bar behaviour, like TGMenuBar. */
+/** Menu bar behavior, like TGMenuBar. */
 function initMenus() {
   const bar = $('menubar');
   const menus = [...bar.querySelectorAll('.menu')];
@@ -1559,6 +2423,7 @@ function initMenus() {
 // ================================================================ 12. wiring
 
 function init() {
+  document.addEventListener('click', handleWorkspaceLink);
   initMenus();
   if ($('splitter')) initResizers();
   for (const el of document.querySelectorAll('[data-action]')) {
@@ -1573,17 +2438,26 @@ function init() {
   document.addEventListener('click', hideHelp);
 
   // backend URL persists across visits (a setting, not part of a document)
-  const savedUrl = storageGet(BACKEND_KEY);
-  if (savedUrl) $('backend-url').value = savedUrl;
-  $('backend-url').addEventListener('change', () => storageSet(BACKEND_KEY, backendUrl()));
-  $('btn-health').addEventListener('click', checkHealth);
+
+  $('analysis-type').addEventListener('change', ev => {
+    const type = ev.target.value;
+    if (datasets.some(d => d.analysis_type === type)) changeAnalysisType(type);
+    else requestNewDataset(type, false);
+  });
+  for (const button of document.querySelectorAll('[data-new-type]')) button.addEventListener('click', () => requestNewDataset(button.dataset.newType));
+  $('dataset-type-cancel').addEventListener('click', () => $('dataset-type-dialog').close());
+  for (const key of HISTOGRAM_FIELDS) $('hist-' + key).addEventListener('input', () => { syncAnalysisControls(); syncActiveFromColumns(); renderDatasetSelector(); autosave(); });
+  $('btn-histogram').addEventListener('click', () => runFit(false));
+  syncAnalysisControls();
 
   // data columns and datasets
   for (const c of COLUMNS) $('col-' + c).addEventListener('input', updateCounts);
   $('dataset-select').addEventListener('change', (ev) => setActiveDataset(parseInt(ev.target.value, 10)));
+  $('fit-dataset-select')?.addEventListener('change', (ev) => setActiveDataset(parseInt(ev.target.value, 10)));
   renderDatasetSelector();
 
   // the data table dialog
+  for (const key of Object.keys(defaultFitSettings())) $('table-fit-' + key).addEventListener('input', readTableFit);
   const grid = $('grid');
   grid.addEventListener('paste', gridPaste);
   grid.addEventListener('keydown', gridKeydown);
@@ -1597,37 +2471,29 @@ function init() {
   $('table-dialog').addEventListener('cancel', (ev) => { ev.preventDefault(); tableCancel(); });   // Escape = cancel
 
   // the "Examples…" dropdown fills formula, names and guesses
-  $('quick-pick').addEventListener('change', (ev) => {
-    const v = ev.target.value;
-    if (!v) return;
-    const [formula, names, guesses] = v.split('|');
-    $('formula').value = formula;
-    $('param-names').value = names || '';
-    $('initial-guesses').value = formula === '[0]*exp(-x/[1])' ? decayStartingGuesses(readForm()) || guesses || '' : guesses || '';
-    ev.target.value = '';
-    renderParamTable();
-    autosave();
+  $('example-dataset')?.addEventListener('change', event => {
+    const key = event.target.value;
+    event.target.value = '';
+    if (key) loadExample(key);
   });
+  $('quick-pick').addEventListener('change', (ev) => applyFunctionExample(ev.target.value));
 
   for (const kind of DIAGNOSTIC_TYPES) $('diag-' + kind).addEventListener('change', syncDiagnosticControls);
   syncDiagnosticControls();
 
   // parameter table <-> comma lists
-  for (const id of ['formula', 'param-names', 'initial-guesses']) $(id).addEventListener('input', renderParamTable);
+  for (const id of ['formula', 'param-names', 'initial-guesses', 'fit-xmin', 'fit-xmax']) $(id).addEventListener('input', () => {
+    syncDatasetFit();
+    if (!id.startsWith('fit-x')) renderParamTable();
+  });
   $('param-table').addEventListener('input', paramTableToLists);
   renderParamTable();
 
   $('btn-fit').addEventListener('click', runFit);
   $('btn-png').addEventListener('click', exportPng);
-  $('btn-table').addEventListener('click', openTable);
-  $('btn-clear').addEventListener('click', clearEverything);
+  $('btn-table')?.addEventListener('click', openTable);
 
-  // keyboard: Ctrl/Cmd+Enter runs the fit, Ctrl/Cmd+E opens the table
-  document.addEventListener('keydown', (ev) => {
-    if (!(ev.ctrlKey || ev.metaKey)) return;
-    if (ev.key === 'Enter' && !$('table-dialog').open) { ev.preventDefault(); runFit(); }
-    if ((ev.key === 'e' || ev.key === 'E') && !$('table-dialog').open) { ev.preventDefault(); openTable(); }
-  });
+  document.addEventListener('keydown', handleWorkspaceKeydown);
 
   // --- save / load ---
   $('btn-save').addEventListener('click', saveDocument);
@@ -1679,8 +2545,10 @@ function init() {
     el.addEventListener('input', autosave);
     if (el.type === 'checkbox' || el.tagName === 'SELECT') el.addEventListener('change', autosave);
   }
+  markAnalysisSaved();
   restoreAutosave();
   checkHealth();
+  showFirstVisitSaveNotice();
 }
 
 init();

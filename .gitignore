@@ -10,3 +10,27 @@ __pycache__/
 
 # files the Claude desktop app drops here
 Claude outputs/
+
+# launcher: marks when the Docker image was last built
+.rootfit-image-stamp
+
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Dependency and test caches
+node_modules/
+.venv/
+venv/
+.pytest_cache/
+.coverage
+htmlcov/
+coverage/
+
+# Temporary files and logs
+*.log
+*.tmp
+*.swp
+*~

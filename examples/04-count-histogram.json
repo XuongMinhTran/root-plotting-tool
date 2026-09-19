@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "title": "Count histogram",
+  "notes": "A count distribution fitted with a normalized Gaussian. Norm is the model\u2019s total area over the full real line.",
+  "inputs": {
+    "datasets": [
+      {
+        "name": "Count distribution",
+        "analysis_type": "histogram",
+        "x": "",
+        "y": "",
+        "ex": "",
+        "ey": "",
+        "histogram": {
+          "source": "counts",
+          "counts": "1 3 12 40 80 80 40 12 3 1",
+          "edges": "0 1 2 3 4 5 6 7 8 9 10",
+          "samples": "",
+          "bins": "",
+          "min": "",
+          "max": "",
+          "method": "poisson"
+        }
+      }
+    ],
+    "active": 0,
+    "formula": "gausn",
+    "param_names": "norm, mean, sigma",
+    "initial_guesses": "",
+    "graph_title": "Count distribution",
+    "x_title": "Measurement",
+    "y_title": "Counts / unit X",
+    "options": {
+      "grid": true,
+      "diagnostics": []
+    }
+  }
+}

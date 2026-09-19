@@ -27,7 +27,7 @@ for (const kind of ['none', 'residual', 'pull']) {
 context.document = {getElementById: () => ({querySelectorAll: () => [
   ['0','10','0.2','0.1'], ['1','5','',''], ['2','2.5','','']
 ].map(row => ({querySelectorAll: () => row.map(value => ({value}))}))})};
-vm.runInContext("tableDatasets = [{x:'',y:'',ex:'',ey:''}]; tableActive = 0; readGridToDataset();", context);
+vm.runInContext("tableDatasets = [{analysis_type:'xy',x:'',y:'',ex:'',ey:''}]; tableActive = 0; readGridToDataset();", context);
 assert.equal(read('tableDatasets[0].ex'), '0.1');
 assert.equal(read('tableDatasets[0].ey'), '0.2');
 console.log('OK: shared errors, validation, table round-trip, decay estimates, optional diagnostics.');
@@ -73,3 +73,34 @@ assert.deepEqual(read('selectedDiagnostics({})'),[]);
 vm.runInContext('writeDiagnosticSettings({})',context);
 assert.equal(elements.get('diag-residual').checked,false);
 console.log('OK: residuals default off; legacy autosave defaults migrate without losing data or explicit modern selections.');
+
+assert.deepEqual(read("splitTableRow('1\t2\t\t0.5')"), ['1','2','','0.5']);
+assert.deepEqual(read("splitTableRow('\t2\t0.1\t')"), ['','2','0.1','']);
+assert.deepEqual(read("splitTableRow('1,2,,0.5')"), ['1','2','','0.5']);
+assert.deepEqual(read("splitTableRow('1;2;;0.5')"), ['1','2','','0.5']);
+assert.deepEqual(read("splitTableRow('1  2  0.3  0.4')"), ['1','2','0.3','0.4']);
+console.log('OK: spreadsheet paste preserves empty cells and column alignment.');
+
+assert.deepEqual(read("tableColumnCells('1\\n\\n3')"), ['1','','3']);
+assert.deepEqual(read("tableColumnCells('1 2 3')"), ['1','2','3']);
+let editedRows = [['1','2','',''], ['3','','','']];
+const tableStatus = {textContent:''};
+context.document.getElementById = id => id === 'table-count' ? tableStatus : ({
+  value:'', querySelectorAll: () => editedRows.map(row=>({querySelectorAll:()=>row.map(value=>({value}))}))
+});
+vm.runInContext("gridInput=()=>({focus(){}}); tableDatasets=[{analysis_type:'xy',x:'preserved',y:'preserved',ey:'',ex:''}];", context);
+assert.equal(vm.runInContext('readGridToDataset()',context), false);
+assert.equal(read('tableDatasets[0].x'), 'preserved');
+assert.match(tableStatus.textContent, /Row 2/);
+editedRows = [['1','2','0.2',''], ['2','4','',''], ['3','6','0.4','']];
+assert.equal(vm.runInContext('readGridToDataset()',context), false);
+assert.equal(read('tableDatasets[0].x'), 'preserved');
+assert.match(tableStatus.textContent, /Missing uncertainties have not been set to zero/);
+console.log('OK: incomplete data and uncertainty rows stay in the editor without silent deletion or zero substitution.');
+
+// Excluded rows stay in source inputs but are absent from fitting arrays and errors.
+vm.runInContext("datasets[activeIdx].exclusions=[{index:1,x:1,y:5,reason:'test'}];payload=buildPayload(input);",context);
+assert.deepEqual(read('payload.x'),[0,2]);assert.deepEqual(read('payload.ey'),[.2,.2]);assert.equal(read('payload.plot.excluded_points[0].reason'),'test');assert.equal(read('input.data.x'),'0 1 2');
+assert.throws(()=>vm.runInContext("buildPayload({...input,data:{...input.data,y:'10 6 2.5'}})",context),/Review Point exclusions/);
+vm.runInContext('datasets[activeIdx].exclusions=[];payload=buildPayload(input);',context);assert.equal(read('payload.x.length'),3);
+console.log('OK: exclusion filtering, shared errors, reasons, restoration and changed-row protection.');

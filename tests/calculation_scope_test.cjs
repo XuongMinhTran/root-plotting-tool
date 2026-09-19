@@ -1,0 +1,11 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const code=fs.readFileSync('frontend/analysis.js','utf8');
+const section=(start,end)=>code.slice(code.indexOf(start),code.indexOf(end,code.indexOf(start)));
+const objects=[{id:'a',datasetId:'a',kind:'measurements',columns:[{name:'x',values:[1,2]}]},{id:'b',datasetId:'b',kind:'measurements',columns:[{name:'x',values:[3,4]}]},{id:'local',ownerDatasetId:'a',kind:'calculation',name:'Constant calculation',bindings:{t:{literal:true,value:2,error:.1}},unit:'s'}];
+const c={session:{inputs:{datasets:[{id:'a',name:'A'},{id:'b',name:'B'}]}},doc:{objects},calculationDatasetId:'a',C:require('../frontend/analysis-core.js'),fmt:String};
+vm.createContext(c);
+vm.runInContext(section('function dependants(', 'function render(){')+section('function sourceOptions(', 'function renderCalculationSources(){'),c);
+assert.deepEqual(Array.from(c.sourceOptions(null),x=>JSON.parse(x.value).id),['a','local']);
+assert.equal(c.sourceDataset(objects[2]).id,'a');assert(c.dependants('a').has('local'));
+c.calculationDatasetId='b';assert.deepEqual(Array.from(c.sourceOptions(null),x=>JSON.parse(x.value).id),['b']);
+console.log('OK: source choices follow selected dataset; inline-only calculations retain dataset ownership.');

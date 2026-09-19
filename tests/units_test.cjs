@@ -1,0 +1,28 @@
+const assert=require('node:assert/strict'),U=require('../frontend/units.js'),C=require('../frontend/analysis-core.js');
+const near=(a,b,t=1e-7)=>assert(Math.abs(a-b)<t*Math.max(Math.abs(b),1e-20),`${a} != ${b}`);
+for(const [a,b] of [['kg*m/s^2','N'],['V/A','ohm'],['J/(mol*K)','kg*m^2/(s^2*mol*K)'],['m^(1/2)','m^0.5']]){assert(U.same(U.parse(a),U.parse(b)));near(U.parse(a).scale,U.parse(b).scale);}
+near(U.parse('mm^-1').scale,1000);near(U.parse('eV').scale,1.602176634e-19);near(U.parse('µm').scale,1e-6);
+for(const unit of ['', 'degC','°C','dB','m^','m//s','m^(1/0)','m)'])assert.throws(()=>U.parse(unit));
+const fit={id:'f',kind:'fit',parameters:[{name:'k',value:4.27113,error:.00206746}],covariance:[[.00206746**2]]};
+const calc={id:'w',kind:'calculation',unitMode:'checked',expression:'\\pi d/(k D)',unit:'nm',bindings:{d:{literal:true,value:.457,error:0,unit:'mm'},k:{id:'f',key:'0',unit:'mm^-1'},D:{literal:true,value:50,error:.1,unit:'cm'}}};
+const value=C.engine([fit,calc]).get('w')[0],expected=Math.PI*.457/(4.27113*500)*1e6;
+near(value.value,expected);near(value.uncertainty,expected*Math.hypot(.00206746/4.27113,.1/50),1e-6);
+const alternate=structuredClone(calc);alternate.bindings.D={literal:true,value:500,error:1,unit:'mm'};near(C.engine([fit,alternate]).get('w')[0].value,value.value);near(C.engine([fit,alternate]).get('w')[0].uncertainty,value.uncertainty);
+const run=(expression,bindings,unit='1')=>C.engine([{id:'t',kind:'calculation',unitMode:'checked',expression,bindings,unit}]).get('t')[0];
+const literal=(value,unit,error=0)=>({literal:true,value,error,unit});
+near(run('a+b',{a:literal(1,'m',.1),b:literal(20,'cm',2)},'cm').value,120);
+near(run('a+b',{a:literal(1,'m',.1),b:literal(20,'cm',2)},'cm').uncertainty,Math.hypot(10,2));
+near(run('\\sqrt{a}',{a:literal(4,'cm^2')},'mm').value,20);
+near(run('sin(a)',{a:literal(30,'deg')}).value,.5);
+assert.throws(()=>run('a+b',{a:literal(1,'m'),b:literal(1,'s')},'m'),/Incompatible/);
+assert.throws(()=>run('exp(a)',{a:literal(1,'m')}),/dimensionless/);
+assert.throws(()=>run('a',{a:literal(1,'m')},'s'),/incompatible/);
+assert.throws(()=>run('a',{a:literal(1,'')},'m'),/Specify/);
+const doubled={id:'next',kind:'calculation',unitMode:'checked',expression:'a-b',unit:'m',bindings:{a:{id:'w',key:'value'},b:{id:'w',key:'value'}}};
+const cancellation=C.engine([fit,calc,doubled]).get('next')[0];near(cancellation.value,0);near(cancellation.uncertainty,0);
+near(C.engine(JSON.parse(JSON.stringify([fit,calc]))).get('w')[0].value,value.value);
+console.log('OK: mixed-unit diffraction =',value.value,'±',value.uncertainty,'nm; compound units, dimensional errors, covariance, chains and save round-trip.');
+const pair={id:'pair',kind:'fit',parameters:[{value:1,error:.1,unit:'m'},{value:20,error:2,unit:'cm'}],covariance:[[.01,.1],[.1,4]]};
+const sum={id:'sum',kind:'calculation',unitMode:'checked',unit:'cm',expression:'a+b',bindings:{a:{id:'pair',key:'0'},b:{id:'pair',key:'1'}}};
+near(C.engine([pair,sum]).get('sum')[0].uncertainty,Math.sqrt(124));
+near(run('atan2(a,b)',{a:literal(1,'m'),b:literal(100,'cm')},'deg').value,45);

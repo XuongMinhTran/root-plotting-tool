@@ -1,0 +1,81 @@
+/* Classic-only desktop button colors; shared layouts retain their own theme. */
+body.classic {
+  --button-top: #eeeeee;
+  --button-bottom: #d7d7d7;
+  --button-edge: #9a9a9a;
+  --button-ink: #111111;
+}
+body.classic button:not(.help-btn):not(.dropdown button) {
+  background: linear-gradient(to bottom, var(--button-top) 0%, var(--button-top) 46%, var(--button-bottom) 47%, var(--button-bottom) 100%);
+  color: var(--button-ink);
+  border-color: #fff var(--button-edge) var(--button-edge) #fff;
+  box-shadow: inset 1px 1px 0 #ffffff88, 1px 1px 0 #5d6570;
+  text-shadow: none;
+}
+/* Blue: import data. Green: create. Gray: routine edits. Red: delete. */
+body.classic :where([data-paste-spreadsheet], [data-taction="import"], #btn-histogram) {
+  --button-top: #e6f0ff;
+  --button-bottom: #a9c4e8;
+  --button-edge: #53749b;
+  --button-ink: #142943;
+}
+body.classic :is([data-action="dataset-add"], [data-taction="add-rows"], .tab.add) {
+  --button-top: #e3f2cf;
+  --button-bottom: #acd18a;
+  --button-edge: #658342;
+  --button-ink: #243915;
+}
+body.classic :is([data-action="dataset-remove"], [data-taction="delete"], [data-taction="delete-empty"], .rowdel-btn) {
+  --button-top: #fbe1dc;
+  --button-bottom: #e4a49b;
+  --button-edge: #9a5a50;
+  --button-ink: #571f19;
+}
+body.classic button.primary {
+  --button-top: #386fb5;
+  --button-bottom: #194781;
+  --button-edge: #103260;
+  --button-ink: #fff;
+}
+body.classic button:not(.help-btn):not(.dropdown button):hover:not(:disabled) {
+  filter: brightness(1.07);
+}
+body.classic button:not(.help-btn):not(.dropdown button):active:not(:disabled) {
+  background: var(--button-bottom);
+  border-color: var(--button-edge) #fff #fff var(--button-edge);
+  box-shadow: inset 1px 1px 0 var(--button-edge);
+  filter: none;
+}
+body.classic button:not(.help-btn):not(.dropdown button):disabled {
+  background: linear-gradient(#ededed, #d8d8d8);
+  color: #727272;
+  border-color: #fff #aaa #aaa #fff;
+  box-shadow: 1px 1px 0 #aaa;
+  text-shadow: 1px 1px 0 #fff;
+}
+
+body.classic :is(#btn-load, #btn-save) {
+  background: var(--frame);
+  color: var(--ink);
+  border-color: var(--hilite) var(--shadow) var(--shadow) var(--hilite);
+  box-shadow: 1px 1px 0 var(--dark);
+}
+body.classic :is(#btn-load, #btn-save):hover:not(:disabled) { background: #f2f2f2; filter: none; }
+body.classic :is(#btn-load, #btn-save):active:not(:disabled) {
+  background: #d8d8d8;
+  border-color: var(--shadow) var(--hilite) var(--hilite) var(--shadow);
+  box-shadow: inset 1px 1px 0 var(--dark);
+}
+
+/* Keep the main Fit action solid rather than using the two-tone button face. */
+body.classic #btn-fit { background: #24558f; }
+body.classic #btn-fit:hover:not(:disabled) { background: #2b63a5; filter: none; }
+body.classic #btn-fit:active:not(:disabled) { background: #194477; }
+body.classic #btn-fit:disabled { background: #dcdcdc; }
+
+body.classic .data-section-heading > button.expand {
+  --button-top: #fff1be;
+  --button-bottom: #e9c66c;
+  --button-edge: #95742c;
+  --button-ink: #44330c;
+}

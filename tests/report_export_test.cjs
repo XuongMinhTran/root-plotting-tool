@@ -1,0 +1,14 @@
+const assert=require('node:assert/strict'),fs=require('fs');
+global.WorkspaceStore=require('../frontend/workspace-store.js');global.AnalysisCore=require('../frontend/analysis-core.js');
+const R=require('../frontend/analysis-export.js'),S=WorkspaceStore;
+(async()=>{const d=S.empty();d.title='A_% & B';d.inputs.datasets=[{id:'a',name:'Measurements',analysis_type:'xy',x:'1 2',y:'3 4',ex:'',ey:'.1',fit:{formula:'[0]*x'},exclusions:[{index:0,x:1,y:3,reason:'test'}]}];
+d.objects=[{id:'c',name:'Doubled',kind:'calculation',resultMode:'column',expression:'2y',bindings:{y:{id:'a',key:'1'}},unit:'V'}];
+S.materialize(d);assert.equal(d.inputs.datasets.length,1,'calculated columns do not become datasets');
+const files=R.report(d,['a']);assert.match(files['dataset-1-data.csv'],/"No","test"/);assert.match(files['report.tex'],/A\\_\\% \\& B/);assert.match(files['calculation-1.csv'],/"6"/);assert.deepEqual(JSON.parse(files['session.json']).objects,d.objects);
+const zipped=Buffer.from(await R.zip(files).arrayBuffer());assert.equal(zipped.readUInt32LE(0),0x04034b50);fs.writeFileSync('/tmp/root-report-regression.zip',zipped);console.log('OK: exclusions, calculated columns, LaTeX escaping, CSV values and complete session in ZIP.');})();
+const sample=S.empty();sample.inputs.datasets=[{id:'one',name:'One',analysis_type:'xy',x:'1 2',y:'3 4',fit:{formula:'[0]*x'},result:{response:{formula:'[0]*x',params:[{name:'slope',value:2,error:.1}],canvas_json:{},covariance:[[.01]]}}}];sample.objects=[{id:'c1',kind:'calculation',name:'First',expression:'2',unit:'1',bindings:{}},{id:'c2',kind:'calculation',name:'Second',expression:'3',unit:'1',bindings:{}}];
+const none={graphs:false,raw:false,fit:false,calculations:false,session:false,notes:false};
+const graphOnly=R.report(sample,['one'],{...none,graphs:true});assert(!graphOnly['session.json']);assert(!Object.keys(graphOnly).some(k=>k.endsWith('.csv')));assert.match(graphOnly['report.tex'],/includegraphics/);assert(!graphOnly['report.tex'].includes('Saved fit result'));
+const valuesOnly=R.report(sample,[],{...none,calculations:true,calculationIds:['c2']});assert(valuesOnly['calculation-2.csv']);assert(!valuesOnly['calculation-1.csv']);assert(!valuesOnly['report.tex'].includes('includegraphics'));
+const rawOnly=R.report(sample,['one'],{...none,raw:true});assert(rawOnly['dataset-1-data.csv']);assert(!rawOnly['dataset-1-parameters.csv']);
+console.log('OK: graph-only, calculation selection, raw-only exports omit unselected content.');

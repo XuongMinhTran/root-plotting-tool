@@ -3,43 +3,48 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Classic workspace · GAUSS-O-MATIC 3000</title>
-<link rel="stylesheet" href="style.css">
+<title>Compact workspace · ROOT-A-TRON 3000</title>
+<link rel="stylesheet" href="style.css?v=20260917-save-notice">
+<link rel="stylesheet" href="classic.css?v=20260918-button-colors">
+<link rel="stylesheet" href="paste-data.css?v=1">
+<link rel="stylesheet" href="analysis-features.css?v=20260919-export">
+<script defer src="analysis-export.js?v=20260919-pdf"></script>
 </head>
-<body>
+<body class="classic">
 
 <!-- ============ menu bar, like TGMenuBar in a ROOT canvas window ============ -->
 <div class="menubar" id="menubar">
   <div class="menu">
     <span class="menu-title" tabindex="0">File</span>
     <div class="dropdown">
-      <button type="button" data-action="load">Load document…</button>
-      <button type="button" data-action="save">Save document</button>
+      <button type="button" data-action="load">Open document…</button>
+      <button type="button" data-action="save">Save</button>
       <button type="button" data-action="png" data-needs-plot>Export plot as PNG…</button>
       <button type="button" data-action="svg" data-needs-plot>Export plot as SVG (vector)…</button>
       <button type="button" data-action="report-txt" data-needs-result>Export report as text…</button>
       <button type="button" data-action="report-csv" data-needs-result>Export report as CSV…</button>
       <hr>
-      <button type="button" data-action="clear">Clear form</button>
     </div>
   </div>
   <div class="menu">
     <span class="menu-title" tabindex="0">Data</span>
     <div class="dropdown">
       <button type="button" data-action="table">Open data table… <span class="shortcut">⌘E</span></button>
-      <button type="button" data-action="dataset-add">Add dataset</button>
+      <button type="button" data-action="dataset-add">New plot</button>
+      <button type="button" data-action="dataset-duplicate">Duplicate dataset</button>
       <button type="button" data-action="dataset-rename">Rename dataset…</button>
-      <button type="button" data-action="dataset-remove">Remove dataset</button>
+      <button type="button" data-action="dataset-remove">Delete dataset</button>
     </div>
   </div>
   <div class="menu">
     <span class="menu-title" tabindex="0">Fit</span>
     <div class="dropdown">
-      <button type="button" data-action="fit">Run fit <span class="shortcut">⌘↩</span></button>
+      <button type="button" data-action="fit">Run fit <span class="shortcut">Enter</span></button>
       <hr>
       <button type="button" data-action="example" data-example="linear">Example: straight line</button>
       <button type="button" data-action="example" data-example="exp">Example: exponential decay</button>
       <button type="button" data-action="example" data-example="gaus">Example: Gaussian peak</button>
+        <button type="button" data-action="example" data-example="histogram">Example: count histogram</button>
     </div>
   </div>
   <div class="menu">
@@ -51,7 +56,6 @@
   <div class="menu">
     <span class="menu-title" tabindex="0">Options</span>
     <div class="dropdown">
-      <button type="button" data-action="settings">Backend URL…</button>
       <button type="button" data-action="health">Check connection</button>
     </div>
   </div>
@@ -66,22 +70,19 @@
       <a href="https://root.cern/doc/master/namespaceTMath.html" target="_blank" rel="noopener">TMath functions</a>
       <hr>
       <a href="https://sos.clayton.edu/physics/chi2/" target="_blank" rel="noopener">Original chi2 tool (Beznosko)</a>
-      <button type="button" data-action="about">About GAUSS-O-MATIC 3000</button>
+      <button type="button" data-action="about">About ROOT-A-TRON 3000</button>
     </div>
   </div>
 </div>
 
 <!-- ============ toolbar, like TGToolBar ============ -->
 <div class="toolbar">
-  <button id="btn-load" type="button" title="Open a saved .json document"><i class="ic ic-load"></i>Load</button>
+  <button id="btn-load" type="button" title="Open a saved .json document"><i class="ic ic-load"></i>Open…</button>
   <button id="btn-save" type="button" title="Download everything on this page as a .json file"><i class="ic ic-save"></i>Save</button>
+  <button type="button" class="danger" data-action="clear-all">Clear all</button>
   <button id="btn-png" type="button" title="Download the plot as a PNG image" disabled><i class="ic ic-png"></i>Export PNG</button>
-  <span class="separator"></span>
-  <button id="btn-table" type="button" title="Edit the data in a spreadsheet-style table"><i class="ic ic-table"></i>Data table</button>
-  <span class="separator"></span>
-  <button id="btn-clear" type="button" title="Empty the form">Clear</button>
   <span class="spacer"></span>
-  <a class="workspace-home" href="index.html">GAUSS-O-MATIC 3000</a><a class="workspace-switch" href="modern.html">Modern UI →</a><a class="workspace-switch" href="cli.html">Command Line Interface →</a>
+  <a class="workspace-home" href="index.html">ROOT-A-TRON 3000</a><a class="workspace-switch" href="modern.html">Standard</a><a class="workspace-switch" href="uncertainties.html" data-classic-analysis hidden>Analyze Data</a>
   <input id="file-input" type="file" accept=".json,application/json" hidden>
 </div>
 
@@ -99,16 +100,35 @@
         <textarea id="doc-notes" rows="2" placeholder="Anything you want saved with the fit"></textarea></div>
     </fieldset>
 
-    <fieldset class="group">
-      <legend>Data <button type="button" class="help-btn" data-help="data" aria-label="Help on data entry">?</button></legend>
+    <fieldset class="group data-group">
+      <legend><span class="data-section-heading"><span>Data <button type="button" class="help-btn" data-help="data" aria-label="Help on data entry">?</button></span><button type="button" class="small expand" data-action="table" title="Open the spreadsheet-style editor">Expand ⤢</button></span></legend>
+      <div class="field analysis-choice"><label for="analysis-type">Analysis type</label><select id="analysis-type"><option value="" disabled selected>Select analysis type…</option><option value="xy">XY data</option><option value="histogram">Histogram</option></select></div>
       <div class="row dataset-row">
-        <span class="swatch" id="dataset-swatch"></span>
         <select id="dataset-select" title="Which dataset the columns below show" class="grow"></select>
-        <button type="button" class="small" data-action="dataset-add" title="Add an independent dataset (x2, y2, …)">+</button>
+        <button type="button" class="small" data-action="dataset-add" title="Create a new plot">New plot</button>
+        <button type="button" class="small" data-paste-spreadsheet>Paste data…</button>
+        <button type="button" class="small" data-action="dataset-duplicate" title="Copy this dataset and its fit settings">Duplicate</button>
         <button type="button" class="small" data-action="dataset-rename" title="Rename this dataset">Rename</button>
-        <button type="button" class="small" data-action="dataset-remove" title="Remove this dataset">−</button>
-        <button type="button" class="small expand" data-action="table" title="Open the spreadsheet-style editor">Expand ⤢</button>
+        <button type="button" class="small" data-action="dataset-remove" title="Delete this dataset">Delete</button>
       </div>
+
+
+      <div id="histogram-data" hidden>
+        <div class="field"><label for="hist-source">Histogram input</label><select id="hist-source"><option value="samples">Individual measurements</option><option value="counts">Pre-binned counts</option></select></div>
+        <div id="hist-samples-group" class="field"><label for="hist-samples">Measurements</label><textarea id="hist-samples" rows="7" spellcheck="false" placeholder="One measurement per line"></textarea></div>
+        <div id="hist-counts-group" class="field" hidden><label for="hist-counts">Bin counts</label><textarea id="hist-counts" rows="7" spellcheck="false" placeholder="One nonnegative whole count per bin"></textarea><p class="hint">Use original counts, before weighting, normalization or background subtraction.</p></div>
+        <div id="hist-binning" class="row histogram-binning">
+          <div class="field grow"><label for="hist-bins">Number of bins</label><input id="hist-bins" type="number" min="1" max="2000" placeholder="Automatic" aria-describedby="hist-bins-help"></div>
+          <div class="field grow"><label for="hist-min">Range from</label><input id="hist-min" type="text" placeholder="Automatic"></div>
+          <div class="field grow"><label for="hist-max">to</label><input id="hist-max" type="text" placeholder="Automatic"></div>
+        </div>
+        <p class="hint" id="hist-bins-help">Leave the bin count blank to use the range width, rounded up to a whole number (at least one bin). Without range limits, the smallest and largest measurements define the range.</p>
+        <details id="hist-edges-details" class="expander"><summary>Bin edges</summary><div class="field"><label for="hist-edges">Edges, in increasing order</label><textarea id="hist-edges" rows="4" spellcheck="false" placeholder="0, 1, 2, 4, 8"></textarea><p class="hint">Required for pre-binned counts: enter one more edge than counts. For measurements, custom edges replace the bin count and range above. Unequal widths are supported.</p></div></details>
+        <p class="hint" id="hist-summary" role="status"></p>
+        <p class="hint">The plot shows counts per unit X, allowing bins of different widths to be compared. Values on the final right edge are included; measurements outside the edges are reported separately.</p>
+        <button type="button" id="btn-histogram">Plot histogram</button>
+      </div>
+      <div id="xy-data">
       <div class="columns">
         <div class="col"><div class="col-head"><span class="cx">X</span><span class="count" id="count-x">0</span></div>
           <textarea id="col-x" aria-label="X values" rows="10" spellcheck="false" placeholder="1&#10;2&#10;3"></textarea></div>
@@ -119,33 +139,31 @@
         <div class="col"><div class="col-head"><span class="cerr">X err</span><span class="count" id="count-ex">0</span></div>
           <textarea id="col-ex" aria-label="X uncertainties" rows="10" spellcheck="false" placeholder="One for all, or one per point"></textarea></div>
       </div>
-      <p class="hint">One value per line; commas, tabs or spaces work too. Errors are optional: enter one value for the whole axis, or one per point. Use <em>Expand</em> to paste a whole table from a spreadsheet.</p>
+      <p class="hint">One value per line; commas, tabs or spaces work too. Errors are optional: enter one value for the whole axis, or one per point. Use <em>Paste data…</em> to load spreadsheet columns with a preview.</p>
+      </div>
     </fieldset>
 
     <fieldset class="group">
       <legend>Fit function <button type="button" class="help-btn" data-help="formula" aria-label="Help on fit functions">?</button></legend>
+
+      <div id="hist-fit-options" hidden>
+        <div class="field"><label for="hist-method">Histogram fitting method</label><select id="hist-method"><option value="poisson">Poisson likelihood</option><option value="chi2">χ² with √count uncertainties</option></select></div>
+        <p class="hint">The function describes counts per unit X. Its integral over each bin predicts that bin’s count. Poisson likelihood includes empty bins and is preferable for sparse counts. χ² excludes empty bins. The fit range selects bins by their centers.</p>
+      </div>
       <div class="row">
         <input id="formula" aria-label="Fit function" type="text" class="grow mono" value="[0]*x+[1]" spellcheck="false" placeholder="[0]*x+[1]">
-        <select id="quick-pick" title="Insert a common function">
+        <select id="quick-pick" title="Insert a fit function" aria-label="Fit function examples">
           <option value="">Examples…</option>
-          <option value="[0]*x+[1]|slope, intercept|1, 0">Straight line  [0]*x+[1]</option>
-          <option value="pol2|a, b, c|">Quadratic  pol2</option>
-          <option value="[0]*exp(-x/[1])|amplitude, tau|1, 1">Exponential decay  [0]*exp(-x/[1])</option>
-          <option value="[0]*(1-TMath::Exp(-x/[1]))|A, tau|1, 1">Saturating rise  [0]*(1-TMath::Exp(-x/[1]))</option>
-          <option value="gaus|constant, mean, sigma|">Gaussian  gaus</option>
-          <option value="gaus(0)+pol0(3)|constant, mean, sigma, background|">Gaussian + flat background  gaus(0)+pol0(3)</option>
-          <option value="expo|constant, slope|">Exponential  expo</option>
-          <option value="landau|constant, mpv, sigma|">Landau  landau</option>
-          <option value="[0]*sin([1]*x+[2])+[3]|amplitude, omega, phase, offset|1, 1, 0, 0">Sine  [0]*sin([1]*x+[2])+[3]</option>
-          <option value="[0]*pow(x,[1])|A, n|1, 1">Power law  [0]*pow(x,[1])</option>
         </select>
       </div>
+      <details class="equation-help"><summary>Typing reference</summary><p>Use <code>x</code> for the independent variable and <code>[0]</code>, <code>[1]</code>, … for fit parameters. Write multiplication as <code>*</code>, division as <code>/</code>, and powers as <code>pow(x,2)</code>. Functions include <code>exp(x)</code>, <code>log(x)</code>, <code>sin(x)</code>, and <code>sqrt(x)</code>. Use <code>TMath::Pi()</code> for π. Example: <code>[0]*exp(-x/[1])+[2]</code>.</p></details>
       <p class="hint"><code>x</code> is the variable, parameters are <code>[0]</code>, <code>[1]</code>, … Named functions
         <code>gaus</code>, <code>expo</code>, <code>landau</code>, <code>pol2</code> … also work.
         <a href="https://root.cern/doc/master/classTFormula.html" target="_blank" rel="noopener">TFormula</a> ·
         <a href="https://root.cern/doc/master/namespaceTMath.html" target="_blank" rel="noopener">TMath</a></p>
       <div class="field"><label for="param-names">Parameter names <span class="hint-inline">(comma-separated)</span></label>
         <input id="param-names" type="text" placeholder="slope, intercept" spellcheck="false"></div>
+      <p class="hint"><strong>Initial guesses matter for nonlinear fits.</strong> Estimate slopes, peak heights, positions, and widths from the data, using the model’s units. Poor guesses can prevent convergence or lead to a different minimum. Leave a value blank to use its default or automatic estimate, where available.</p>
       <div class="field"><label for="initial-guesses">Initial guesses <span class="hint-inline">(comma-separated)</span>
           <button type="button" class="help-btn" data-help="guesses" aria-label="Help on initial guesses">?</button></label>
         <input id="initial-guesses" type="text" class="mono" placeholder="1, 0" spellcheck="false"></div>
@@ -194,7 +212,7 @@
 
     <div class="row actions">
       <button id="btn-fit" type="button" class="primary">Fit</button>
-      <span class="hint">or press Ctrl/⌘ + Enter</span>
+      <span class="hint">or press Enter</span>
     </div>
   </div>
 
@@ -202,6 +220,7 @@
 
   <!-- right: canvas and report -->
   <div class="results" id="results">
+    <div class="result-navigation" data-classic-analysis hidden><a class="analyze-results-button" href="uncertainties.html" data-analyze-results>Analyze Data</a></div>
     <div id="message" class="message" hidden></div>
     <div class="canvas-frame"><div id="plot" class="plot"><p class="placeholder">The plot appears here after a fit.</p></div></div>
     <div class="hsplitter" id="plot-resizer" title="Drag to change the plot height"></div>
@@ -220,7 +239,7 @@
 
 <!-- ============ status bar, like TGStatusBar ============ -->
 <div class="statusbar">
-  <span class="status-part" id="health-status">Backend: not checked</span>
+  <span class="status-part" id="health-status">Backend: checking…</span>
   <span class="status-part" id="fit-status">Ready</span>
   <span class="status-part grow" id="jsroot-status">JSROOT loads with the first plot</span>
   <span class="status-part credit">Minh Tran · 2026</span>
@@ -238,19 +257,33 @@
   <div class="dialog-body table-body">
     <div class="tabs" id="dataset-tabs"></div>
     <div class="row table-tools">
+      <button type="button" class="small" data-taction="duplicate">Duplicate dataset</button>
       <button type="button" class="small" data-taction="add-rows">+ 10 rows</button>
       <button type="button" class="small" data-taction="delete-empty">Delete empty rows</button>
-      <button type="button" class="small" data-taction="clear">Clear this dataset</button>
+      <button type="button" class="small" data-taction="delete">Delete dataset</button>
       <button type="button" class="small" data-taction="import">Import from text…</button>
       <span class="spacer"></span>
       <span class="hint" id="table-count"></span>
     </div>
+    <p class="hint" id="table-histogram-note" hidden>Choose Done to enter this histogram’s measurements or bin counts in Data.</p>
     <div class="grid-wrap" id="grid-wrap">
       <table class="grid" id="grid">
         <thead><tr><th class="rownum">#</th><th class="cx">X</th><th class="cy">Y</th><th class="cerr">Y err</th><th class="cerr">X err</th><th class="rowdel"></th></tr></thead>
         <tbody></tbody>
       </table>
     </div>
+
+    <fieldset class="table-fit-settings"><legend id="table-fit-label">Fit settings for this dataset</legend>
+      <div class="field"><label for="table-fit-formula">Fit function</label><input id="table-fit-formula" type="text" class="mono" spellcheck="false" placeholder="[0]*x+[1]"><details class="equation-help"><summary>Typing reference</summary><p>Use <code>x</code> for the independent variable and <code>[0]</code>, <code>[1]</code>, … for fit parameters. Write multiplication as <code>*</code>, division as <code>/</code>, and powers as <code>pow(x,2)</code>. Functions include <code>exp(x)</code>, <code>log(x)</code>, <code>sin(x)</code>, and <code>sqrt(x)</code>. Use <code>TMath::Pi()</code> for π. Example: <code>[0]*exp(-x/[1])+[2]</code>.</p></details></div>
+      <div class="row">
+        <div class="field grow"><label for="table-fit-param_names">Parameter names (comma-separated)</label><input id="table-fit-param_names" type="text" placeholder="slope, intercept"></div>
+        <div class="field grow"><label for="table-fit-initial_guesses">Initial guesses (comma-separated)</label><input id="table-fit-initial_guesses" type="text" placeholder="1, 0"></div>
+      </div>
+      <div class="row">
+        <div class="field grow"><label for="table-fit-x_min">Fit range from</label><input id="table-fit-x_min" type="text" placeholder="All data"></div>
+        <div class="field grow"><label for="table-fit-x_max">to</label><input id="table-fit-x_max" type="text" placeholder="All data"></div>
+      </div>
+    </fieldset>
     <div class="import-panel" id="import-panel" hidden>
       <p class="hint">Paste a block of text with one point per line. Columns may be separated by tabs, commas, semicolons or spaces. Then say which column is which.</p>
       <textarea id="import-text" rows="6" class="mono" spellcheck="false" placeholder="1&#9;2.3&#9;0.2&#10;2&#9;4.1&#9;0.2"></textarea>
@@ -288,39 +321,37 @@
 </dialog>
 
 <!-- settings dialog -->
-<dialog id="settings-dialog" class="tframe">
-  <form method="dialog">
-    <div class="titlebar">Backend</div>
-    <div class="dialog-body">
-      <div class="field"><label for="backend-url">Backend URL</label>
-        <input id="backend-url" type="url" value="http://localhost:8000" spellcheck="false"></div>
-      <p class="hint">Where the ROOT server runs. <code>http://localhost:8000</code> is the Docker container on this machine.
-        The setting is remembered by this browser.</p>
-      <div class="row actions">
-        <button id="btn-health" type="button">Check connection</button>
-        <button type="submit" class="primary">Close</button>
-      </div>
-    </div>
-  </form>
-</dialog>
 
 <!-- about dialog -->
 <dialog id="about-dialog" class="tframe">
   <form method="dialog">
-    <div class="titlebar">About GAUSS-O-MATIC 3000</div>
+    <div class="titlebar">About ROOT-A-TRON 3000</div>
     <div class="dialog-body">
       <p>Fits are computed server-side by <a href="https://root.cern" target="_blank" rel="noopener">CERN ROOT</a> (Minuit)
         and drawn by <a href="https://root.cern/js/" target="_blank" rel="noopener">JSROOT</a>. Nothing you enter is stored
-        on the server — use <em>Save document</em> to keep your work.</p>
+        on the server — use <em>Save</em> to keep your work.</p>
       <p>Built by <strong>Minh Tran</strong> (2026) as a redesign of Dr. D. Beznosko's
         <a href="https://sos.clayton.edu/physics/chi2/" target="_blank" rel="noopener">chi2 tool</a>
         (Clayton State University), without accounts or server-side storage.</p>
+      <p><a href="about.html">About the project</a></p>
       <p class="hint" id="about-versions"></p>
       <div class="row actions"><button type="submit" class="primary">Close</button></div>
     </div>
   </form>
 </dialog>
 
-<script src="app.js" defer></script>
+<script src="equation-parser.js?v=20260919-units" defer></script>
+<script defer src="units.js?v=1"></script><script src="analysis-core.js?v=20260919-units" defer></script>
+<script src="workspace-store.js?v=1" defer></script>
+<script src="app.js?v=shared-session" defer></script>
+<dialog id="dataset-type-dialog" class="tframe">
+  <div class="dialog-body">
+    <h2>Add dataset</h2>
+    <p>Select the analysis type for the new dataset.</p>
+    <div class="row"><button type="button" data-new-type="xy">XY data</button><button type="button" data-new-type="histogram">Histogram</button><button type="button" id="dataset-type-cancel">Cancel</button></div>
+  </div>
+</dialog>
+<script src="paste-data.js?v=1" defer></script>
+<script defer src="analysis-features.js?v=20260919-export"></script>
 </body>
 </html>

@@ -3,7 +3,7 @@ fit.py — the core fitting routine. This is the only file that talks to ROOT.
 
 It takes plain Python lists (x, y, errors), builds a TGraphErrors, fits a TF1
 to it, and returns a plain dict that Flask can turn into JSON. It also returns
-the finished ROOT canvas serialised with TBufferJSON so the browser can draw
+the finished ROOT canvas serialized with TBufferJSON so the browser can draw
 exactly what ROOT would draw (via JSROOT), instead of re-implementing plotting.
 
 Runs inside the ROOT container, e.g. for a quick self-test:
@@ -43,6 +43,25 @@ def _safe_title(text):
     return str(text or "").replace(";", ",")
 
 
+def confidence_band(result, function, xmin, xmax, plot):
+    level = plot.get('confidence_level')
+    if level in (None, '', 0, '0'):
+        return None
+    level = float(level)
+    if level not in (.68, .95, .99):
+        raise ValueError('Choose a confidence level of 68%, 95%, or 99%.')
+    if not result.IsValid() or result.Status() != 0 or result.CovMatrixStatus() != 3:
+        return None
+    points = np.linspace(xmin, xmax, 201, dtype=np.float64)
+    errors = np.zeros(len(points), dtype=np.float64)
+    result.GetConfidenceIntervals(len(points), 1, 1, points, errors, level, False)
+    values = np.asarray([function.Eval(float(x)) for x in points])
+    if not np.isfinite(values).all() or not np.isfinite(errors).all() or (errors < 0).any():
+        return None
+    return dict(level=level, x=points.tolist(), y=values.tolist(), errors=errors.tolist(),
+                method='Pointwise linearized covariance; no additional chi-square rescaling; not a prediction interval.')
+
+
 def run_fit(x, y, ex=None, ey=None, formula="pol1",
             par_names=None, par_guesses=None, x_range=None,
             title="", x_title="", y_title="", plot=None):
@@ -59,7 +78,7 @@ def run_fit(x, y, ex=None, ey=None, formula="pol1",
     plot        : dict of drawing options: {"logx": bool, "logy": bool, "grid": bool,
                   "diagnostics": list of per-panel settings; legacy "residuals" is also accepted}
 
-    Returns a plain dict (JSON-serialisable). Raises ValueError for bad input.
+    Returns a plain dict (JSON-serializable). Raises ValueError for bad input.
     """
     plot = plot or {}
     configs = diagnostics.configurations(plot)
@@ -156,6 +175,34 @@ def run_fit(x, y, ex=None, ey=None, formula="pol1",
         raise RuntimeError("ROOT did not attach the fitted function to the graph")
     panels, plot_notes, residuals = diagnostics.calculate(configs, x, y, ex, ey, fitted, xmin, xmax)
 
+    band = confidence_band(result, fitted, xmin, xmax, plot)
+    if plot.get('confidence_level') and band is None:
+        plot_notes.append('Confidence band unavailable: the fit needs a valid, accurate covariance matrix and finite curve values.')
+    out = {
+        'confidence_band': band,
+        "status": status,                     # 0 = converged
+        "converged": status == 0 and result.IsValid(),
+        "status_message": STATUS_MESSAGES.get(status, f"Minuit status {status}"),
+        "formula": formula,
+        "range": [xmin, xmax],
+        "n_points": int(n),
+        "params": params,
+        "chi2": chi2,
+        "ndf": ndf,
+        "chi2_ndf": (chi2 / ndf) if ndf > 0 else None,
+        "prob": float(result.Prob()),          # p-value of chi2 for ndf degrees of freedom
+        "covariance": cov,
+        "residuals": residuals,
+        "diagnostics": panels,
+        "plot_notes": plot_notes,
+        # ROOT objects serialized for JSROOT
+        **render_fit_plot(graph, fitted, panels, plot, x_title, xmin, xmax, band=band),
+    }
+
+    return out
+
+
+def render_fit_plot(graph, fitted, panels, plot, x_title, xmin, xmax, draw_option="AP", plot_summary=None, band=None):
     # Give each selected diagnostic its own pad and physical height. The main
     # fit remains readable even when all optional panels are selected.
     keep = []
@@ -168,9 +215,63 @@ def run_fit(x, y, ex=None, ey=None, formula="pol1",
         pad.SetLogx(int(bool(logx)))
         pad.SetLogy(int(bool(logy)))
 
+    def draw_main():
+        graph.Draw(draw_option)
+        if band:
+            bx = np.asarray(band['x'], dtype=float)
+            by = np.asarray(band['y'], dtype=float)
+            be = np.asarray(band['errors'], dtype=float)
+            ribbon = ROOT.TGraphErrors(len(bx), bx, by, np.zeros(len(bx)), be)
+            ribbon.SetName('confidence_band')
+            ribbon.SetTitle(str(round(band['level']*100)) + '% pointwise confidence band')
+            ribbon.SetFillColorAlpha(ROOT.kAzure-9, .45)
+            ribbon.SetLineColor(ROOT.kAzure-9)
+            ribbon.Draw('3 SAME')
+            points = graph.Clone('data_over_band')
+            points.GetListOfFunctions().Clear()
+            points.Draw('P SAME' if graph.InheritsFrom('TGraph') else 'E1 HIST SAME')
+            keep.append(points)
+            if fitted: fitted.Draw('SAME')
+            keep.append(ribbon)
+        excluded = plot.get('excluded_points') or []
+        if excluded:
+            if len(excluded) > 100000: raise ValueError('Too many excluded points.')
+            xx = np.asarray([p['x'] for p in excluded], dtype=float)
+            yy = np.asarray([p['y'] for p in excluded], dtype=float)
+            if not np.isfinite(xx).all() or not np.isfinite(yy).all(): raise ValueError('Excluded points must be finite.')
+            if graph.InheritsFrom('TGraph'):
+                gx = [graph.GetPointX(i) for i in range(graph.GetN())] + xx.tolist()
+                gy = [graph.GetPointY(i) for i in range(graph.GetN())] + yy.tolist()
+                dx = max(gx)-min(gx); dy = max(gy)-min(gy)
+                graph.GetXaxis().SetLimits(min(gx)-.05*(dx or 1), max(gx)+.05*(dx or 1))
+                graph.SetMinimum(min(gy)-.1*(dy or 1))
+                graph.SetMaximum(max(gy)+.1*(dy or 1))
+            omitted = ROOT.TGraph(len(xx), xx, yy)
+            omitted.SetName('excluded_points')
+            omitted.SetTitle('Excluded measurements')
+            omitted.SetMarkerStyle(24)
+            omitted.SetMarkerColor(ROOT.kGray+1)
+            omitted.Draw('P SAME')
+            keep.append(omitted)
+        if fitted and graph.InheritsFrom('TH1'):
+            fitted.Draw('SAME')
+        if plot_summary:
+            height = min(.75, .038 * len(plot_summary) + .025)
+            box = ROOT.TPaveText(.61, .90-height, .98, .90, 'NDC')
+            box.SetName('histogram_summary')
+            box.SetFillColor(ROOT.kWhite)
+            box.SetBorderSize(1)
+            box.SetTextFont(42)
+            box.SetTextAlign(12)
+            box.SetTextSize(min(.026, (height-.02)/len(plot_summary)*.7))
+            for line in plot_summary:
+                box.AddText(line)
+            box.Draw()
+            keep.append(box)
+
     if not panels:
         style_pad(canvas, plot.get('logx'), plot.get('logy'), plot.get('grid', True))
-        graph.Draw("AP")
+        draw_main()
     else:
         split = 1.0 - main_height / total_height
         main_pad = ROOT.TPad('main_plot', 'Fit', 0, split, 1, 1)
@@ -179,7 +280,7 @@ def run_fit(x, y, ex=None, ey=None, formula="pol1",
         style_pad(main_pad, plot.get('logx'), plot.get('logy'), plot.get('grid', True))
         main_pad.Draw()
         main_pad.cd()
-        graph.Draw('AP')
+        draw_main()
         keep.append(main_pad)
         xlow, xhigh = graph.GetXaxis().GetXmin(), graph.GetXaxis().GetXmax()
         top = split
@@ -272,34 +373,17 @@ def run_fit(x, y, ex=None, ey=None, formula="pol1",
     # Store the curve as sampled points too (fSave). JSROOT can evaluate most
     # formulas itself, but for anything exotic it falls back to these values,
     # so the browser always shows ROOT's own evaluation of the fitted function.
-    fitted.Save(xmin, xmax, 0, 0, 0, 0)
+    if fitted:
+        fitted.Save(xmin, xmax, 0, 0, 0, 0)
 
     def to_dict(obj):
         return json.loads(str(ROOT.TBufferJSON.ToJSON(obj)))
 
     out = {
-        "status": status,                     # 0 = converged
-        "converged": status == 0 and result.IsValid(),
-        "status_message": STATUS_MESSAGES.get(status, f"Minuit status {status}"),
-        "formula": formula,
-        "range": [xmin, xmax],
-        "n_points": int(n),
-        "params": params,
-        "chi2": chi2,
-        "ndf": ndf,
-        "chi2_ndf": (chi2 / ndf) if ndf > 0 else None,
-        "prob": float(result.Prob()),          # p-value of chi2 for ndf degrees of freedom
-        "covariance": cov,
-        "residuals": residuals,
-        "diagnostics": panels,
-        "plot_notes": plot_notes,
         "plot_height": total_height if panels else None,
-        # ROOT objects serialised for JSROOT
         "canvas_json": to_dict(canvas),
         "graph_json": to_dict(graph),
         "func_json": to_dict(fitted) if fitted else None,
     }
-
     canvas.Close()
-    del keep
     return out

@@ -10,6 +10,7 @@ backend/    Python + Flask + PyROOT, runs in a Docker container (rootproject/roo
 frontend/   landing page, Classic and Modern interfaces (no build step)
 examples/   sample saved documents (JSON) you can load into the page
 tests/      reference datasets with independently known results
+start       one command: build if needed, run, open the browser
 root-run    helper: run any command inside the ROOT container
 ```
 
@@ -17,30 +18,81 @@ The form backend stores no analysis data: `POST /fit` returns a result, and
 the page saves your work in a JSON file you download ("Save") and re-open
 ("Load").
 
-## Run the backend
+## Start it
 
-You need Docker. From the repo root:
+You need Docker. Then, from the repo root:
+
+```sh
+./start
+```
+
+macOS and Linux both. It builds the image if it is missing, starts the server,
+waits for it, and opens <http://localhost:8000>. Press Ctrl-C, or close the
+window, to stop. The first build downloads the ROOT image (a few GB); later
+starts take seconds.
+
+Linux users: see **[LINUX.md](LINUX.md)** for installing Docker, the
+applications-menu launcher, SELinux, ARM, rootless and WSL2 notes.
+
+For one button instead of one command:
+
+- **macOS** — double-click `Start ROOT-A-TRON 3000.command` in Finder.
+- **Linux** — run `./start --install-desktop` once; "ROOT-A-TRON 3000" then
+  appears in your applications menu.
+
+```sh
+./start                    # build if needed, run, open a browser
+./start --rebuild          # force a fresh image build first
+./start --no-open          # leave the browser alone
+./start --install-desktop  # Linux applications-menu launcher
+```
+
+`start` rebuilds automatically when a file under `backend/` is newer than the
+last build. On macOS it launches Docker Desktop for you if it is not running;
+on Linux it tells you the `systemctl` command, and recognizes the "user is not
+in the docker group" case. It relabels the bind mount under SELinux, falls back
+from curl to wget to the container's own Python for the health check, and
+prefers `xdg-open` over `/usr/bin/open` (which on Linux can be `openvt`).
+
+Environment overrides:
+
+| | |
+|---|---|
+| `ROOTFIT_DOCKER=podman` | use podman instead of docker |
+| `ROOTFIT_PLATFORM=` | drop `--platform linux/amd64` and build natively |
+| `ROOTFIT_PORT=9000` | listen somewhere other than 8000 |
+
+The frontend is bind-mounted into the container rather than baked into the
+image, so editing a page and reloading is enough — no rebuild, no second
+server, and one origin for both the pages and the API.
+
+### Running the pieces by hand
 
 ```sh
 docker build --platform linux/amd64 -t rootfit-backend backend
-docker run --rm -p 8000:8000 rootfit-backend
-```
-
-The first build downloads the ROOT image (a few GB) — later builds are fast.
-Check it is alive:
-
-```sh
+docker run --rm -p 8000:8000 -v "$PWD/frontend:/app/frontend:ro" rootfit-backend
 curl -s http://localhost:8000/health
 ```
 
+Leaving out the `-v` gives you the API alone; the pages then still work from
+`file://` or any static server, and fall back to `http://localhost:8000` for
+the API. Set `FRONTEND_DIR` to serve the frontend from somewhere else.
+
 ## Open the frontend
 
-Open `frontend/index.html` for the front page, then choose **Make a Plot** and **Classic** or **Modern**. Classic is the compact desktop-style layout. Modern is a worksheet: three numbered steps (data, function, labels and extras) in one column, with the plot and fit report in a panel beside them that stays in view, so changing a setting and fitting again never hides the result; below about 1100px the panel moves underneath. Both share every function in `app.js`. `modern.js` adds only Modern's own presentation — the clickable function shapes (mirrored from the `quick-pick` list app.js maintains, so they follow the analysis type), the one-line summary under each step, and the step highlight that follows the page. Modern's visual design follows root.cern: ROOT blue `#346295`, sand `#e9dcbe` hairlines, a pale blue-grey footer and a 4px radius. **What is ROOT?** opens a short explanation and a link to the official website.
+<http://localhost:8000> is the front page once the server is up — choose **Make a Plot** and **Classic** or **Modern**. Opening `frontend/index.html` directly from disk works too. Classic is the compact desktop-style layout. Modern uses separate Measurements, Fit model, and Results pages. Both share the analysis and backend in `app.js`.
 
-You can also open `frontend/classic.html` or `frontend/modern.html` directly. For shared autosave when switching between Classic and Modern, serve the pages from the same address. Serve the
-folder with any static server, e.g. `cd frontend && python3 -m http.server 8080`
-and visit <http://localhost:8080>. The "Backend URL" setting on the page
-defaults to `http://localhost:8000`; change it if the backend runs elsewhere.
+Modern includes a keyboard-operated equation editor. Type `A exp(-x/tau)+B`, `x_0`, `x^2`, or `sqrt`; common Greek names become symbols automatically. The Typing reference documents multiplication, constants, and supported functions. The editor translates the expression to ROOT and creates parameter fields; rearranging terms preserves parameter identities and initial guesses. ROOT expression mode supports ROOT-specific syntax that the visual editor cannot represent. Classic continues to use ROOT text entry.
+
+Equation drafts and symbol mappings are saved per dataset, including incomplete drafts. An incomplete equation cannot submit the previous valid formula. Unchanged equations survive Classic/Modern switching; editing the ROOT formula invalidates its old visual representation. MathLive 0.110.0 and its fonts are bundled locally under `frontend/vendor/mathlive/` (MIT license); equation editing does not require a CDN. The parser uses an explicit arithmetic/function grammar and does not evaluate user JavaScript.
+
+Both interfaces provide **Paste data…** beside the dataset selector. Paste a rectangular block from Excel with optional headers, inspect the first five rows, and assign X/Y/error columns (or a histogram measurement column). Names such as `u(Voltage)` are matched to their measurement column. Loading creates a new dataset by default; replacing the selected dataset requires confirmation and clears its old result. Blank or invalid mapped cells are reported rather than silently dropped. Tests: `node tests/paste_data_test.cjs`.
+
+You can also open `frontend/classic.html` or `frontend/modern.html` directly.
+Serving the pages from one address (which `./start` does) keeps autosave shared
+when you switch between Classic and Modern. The page uses whichever origin
+served it if that origin answers `/health`, and otherwise
+`http://localhost:8000`; the "Backend URL" setting overrides both.
 
 ### Using the page
 
@@ -127,6 +179,18 @@ Response fields: `params[]` (name, value, error), `chi2`, `ndf`, `chi2_ndf`,
 objects for JSROOT: `canvas_json`, `graph_json`, `func_json`.
 Errors: `{"error": "..."}` with HTTP 400 (your input) or 500 (server).
 
+## Shared analysis session
+
+Classic, Modern, and Analyze Data use **one document** and the `rootfit.autosave` browser key. Opening a session in any workspace replaces the same shared session. Saving in any workspace writes all datasets, per-dataset fit settings and results (including canvases and covariance), notes, quantities, calculation definitions, and source links to one JSON file. Browser autosave is not a permanent backup.
+
+Datasets have stable IDs. Analyze Data shows a dataset box with Raw data and Fit results; no import or copy step is required. Pasted measurements become datasets available in the plotting interfaces. Calculated columns become linked plotting datasets; their Y values and uncertainties are regenerated from the calculation. Scalar quantities remain available for further calculations. Extra source columns and their metadata survive opening and saving in the plotting interfaces.
+
+Fits are linked to the source dataset. Refitting updates calculations that use its parameters. Editing the raw data or model marks an old fit as stale and blocks propagation from it until refitted. Missing sources produce explicit errors. Mathematical propagation retains shared-input covariance; cross-covariance between measured data and an estimated fit parameter is not inferred. Separate input sources are treated as independent. Units remain labels, without automatic conversion or dimensional checking.
+
+Old plotting JSON documents are accepted. Earlier `gauss-analysis` documents can also be opened in any workspace, and the old separate browser autosave is migrated into the shared session. No new data is written to the former DA storage key. Open tabs receive updates; revision checks prevent an older tab from silently overwriting newer work. Use Reload session in Analyze Data, or reload the plotting page, after resolving conflicting unsaved edits.
+
+Run `node tests/workspace_store_test.cjs` for shared-session round trips, fit links, stale-result protection, metadata, old-document migration and revision checks. Run `node tests/analysis_test.cjs` for numerical propagation and covariance.
+
 ## Self-test inside the ROOT container
 
 ```sh
@@ -150,3 +214,11 @@ crystalball breitwigner`.
 Reference: [TF1](https://root.cern/doc/master/classTF1.html),
 [TFormula](https://root.cern/doc/master/classTFormula.html),
 [TMath](https://root.cern/doc/master/namespaceTMath.html).
+
+### Analysis features
+
+- **Point exclusions** (XY data, Standard and Compact): uncheck rows and optionally record reasons. Original values remain in the session. Refit after changes; excluded measurements are open gray markers and do not enter the fit or diagnostics. If excluded row values or positions change, review exclusions before fitting again.
+- **Calculated columns** (Analyze Data): select Calculated column as the result type, insert source columns, and enter an expression. Values and first-order propagated standard uncertainties appear alongside their source dataset and update from the stored calculation. Separate inputs are assumed independent except where fit covariance or shared input identities are available. Units are labels, not automatic conversions.
+- **Correlation matrix**: available below the fit report and in Analyze Data. Undefined zero-variance correlations are shown as a dash.
+- **Confidence bands**: choose None, 68%, 95%, or 99% under plot settings and refit. ROOT computes pointwise linearized covariance intervals, without extra chi-square normalization. These are not simultaneous bands or prediction intervals. Bands require a converged fit with an accurate covariance matrix. Histogram bands describe the fitted density (counts per unit X).
+- **Export analysis**: downloads a ZIP with report.tex, PNG/SVG figures, CSV tables, calculation definitions/results, and the complete session.json. Select which datasets appear in the report; all calculations and the complete session remain in the bundle. Compile report.tex with XeLaTeX. The tool does not generate interpretations or conclusions.

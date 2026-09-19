@@ -1,7 +1,5 @@
 // Run: node tests/modern_navigation_test.cjs
-// Checks Modern's own presentation layer: preset shapes built from the hidden
-// <select>, the step summaries, the step highlight, and what happens when
-// app.js announces a fit, a reset or a message.
+// Checks page navigation, result freshness, and shared application events.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
@@ -94,7 +92,7 @@ datasets.append(new Element('option'));
 const paramTable = make('param-table');
 paramTable.rows = [new Element('tr'), new Element('tr')];
 for (const id of ['state-data', 'state-function', 'state-options', 'diag-tag']) make(id);
-for (const name of ['data', 'function', 'options']) {
+for (const name of ['data', 'function', 'results']) {
   const chip = make(null, 'step-chip');
   chip.dataset.target = 'step-' + name;
   make('step-' + name, 'card');
@@ -104,76 +102,51 @@ for (const kind of ['residual', 'pull', 'ratio', 'percent', 'histogram']) {
 }
 make('graph-title', null, { tag: 'input' });
 make('results', 'rail');
+make('step-options', 'card');
+for (const id of ['modern-back','modern-next','btn-fit','state-results']) make(id);
 make('message', 'message');
+make('result-input-notice');
 make('col-x', null, { tag: 'input' });
 make('col-y', null, { tag: 'input' });
 
 let replots = 0;
-vm.runInNewContext(fs.readFileSync('frontend/modern.js', 'utf8'), {
+const scrolls = [];
+const fixture = {
   document,
-  window: { innerWidth: 900 },                       // narrow: the rail is below the form
+  window: { innerWidth: 900, scrollTo(options) { scrolls.push(options); } },                       // narrow: the rail is below the form
   Event: class { constructor(type) { this.type = type; } },
   requestAnimationFrame: (fn) => fn(),
   replotToSize() { replots += 1; },
-});
+  lastResult: null, lastPayload: null, readForm: () => ({x:[1]}), buildPayload: x => x,
+};
+vm.runInNewContext(fs.readFileSync('frontend/modern.js', 'utf8'), fixture);
 
-// --- 1. the hidden select becomes clickable shapes --------------------------
-const presets = document.querySelectorAll('.preset');
-assert.equal(presets.length, 3, 'one button per preset');
-assert.equal(presets[0].children[0].textContent, 'Straight line');
-assert.equal(presets[0].children[1].textContent, '[0]*x+[1]');
-assert.equal(presets[0].attributes['aria-pressed'], 'true', 'the current formula is marked');
-assert.equal(presets[1].attributes['aria-pressed'], 'false');
+// Presets use the shared native select; summary resolves its current formula.
+assert.equal(select.options.length, 3);
+const html = fs.readFileSync('frontend/modern.html', 'utf8');
+assert.match(html, /<select id="quick-pick">/);
+assert(!html.includes('id="presets"'));
 
-let changes = 0;
-select.addEventListener('change', () => { changes += 1; });
-presets[2].fire('click');
-assert.equal(select.value, 'gaus|constant, mean, sigma|', 'clicking a shape drives the real control');
-assert.equal(changes, 1, 'app.js is notified through a change event');
-
-// --- 2. the step summaries describe the worksheet ---------------------------
-// Nothing is usable until an analysis type is chosen, and the chips say so.
-assert.equal(byId.get('state-data').textContent, 'Choose a type');
-assert.equal(byId.get('state-function').textContent, 'Waiting for data');
-
-byId.get('analysis-type').value = 'xy';
-byId.get('analysis-type').fire('change');
-assert.equal(byId.get('state-data').textContent, '8 points');
-assert.equal(byId.get('state-function').textContent, 'Straight line');
-assert.equal(byId.get('state-options').textContent, 'Defaults');
-
-// A histogram counts measurements, not XY points.
-byId.get('analysis-type').value = 'histogram';
-byId.get('hist-summary').textContent = '200 measurements entered.';
-byId.get('analysis-type').fire('change');
-assert.equal(byId.get('state-data').textContent, '200 measurements entered');
-byId.get('analysis-type').value = 'xy';
-byId.get('analysis-type').fire('change');
-
-byId.get('diag-residual').checked = true;
-byId.get('diag-pull').checked = true;
-byId.get('diag-pull').fire('change');
-assert.equal(byId.get('state-options').textContent, '2 extra plots');
-assert.equal(byId.get('diag-tag').textContent, '2 selected');
-
-datasets.append(new Element('option'));
-byId.get('count-x').textContent = '12';
 byId.get('formula').value = 'gaus';
-byId.get('formula').fire('input');
-assert.equal(byId.get('state-data').textContent, '12 points · 2 datasets');
-assert.equal(byId.get('state-function').textContent, 'Gaussian peak');
-
 // --- 3. step chips scroll and follow ---------------------------------------
-const chips = ['data', 'function', 'options'].map((n) => document.querySelector(`.step-chip[data-target="step-${n}"]`));
+const chips = ['data', 'function', 'results'].map((n) => document.querySelector(`.step-chip[data-target="step-${n}"]`));
+chips[1].fire('click');
+assert.equal(chips[0].attributes['aria-current'], 'step', 'choose an analysis type before opening the model');
+byId.get('analysis-type').value = 'xy';
+chips[1].fire('click');
+assert.equal(chips[0].attributes['aria-current'], 'step', 'enter data before opening the model');
+byId.get('col-x').value = '1 2';byId.get('col-y').value = '3 4';
 chips[1].fire('click');
 assert.equal(chips[1].attributes['aria-current'], 'step');
 assert.equal(chips[0].attributes['aria-current'], undefined, 'only one step is current');
-assert.equal(byId.get('step-function').scrolled, 1, 'the card is scrolled to');
+assert.equal(scrolls.at(-1).top, 0, 'switching pages starts at the document top');
+assert.equal(scrolls.at(-1).behavior, 'instant');
+assert.equal(chips[1].scrolled, 0, 'navigation does not scroll the page to the tabs');
 
 // --- 4. what app.js announces ----------------------------------------------
 document.fire('rootfit:draw');
 assert.ok(replots > 0, 'the plot is told its box may have changed size');
-assert.equal(byId.get('results').scrolled, 1, 'on a narrow screen the result is brought into view');
+assert.equal(scrolls.at(-1).top, 0, 'results start at the document top');
 
 document.fire('rootfit:reset');
 assert.equal(chips[0].attributes['aria-current'], 'step', 'a reset returns to step 1');
@@ -183,4 +156,40 @@ assert.equal(byId.get('message').scrolled, 1, 'errors are scrolled into view');
 document.fire('rootfit:message', { detail: { kind: 'info' } });
 assert.equal(byId.get('message').scrolled, 1, 'ordinary notes do not move the page');
 
-console.log('OK: preset shapes, step summaries, step highlight, and fit/reset/message handling.');
+console.log('OK: native preset dropdown and fit/reset/message handling.');
+
+assert.equal(byId.get('step-data').hidden,false);
+assert.equal(byId.get('step-function').hidden,true);
+assert.equal(byId.get('results').hidden,true);
+byId.get('modern-next').fire('click');
+assert.equal(byId.get('step-data').hidden,true);
+assert.equal(byId.get('step-function').hidden,false);
+assert.equal(byId.get('step-options').hidden,false);
+assert.equal(byId.get('btn-fit').hidden,false);
+document.fire('rootfit:draw');
+assert.equal(byId.get('results').hidden,false);
+assert.equal(byId.get('step-function').hidden,true);
+assert.equal(byId.get('step-options').hidden,true);
+byId.get('modern-back').fire('click');
+assert.equal(byId.get('step-function').hidden,false);
+byId.get('modern-back').fire('click');
+assert.equal(byId.get('step-data').hidden,false);
+chips[0].fire('keydown',{key:'End'});
+assert.equal(byId.get('results').hidden,false);
+assert.equal(byId.get('formula').value,'gaus');
+console.log('OK: three separate pages, Next/Back, keyboard navigation, result transition, and retained inputs.');
+
+assert.equal(scrolls.at(-1).top, 0, 'keyboard navigation also returns to the top');
+assert.ok(scrolls.length >= 8, 'all page transitions reset scroll');
+
+fixture.lastResult = {fit_performed:true};
+fixture.lastPayload = {x:[1]};
+document.fire('rootfit:draw');
+assert.equal(byId.get('result-input-notice').hidden,true);
+fixture.readForm = () => ({x:[2]});
+document.fire('input');
+assert.equal(byId.get('result-input-notice').hidden,false);
+fixture.readForm = () => ({x:[1]});
+document.fire('change');
+assert.equal(byId.get('result-input-notice').hidden,true);
+console.log('OK: result notice distinguishes current inputs from the last fitted inputs.');

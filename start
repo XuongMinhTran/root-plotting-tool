@@ -1,0 +1,226 @@
+#!/bin/sh
+# start — bring up ROOT-A-TRON 3000 with one command. macOS and Linux.
+#
+#   ./start                   build if needed, run, open the browser
+#   ./start --rebuild         force a fresh image build first
+#   ./start --no-open         don't open a browser window
+#   ./start --install-desktop add a launcher to the Linux applications menu
+#
+# Everything ends up on one address: http://localhost:8000
+# The backend serves the pages from the bind-mounted frontend/ folder, so
+# editing a file there and reloading is enough — no rebuild, no second server.
+#
+# Ctrl-C (or closing the window) stops the container.
+#
+# Environment overrides:
+#   ROOTFIT_DOCKER=podman     use podman instead of docker
+#   ROOTFIT_PLATFORM=         skip --platform (native build; try on ARM Linux)
+#   ROOTFIT_PORT=9000         listen somewhere other than 8000
+
+set -eu
+
+DOCKER=${ROOTFIT_DOCKER:-docker}
+PLATFORM=${ROOTFIT_PLATFORM-linux/amd64}
+PORT=${ROOTFIT_PORT:-8000}
+IMAGE=rootfit-backend
+CONTAINER=rootfit
+REPO=$(cd "$(dirname "$0")" && pwd)
+STAMP=$REPO/.rootfit-image-stamp
+URL=http://localhost:$PORT
+REBUILD=no
+OPEN=yes
+
+say() { printf '%s\n' "$*"; }
+die() { printf '\n%s\n' "$*" >&2; exit 1; }
+
+# ------------------------------------------------------------ desktop launcher
+install_desktop() {
+  [ "$(uname)" = Linux ] || die "--install-desktop is for Linux. On macOS, double-click 'Start ROOT-A-TRON 3000.command'."
+  dir=${XDG_DATA_HOME:-$HOME/.local/share}/applications
+  mkdir -p "$dir"
+  file=$dir/rootatron3000.desktop
+  cat > "$file" <<DESKTOP
+[Desktop Entry]
+Type=Application
+Name=ROOT-A-TRON 3000
+Comment=Curve fitting with CERN ROOT
+Exec=$REPO/start
+Path=$REPO
+Terminal=true
+Categories=Science;Education;
+DESKTOP
+  chmod +x "$file"
+  command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database "$dir" 2>/dev/null || true
+  say "Added a 'ROOT-A-TRON 3000' launcher to your applications menu."
+  say "($file)"
+  exit 0
+}
+
+for arg in "$@"; do
+  case "$arg" in
+    --rebuild) REBUILD=yes ;;
+    --no-open) OPEN=no ;;
+    --install-desktop) install_desktop ;;
+    -h|--help) sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) echo "start: unknown option '$arg' (try --help)" >&2; exit 2 ;;
+  esac
+done
+
+# ---------------------------------------------------------------- docker check
+command -v "$DOCKER" >/dev/null 2>&1 || die \
+"'$DOCKER' is not installed, or not on this shell's PATH.
+
+  macOS   https://www.docker.com/products/docker-desktop/
+  Linux   your distribution's docker.io / docker-ce package,
+          or set ROOTFIT_DOCKER=podman if you use podman
+
+Then run ./start again."
+
+if ! "$DOCKER" info >/dev/null 2>&1; then
+  why=$("$DOCKER" info 2>&1 || true)
+  case "$why" in
+    *"permission denied"*|*"Permission denied"*)
+      die \
+"Docker is installed but this user is not allowed to talk to it.
+
+Add yourself to the docker group, then log out and back in:
+
+  sudo usermod -aG docker \"\$USER\"
+
+To use it in this shell straight away:  newgrp docker" ;;
+  esac
+
+  # macOS: Docker Desktop is probably just not launched yet. Give it a chance.
+  if [ "$(uname)" = Darwin ] && [ -d /Applications/Docker.app ]; then
+    say "Starting Docker Desktop…"
+    /usr/bin/open -g -a Docker || true
+    i=0
+    while [ "$i" -lt 60 ]; do
+      "$DOCKER" info >/dev/null 2>&1 && break
+      sleep 2
+      i=$((i + 1))
+    done
+  fi
+
+  if ! "$DOCKER" info >/dev/null 2>&1; then
+    if [ "$(uname)" = Darwin ]; then
+      die "Docker is installed but not running. Start Docker Desktop, wait for the
+whale icon to stop animating, then run ./start again."
+    else
+      die "Docker is installed but the daemon is not running. Start it with:
+
+  sudo systemctl start docker        (and: sudo systemctl enable docker)
+
+then run ./start again."
+    fi
+  fi
+fi
+
+# ----------------------------------------------------------------- build image
+# Staleness is tracked with a stamp file rather than by parsing the image's
+# timestamp: `find -newer FILE` is portable, `-newermt <RFC3339 string>` is not.
+needs_build=no
+[ "$REBUILD" = yes ] && needs_build=yes
+"$DOCKER" image inspect "$IMAGE" >/dev/null 2>&1 || needs_build=yes
+[ -f "$STAMP" ] || needs_build=yes
+
+if [ "$needs_build" = no ]; then
+  newer=$(find "$REPO/backend" -type f \
+            \( -name '*.py' -o -name 'Dockerfile' -o -name 'requirements.txt' \) \
+            -newer "$STAMP" -print 2>/dev/null | head -n 1 || true)
+  [ -n "$newer" ] && { say "A backend file changed since the image was built."; needs_build=yes; }
+fi
+
+set -- 
+[ -n "$PLATFORM" ] && set -- --platform "$PLATFORM"
+
+if [ "$needs_build" = yes ]; then
+  say "Building the ROOT image. The first build downloads a few GB and takes a"
+  say "while; later builds are fast."
+  "$DOCKER" build "$@" -t "$IMAGE" "$REPO/backend" \
+    || die "The image could not be built. The output above says why.
+On ARM (Apple Silicon, ARM Linux) an amd64 build needs emulation; if it failed
+for that reason, try:  ROOTFIT_PLATFORM= ./start --rebuild"
+  touch "$STAMP"
+fi
+
+# ------------------------------------------------------------------- run it
+# SELinux (Fedora, RHEL, ...) blocks container reads of an unlabelled bind
+# mount; ,z asks the engine to relabel it as shared content.
+MOUNT_OPTS=ro
+if command -v getenforce >/dev/null 2>&1 && [ "$(getenforce 2>/dev/null || echo)" = Enforcing ]; then
+  MOUNT_OPTS=ro,z
+fi
+
+"$DOCKER" rm -f "$CONTAINER" >/dev/null 2>&1 || true
+
+cleanup() {
+  printf '\nStopping…\n'
+  "$DOCKER" rm -f "$CONTAINER" >/dev/null 2>&1 || true
+  exit 0
+}
+trap cleanup INT TERM HUP
+
+if ! "$DOCKER" run -d --rm --name "$CONTAINER" "$@" \
+       -p "$PORT:8000" \
+       -v "$REPO/frontend:/app/frontend:$MOUNT_OPTS" \
+       "$IMAGE" >/dev/null; then
+  die "The container could not start.
+If the message above mentions port $PORT, something else is already using it.
+Pick another:  ROOTFIT_PORT=9000 ./start"
+fi
+
+# ---------------------------------------------------------------- wait & open
+# curl is not on every minimal Linux install; fall back to wget, then to the
+# container's own python3, which the ROOT image always has.
+http_ok() {
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsS "$1" >/dev/null 2>&1
+  elif command -v wget >/dev/null 2>&1; then
+    wget -qO- "$1" >/dev/null 2>&1
+  else
+    "$DOCKER" exec "$CONTAINER" python3 -c \
+      "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/health',timeout=2)" \
+      >/dev/null 2>&1
+  fi
+}
+
+open_url() {
+  # Check xdg-open first: on Linux /usr/bin/open is an alternatives link that
+  # can point at openvt, which would switch virtual terminals instead.
+  if command -v xdg-open >/dev/null 2>&1; then xdg-open "$1" >/dev/null 2>&1 && return 0; fi
+  if command -v gio >/dev/null 2>&1; then gio open "$1" >/dev/null 2>&1 && return 0; fi
+  if [ "$(uname)" = Darwin ]; then /usr/bin/open "$1" >/dev/null 2>&1 && return 0; fi
+  return 1
+}
+
+printf 'Starting ROOT'
+i=0
+until http_ok "$URL/health"; do
+  i=$((i + 1))
+  if [ "$i" -gt 60 ]; then
+    printf '\n'
+    say "The server did not answer within 60 seconds. Its log:"
+    "$DOCKER" logs "$CONTAINER" 2>&1 | tail -n 20
+    cleanup
+  fi
+  "$DOCKER" ps -q -f "name=^${CONTAINER}$" | grep -q . || {
+    printf '\n'
+    say "The server stopped while starting up. Its log:"
+    "$DOCKER" logs "$CONTAINER" 2>&1 | tail -n 20
+    exit 1
+  }
+  printf '.'
+  sleep 1
+done
+printf ' ready\n\n'
+
+say "  ROOT-A-TRON 3000 is running at  $URL"
+say "  Press Ctrl-C to stop."
+say ""
+
+[ "$OPEN" = yes ] && { open_url "$URL" || say "  (Open $URL yourself — no browser opener found.)"; }
+
+# Stay in the foreground streaming the log, so Ctrl-C lands in the trap above.
+"$DOCKER" logs -f "$CONTAINER" 2>&1 || true
+cleanup

@@ -1,0 +1,18 @@
+const assert=require('node:assert/strict'),P=require('../frontend/paste-data.js');
+const t=P.parse('Time [s]\tVoltage [V]\tu(Voltage)\n0\t2.4\t0.1\n1\t1.8\t0.1');
+assert.equal(t.hasHeader,true);assert.deepEqual(P.defaults(t,'xy'),['x','y','ey']);
+assert.deepEqual(P.convert(t,P.defaults(t,'xy'),'xy'),{x:'0\n1',y:'2.4\n1.8',ex:'',ey:'0.1\n0.1',samples:''});
+const reordered=P.parse('u(x)\ty\tx\tu(y)\n.1\t5\t2\t.3');assert.deepEqual(P.defaults(reordered,'xy'),['ex','y','x','ey']);
+assert.equal(P.parse('1\t2\n3\t4').hasHeader,false);
+assert.equal(P.parse('1\t2\n3\t4','yes').rows.length,1);
+assert.equal(P.parse('x\ty\n1\t2','no').hasHeader,false);
+assert.throws(()=>P.convert(P.parse('x\ty\tu(y)\n1\t\t0.1'),['x','y','ey'],'xy'),/Empty cells/);
+assert.throws(()=>P.convert(t,['x','x','ey'],'xy'),/only one column/);
+assert.throws(()=>P.convert(t,['x','','ey'],'xy'),/Y/);
+assert.throws(()=>P.convert(P.parse('1\t2\t-.1'),['x','y','ey'],'xy'),/nonnegative/);
+assert.throws(()=>P.convert(P.parse('1\tabc'),['x','y'],'xy'),/finite/);
+assert.equal(P.convert(P.parse('Voltage\n1.2\n1.4'),['samples'],'histogram').samples,'1.2\n1.4');
+assert.deepEqual(P.parse('"Time [s]","Voltage, calibrated"\n1,2').headers,['Time [s]','Voltage, calibrated']);
+assert.throws(()=>P.parse('"a\tb\n1\t2'),/quoted cell/);
+assert.equal(P.parse('x\ty\n1\t2\n\n').rows.length,1);
+console.log('OK: Excel headers, reordered uncertainty columns, header override, missing cells, duplicate mapping, invalid values, histogram samples and quoted CSV.');

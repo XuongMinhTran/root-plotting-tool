@@ -4,115 +4,120 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="description" content="Fit a function to your measurements with CERN ROOT and read off the parameters, uncertainties and goodness of fit.">
-<title>Fit and plot · GAUSS-O-MATIC 3000</title>
-<link rel="stylesheet" href="style.css">
-<link rel="stylesheet" href="modern.css">
+<title>Standard workspace · ROOT-A-TRON 3000</title>
+<link rel="stylesheet" href="style.css?v=20260917-save-notice">
+<link rel="stylesheet" href="modern.css?v=20260918-example-menu">
+<link rel="stylesheet" href="paste-data.css?v=1">
+<link rel="stylesheet" href="site-brand.css?v=1">
+<link rel="stylesheet" href="analysis-features.css?v=20260919-export">
+<script defer src="analysis-export.js?v=20260919-pdf"></script>
 </head>
 <body class="modern">
 <a class="skip-link" href="#main">Skip to the worksheet</a>
 
 <header class="masthead">
   <a class="brand" href="index.html">
-    <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><rect x="1" y="1" width="30" height="30" rx="4" fill="#fff" fill-opacity=".1" stroke="#fff" stroke-opacity=".45"/><path d="M6 25V7M6 25h20" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/><path d="M7.5 22c4-1.5 6.5-8 9-11.5S23 7 25.5 10" stroke="#8fc4ff" stroke-width="2" fill="none" stroke-linecap="round"/><circle cx="11" cy="18.5" r="1.7" fill="#fff"/><circle cx="16.5" cy="12" r="1.7" fill="#fff"/><circle cx="22" cy="10.5" r="1.7" fill="#fff"/></svg>
-    <span class="brand-text"><span class="brand-name">GAUSS-O-MATIC 3000</span><span class="brand-sub">Curve fitting with CERN ROOT</span></span>
+    <span class="brand-text"><span class="brand-name">ROOT-A-TRON 3000</span></span>
   </a>
   <nav aria-label="Interfaces">
-    <a href="modern.html" aria-current="page">Fit &amp; plot</a>
-    <a href="classic.html">Classic</a>
-    <a href="cli.html">Console</a>
+    <a href="modern.html" aria-current="page">Standard</a>
+    <a href="classic.html">Compact</a>
+    <a href="uncertainties.html">Analyze Data</a>
     <a href="index.html">Home</a>
   </nav>
 </header>
 
-<!-- the document's own name lives with the file actions; `inputs` marks it for autosave -->
-<div class="worksheet-bar inputs">
-  <div class="title-field">
-    <svg class="title-icon" width="17" height="17" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 1.5h6.5L13 5v9.5H3z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M9.3 1.6V5H13" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
-    <input id="doc-title" type="text" placeholder="Untitled analysis" aria-label="Title of this analysis">
-  </div>
-  <div class="doc-actions">
-    <button id="btn-load" type="button">Open…</button>
-    <button id="btn-save" type="button">Save</button>
-    <details class="utilities"><summary>More</summary><div class="utility-menu">
-      <button type="button" data-action="example" data-example="linear">Example: straight line</button>
-      <button type="button" data-action="example" data-example="exp">Example: exponential decay</button>
-      <button type="button" data-action="example" data-example="gaus">Example: Gaussian peak</button>
-      <hr>
-      <button type="button" data-action="report-copy" data-needs-result disabled>Copy the fit report</button>
-      <button id="btn-clear" type="button">Clear everything</button>
-      <hr>
-      <button type="button" data-action="settings">Connection settings…</button>
-      <button type="button" data-action="about">About this tool</button>
-    </div></details>
-  </div>
-</div>
-
 <main class="workspace" id="main" tabindex="-1">
+  <div class="worksheet-bar inputs">
+    <div class="doc-actions" role="toolbar" aria-label="Document">
+      <button id="btn-load" type="button">Open…</button>
+      <button id="btn-save" type="button">Save</button>
+      <button type="button" class="danger" data-action="clear-all">Clear all</button>
+    </div>
+    <div class="title-field">
+      <label for="doc-title">Analysis title</label>
+      <input id="doc-title" type="text" placeholder="Untitled analysis">
+    </div>
+  </div>
+
+    <nav class="steps" aria-label="Worksheet steps">
+      <button type="button" class="step-chip" data-target="step-data" aria-current="step">
+        <span class="label"><b>Measurements</b></span></button>
+      <button type="button" class="step-chip" data-target="step-function">
+        <span class="label"><b>Fit model</b></span></button>
+      <button type="button" class="step-chip" data-target="step-results">
+        <span class="label"><b>Results</b></span></button>
+    </nav>
+  <div id="message" class="message" role="status" aria-live="polite" hidden></div>
 
   <!-- ==================== the worksheet ==================== -->
   <div class="worksheet inputs" id="inputs">
 
-    <nav class="steps" aria-label="Worksheet steps">
-      <button type="button" class="step-chip" data-target="step-data" aria-current="step">
-        <span class="n">1</span><span class="label"><b>Your data</b><span id="state-data">No points yet</span></span></button>
-      <button type="button" class="step-chip" data-target="step-function">
-        <span class="n">2</span><span class="label"><b>The function</b><span id="state-function">Straight line</span></span></button>
-      <button type="button" class="step-chip" data-target="step-options">
-        <span class="n">3</span><span class="label"><b>Labels &amp; extras</b><span id="state-options">Defaults</span></span></button>
-    </nav>
+
 
     <!-- ---------- step 1 ---------- -->
     <section class="card" id="step-data" aria-labelledby="h-data">
-      <header><span class="n">1</span><h2 id="h-data">Your data</h2>
+      <header><h2 id="h-data">Measurements</h2>
         <button type="button" class="help-btn" data-help="data" aria-label="Help on entering data">?</button></header>
       <!-- app.js rewrites this line to suit the analysis type, so it keeps the
            id and class it looks for. -->
       <div id="panel-data">
-      <p class="lede section-description">Select an analysis type to get started.</p>
+
+
+      <div class="field example-actions">
+        <label for="example-dataset">Example dataset</label>
+        <select id="example-dataset">
+          <option value="">Choose an example…</option>
+          <option value="linear">Straight line</option>
+          <option value="exp">Exponential decay</option>
+          <option value="gaus">Gaussian peak</option>
+          <option value="histogram">Count histogram</option>
+        </select>
+      </div>
 
       <div class="field analysis-choice">
-        <label for="analysis-type">What kind of data is this?</label>
+        <label for="analysis-type">Analysis type</label>
         <select id="analysis-type">
-          <option value="" disabled selected>Choose…</option>
-          <option value="xy">XY data — a pair of numbers per measurement</option>
-          <option value="histogram">Histogram — counts falling into bins</option>
+          <option value="" disabled selected>Select analysis type…</option>
+          <option value="xy">XY data</option>
+          <option value="histogram">Histogram</option>
         </select>
       </div>
 
       <div class="dataset-row">
-        <span class="swatch" id="dataset-swatch"></span>
-        <select id="dataset-select" aria-label="Which dataset you are editing"></select>
-        <button type="button" class="small" data-action="dataset-add" title="Add another dataset">Add</button>
+        <select id="dataset-select" aria-label="Dataset"></select>
+        <button type="button" class="small" data-action="dataset-add" title="Create a dataset">New plot</button>
+        <button type="button" class="small" data-paste-spreadsheet>Paste data…</button>
         <button type="button" class="small" data-action="dataset-duplicate" title="Copy this dataset and its fit settings">Duplicate</button>
         <button type="button" class="small" data-action="dataset-rename" title="Rename this dataset">Rename</button>
-        <button type="button" class="small" data-action="dataset-remove" title="Remove this dataset">Remove</button>
-        <button type="button" class="small expand" id="btn-table">Open table editor</button>
+        <button type="button" class="small" data-action="dataset-remove" title="Delete this dataset">Delete</button>
+        <button type="button" class="small expand" id="btn-table">Data table</button>
       </div>
-      <p class="hint dataset-note" id="modern-data-summary"></p>
+      <p class="hint dataset-note" id="modern-data-summary" hidden></p>
 
       <!-- ---- histogram input ---- -->
       <div id="histogram-data" hidden>
-        <div class="field"><label for="hist-source">Where do the numbers come from?</label>
+        <div class="field"><label for="hist-source">Histogram input</label>
           <select id="hist-source">
-            <option value="samples">Individual measurements — group them into bins for me</option>
-            <option value="counts">Counts that are already binned</option>
+            <option value="samples">Individual measurements</option>
+            <option value="counts">Pre-binned counts</option>
           </select></div>
         <div id="hist-samples-group" class="field"><label for="hist-samples">Measurements</label>
           <textarea id="hist-samples" rows="7" spellcheck="false" placeholder="One measurement per line"></textarea></div>
         <div id="hist-counts-group" class="field" hidden><label for="hist-counts">Bin counts</label>
           <textarea id="hist-counts" rows="7" spellcheck="false" placeholder="One nonnegative whole count per bin"></textarea>
-          <p class="hint">Use the original counts — before any weighting, normalisation or background subtraction.</p></div>
+          <p class="hint">Enter unweighted, nonnegative integer counts before normalization or background subtraction.</p></div>
         <div id="hist-binning" class="row histogram-binning">
           <div class="field grow"><label for="hist-bins">Number of bins</label>
             <input id="hist-bins" type="number" min="1" max="2000" placeholder="Automatic" aria-describedby="hist-bins-help"></div>
           <div class="field grow"><label for="hist-min">Range from</label><input id="hist-min" type="text" placeholder="Automatic"></div>
           <div class="field grow"><label for="hist-max">to</label><input id="hist-max" type="text" placeholder="Automatic"></div>
         </div>
-        <p class="hint" id="hist-bins-help">Leave the bin count blank to use the range width, rounded up to a whole number (at least one bin). With no range, the smallest and largest measurements set it.</p>
-        <details id="hist-edges-details" class="fold"><summary>Set the bin edges yourself <span class="tag">uneven bins</span></summary>
+        <p class="hint" id="hist-bins-help">Leave the bin count blank to use the range width, rounded up to a whole number (at least one bin). If both range limits are blank, the sample minimum and maximum define the range.</p>
+        <details id="hist-edges-details" class="fold"><summary>Bin edges</summary>
           <div class="fold-body"><div class="field"><label for="hist-edges">Edges, in increasing order</label>
             <textarea id="hist-edges" rows="4" spellcheck="false" placeholder="0, 1, 2, 4, 8"></textarea>
-            <p class="hint">Required for counts that are already binned: give one more edge than counts. For measurements, edges here replace the bin count and range above. Bins may have different widths.</p></div></div></details>
+            <p class="hint">For N bins, enter N + 1 strictly increasing edges. Explicit edges override the bin count and range.</p></div></div></details>
         <p class="hint hist-summary" id="hist-summary" role="status"></p>
         <p class="hint">The plot shows counts per unit X, so bins of different widths can be compared. Values on the final right edge are included; measurements outside the edges are reported separately.</p>
         <button type="button" id="btn-histogram">Plot histogram without fitting</button>
@@ -130,80 +135,104 @@
         <div class="col"><div class="col-head"><span class="cerr">X uncertainty</span><span class="count" id="count-ex">0</span></div>
           <textarea id="col-ex" aria-label="X uncertainties" spellcheck="false" placeholder="optional"></textarea></div>
       </div>
-      <p class="hint">One value per line — commas, tabs and spaces work too. The <strong>table editor</strong> lets you paste a whole spreadsheet block at once and keep several datasets side by side.</p>
+      <p class="hint">Separate values with newlines, commas, tabs, or spaces. Uncertainties: one value per axis or one per point. Use Paste data… to load spreadsheet columns with a preview.</p>
       </div>
       </div>
     </section>
 
     <!-- ---------- step 2 ---------- -->
-    <section class="card" id="step-function" aria-labelledby="h-function">
-      <header><span class="n">2</span><h2 id="h-function">The function</h2>
-        <button type="button" class="help-btn" data-help="formula" aria-label="Help on writing a fit function">?</button></header>
-      <p class="lede">Pick a shape below, or write your own. <code>x</code> is the measurement, and <code>[0]</code>, <code>[1]</code>, … are the numbers ROOT will find for you.</p>
+    <section class="card" id="step-function" hidden aria-labelledby="h-function">
+      <header><h2 id="h-function">Fit model</h2>
+</header>
 
-      <div class="field"><label for="fit-dataset-select">Fitting which dataset?</label>
-        <select id="fit-dataset-select" aria-describedby="fit-dataset-label"></select></div>
-      <p class="hint" id="fit-dataset-label"></p>
+
 
       <div id="hist-fit-options" hidden>
-        <div class="field"><label for="hist-method">How should the counts be fitted?</label>
+        <div class="field"><label for="hist-method">Fit method</label>
           <select id="hist-method">
-            <option value="poisson">Poisson likelihood — best for small counts</option>
+            <option value="poisson">Poisson likelihood</option>
             <option value="chi2">χ² with √count uncertainties</option>
           </select></div>
-        <p class="hint">The function gives counts per unit X; its integral across a bin predicts that bin's count. Poisson likelihood keeps empty bins and suits sparse data; χ² leaves empty bins out. The fit range picks bins by their centres.</p>
+        <p class="hint">The model is a count density; its bin integral gives the expected count. Poisson likelihood includes empty bins; χ² uses √count uncertainties and excludes empty bins. Fit-range limits select bins by their centers.</p>
       </div>
 
-      <div class="formula-field">
-        <label for="formula">Fit function</label>
-        <input id="formula" type="text" class="mono" value="[0]*x+[1]" spellcheck="false" autocomplete="off" placeholder="[0]*x+[1]">
+      <div class="equation-editor">
+        <fieldset class="equation-mode-field" id="equation-mode">
+          <legend>Function input</legend>
+          <div class="equation-mode-options">
+            <input type="radio" name="equation-mode" id="mode-equation" value="equation" aria-controls="equation-visual" checked>
+            <label for="mode-equation">Equation editor</label>
+            <input type="radio" name="equation-mode" id="mode-root" value="root" aria-controls="equation-root">
+            <label for="mode-root">ROOT expression</label>
+          </div>
+        </fieldset>
+        <div id="equation-visual">
+          <label id="equation-label" for="fit-equation">Fit function</label>
+          <math-field id="fit-equation" aria-labelledby="equation-label" aria-describedby="equation-rules equation-error" math-virtual-keyboard-policy="manual"></math-field>
+          <p class="hint" id="equation-rules"><code>x</code> is the independent variable. Other symbols become fit parameters; <code>e</code> and π are constants. Type <code>x_0</code> for a subscript or <code>x^2</code> for a power.</p>
+        </div>
+        <div class="formula-field" id="equation-root" hidden>
+          <label for="formula">ROOT fit expression</label>
+          <input id="formula" type="text" class="mono" value="[0]*x+[1]" spellcheck="false" autocomplete="off" placeholder="[0]*x+[1]"><details class="equation-help"><summary>Typing reference</summary><p>Use <code>x</code> for the independent variable and <code>[0]</code>, <code>[1]</code>, … for fit parameters. Write multiplication as <code>*</code>, division as <code>/</code>, and powers as <code>pow(x,2)</code>. Functions include <code>exp(x)</code>, <code>log(x)</code>, <code>sin(x)</code>, and <code>sqrt(x)</code>. Use <code>TMath::Pi()</code> for π. Example: <code>[0]*exp(-x/[1])+[2]</code>.</p></details>
+          <p class="hint">Use <code>x</code> for the independent variable and <code>[0]</code>, <code>[1]</code>, … for parameters. ROOT named functions and TMath expressions are supported.</p>
+        </div>
+        <p id="equation-error" class="equation-error" role="status" hidden></p>
+        <details id="equation-translation"><summary>ROOT expression</summary><code id="equation-root-preview"></code></details>
+        <details class="equation-help"><summary>Typing reference</summary>
+          <p>Type <code>alpha</code>, <code>beta</code>, <code>mu</code>, <code>sigma</code>, <code>tau</code>, <code>lambda</code>, or <code>theta</code> for Greek symbols, and <code>pi</code> for π. Other Greek letters can be entered as LaTeX commands, such as <code>\omega</code>, followed by Space. Type <code>sqrt</code> for a square root, <code>/</code> for a fraction, <code>^</code> for a power, and <code>_</code> for a subscript. Use Ctrl/⌘ + Z to undo.</p>
+          <p>Enter the right-hand side of the model, for example <code>A exp(-x/tau) + B</code>. Use the arrow keys to move out of a fraction, exponent, or subscript. LaTeX expressions can also be pasted into the field.</p>
+          <p>Adjacent symbols multiply: <code>ab</code> means <code>a × b</code>. For a single parameter with a longer name, enter <code>\mathrm{background}</code>. A subscripted symbol such as <code>x_0</code> is a parameter. Report names can differ from equation symbols.</p>
+          <p>Functions require parentheses. Supported functions include exp, ln (natural logarithm), log (natural logarithm), log10, sin, cos, tan, asin, acos, atan, sinh, cosh, tanh, sqrt, abs, erf, erfc, pow, min, max, and atan2. Use ROOT expression mode for other ROOT functions.</p>
+        </details>
       </div>
 
-      <p class="preset-label" id="preset-label">Common shapes</p>
-      <div class="presets" id="presets" role="group" aria-labelledby="preset-label"></div>
-      <!-- app.js fills this in, and swaps the list when the analysis type
-           changes; modern.js mirrors it as the buttons above. -->
-      <select id="quick-pick" hidden aria-hidden="true" tabindex="-1"><option value="">Examples…</option></select>
+      <div class="field">
+        <label for="quick-pick">Function presets</label>
+        <select id="quick-pick"><option value="">Examples…</option></select>
+      </div>
 
-      <p class="hint"><a href="https://root.cern/doc/master/classTFormula.html" target="_blank" rel="noopener">TFormula syntax</a> ·
+      <p class="hint" id="root-syntax-links"><a href="https://root.cern/doc/master/classTFormula.html" target="_blank" rel="noopener">TFormula syntax</a> ·
         <a href="https://root.cern/doc/master/namespaceTMath.html" target="_blank" rel="noopener">TMath functions</a> —
-        named shapes such as <code>gaus</code>, <code>expo</code> and <code>pol2</code> work on their own too.</p>
+        named functions such as <code>gaus</code>, <code>expo</code> and <code>pol2</code> are supported.</p>
 
       <div class="param-block">
-        <p class="preset-label">Parameters
-          <button type="button" class="help-btn" data-help="guesses" aria-label="Help on starting values">?</button></p>
+        <div class="parameter-heading"><p class="preset-label">Parameters</p><a class="parameter-guide-button" href="documentation.html#initial-parameters" target="_blank" rel="noopener" aria-label="Help with parameters (opens in a new tab)">Help with parameters</a></div>
+        <p class="hint"><strong>Initial guesses matter for nonlinear fits.</strong> Estimate slopes, peak heights, positions, and widths from the data, using the model’s units. Poor guesses can prevent convergence or lead to a different minimum. Leave a value blank to use its default or automatic estimate, where available.</p>
+        <details class="fold parameter-paste"><summary>Paste comma-separated parameters</summary><div class="fold-body">
+          <div class="field-row">
+            <div class="field"><label for="param-names">Parameter names (comma-separated)</label>
+              <input id="param-names" type="text" placeholder="slope, intercept" spellcheck="false"></div>
+            <div class="field"><label for="initial-guesses">Initial guesses (comma-separated)</label>
+              <input id="initial-guesses" type="text" class="mono" placeholder="1, 0" spellcheck="false"></div>
+          </div>
+          <p class="hint">Paste values in parameter order: [0], [1], [2], … Leave an initial guess empty between commas to keep that parameter’s default. Edits update the table below.</p>
+        </div></details>
         <table class="param-table" id="param-table">
-          <thead><tr><th>#</th><th>Name</th><th>Starting value</th></tr></thead>
+          <thead><tr><th id="equation-parameter-heading">Symbol / index</th><th id="equation-name-heading">Report name</th><th>Initial guess</th></tr></thead>
           <tbody></tbody>
         </table>
         <p class="hint" id="param-table-note"></p>
       </div>
 
       <details class="fold" id="param-expander">
-        <summary>Fit range and text entry <span class="tag">optional</span></summary>
+        <summary>Fit range</summary>
         <div class="fold-body">
           <div class="field-row">
-            <div class="field"><label for="fit-xmin">Fit from x <span class="hint-inline">(blank = all data)</span></label>
+            <div class="field"><label for="fit-xmin">X minimum</label>
               <input id="fit-xmin" type="text" class="mono" inputmode="decimal" placeholder="x min"></div>
-            <div class="field"><label for="fit-xmax">up to x</label>
+            <div class="field"><label for="fit-xmax">X maximum</label>
               <input id="fit-xmax" type="text" class="mono" inputmode="decimal" placeholder="x max"></div>
           </div>
-          <div class="field-row">
-            <div class="field"><label for="param-names">Parameter names</label>
-              <input id="param-names" type="text" placeholder="slope, intercept" spellcheck="false"></div>
-            <div class="field"><label for="initial-guesses">Starting values</label>
-              <input id="initial-guesses" type="text" class="mono" placeholder="1, 0" spellcheck="false"></div>
-          </div>
-          <p class="hint">These two boxes are the same information as the table above, written as comma-separated lists. Editing either one updates the other.</p>
+          <p class="hint">Blank limits use the corresponding data-range bounds.</p>
+
         </div>
       </details>
     </section>
 
     <!-- ---------- step 3 ---------- -->
-    <section class="card" id="step-options" aria-labelledby="h-options">
-      <header><span class="n">3</span><h2 id="h-options">Labels &amp; extras</h2>
+    <section class="card" id="step-options" hidden aria-labelledby="h-options">
+      <header><h2 id="h-options">Plot settings</h2>
         <button type="button" class="help-btn" data-help="plot" aria-label="Help on plot options">?</button></header>
-      <p class="lede">Everything here is optional — a fit works without it.</p>
 
       <div class="field"><label for="graph-title">Plot title</label>
         <input id="graph-title" type="text" placeholder="Period against length"></div>
@@ -218,25 +247,25 @@
       </div>
 
       <details class="fold" id="plot-expander">
-        <summary>Extra plots below the fit <span class="tag" id="diag-tag">none selected</span></summary>
+        <summary>Diagnostic plots</summary>
         <div class="fold-body">
           <fieldset class="optional-plots">
-            <legend class="sr-only">Extra plots</legend>
-            <p class="hint" style="margin-top:0">These show how far each point sits from the fitted curve — the quickest way to see whether the shape is right. Choose any combination, then fit again.</p>
+            <legend class="sr-only">Diagnostic plots</legend>
+            <p class="hint" style="margin-top:0">Select any combination. Run the fit to update the selected diagnostics.</p>
             <div class="optional-choices">
 <label class="optional-choice"><input type="checkbox" id="diag-residual"><span>Residuals<small>data − fit</small></span></label>
-<label class="optional-choice"><input type="checkbox" id="diag-pull"><span>Pulls<small>(data − fit) ÷ uncertainty</small></span></label>
+<label class="optional-choice"><input type="checkbox" id="diag-pull"><span>Pulls<small>(data − fit) / effective uncertainty</small></span></label>
 <label class="optional-choice"><input type="checkbox" id="diag-ratio"><span>Data / fit<small>ratio to the fitted curve</small></span></label>
 <label class="optional-choice"><input type="checkbox" id="diag-percent"><span>Percentage difference<small>100 × (data − fit) ÷ fit</small></span></label>
 <label class="optional-choice"><input type="checkbox" id="diag-histogram"><span>Residual histogram<small>distribution of data − fit</small></span></label>
             </div>
-            <details class="fold diagnostic-advanced"><summary>Fine-tune each extra plot <span class="tag">titles, ranges, height</span></summary>
+            <details class="fold diagnostic-advanced"><summary>Diagnostic settings</summary>
               <div class="fold-body">
-                <p class="hint" id="diag-empty">Tick an extra plot above to set its options.</p>
+                <p class="hint" id="diag-empty">Select a diagnostic to configure its axes and display.</p>
 <details class="diagnostic-config" id="diag-settings-residual" hidden><summary>Residuals</summary><div class="diagnostic-fields"><div class="field"><label for="diag-residual-title">Plot title</label><input type="text" id="diag-residual-title" placeholder="Residuals"></div><div class="field"><label for="diag-residual-x_title">X-axis label</label><input type="text" id="diag-residual-x_title" placeholder="Same as main X axis"></div><div class="field"><label for="diag-residual-y_title">Y-axis label</label><input type="text" id="diag-residual-y_title" placeholder="data − fit"></div><div class="field"><label for="diag-residual-y_min">Y minimum</label><input type="text" id="diag-residual-y_min" placeholder="Automatic"></div><div class="field"><label for="diag-residual-y_max">Y maximum</label><input type="text" id="diag-residual-y_max" placeholder="Automatic"></div><div class="field"><label for="diag-residual-height">Panel height (px)</label><input type="number" min="180" max="480" step="1" value="240" id="diag-residual-height"></div><div class="field"><label for="diag-residual-scope">Include points</label><select id="diag-residual-scope"><option value="fit">Within the fit range</option><option value="all">All data points</option></select></div></div><div class="checks"><label class="check"><input type="checkbox" checked id="diag-residual-grid"> Grid</label><label class="check"><input type="checkbox" checked id="diag-residual-reference"> Reference line at 0</label><label class="check"><input type="checkbox" checked id="diag-residual-errors"> Uncertainty bars</label></div></details>
-<details class="diagnostic-config" id="diag-settings-pull" hidden><summary>Pulls</summary><div class="diagnostic-fields"><div class="field"><label for="diag-pull-title">Plot title</label><input type="text" id="diag-pull-title" placeholder="Pulls"></div><div class="field"><label for="diag-pull-x_title">X-axis label</label><input type="text" id="diag-pull-x_title" placeholder="Same as main X axis"></div><div class="field"><label for="diag-pull-y_title">Y-axis label</label><input type="text" id="diag-pull-y_title" placeholder="(data − fit) / effective uncertainty"></div><div class="field"><label for="diag-pull-y_min">Y minimum</label><input type="text" id="diag-pull-y_min" placeholder="Automatic"></div><div class="field"><label for="diag-pull-y_max">Y maximum</label><input type="text" id="diag-pull-y_max" placeholder="Automatic"></div><div class="field"><label for="diag-pull-height">Panel height (px)</label><input type="number" min="180" max="480" step="1" value="240" id="diag-pull-height"></div><div class="field"><label for="diag-pull-scope">Include points</label><select id="diag-pull-scope"><option value="fit">Within the fit range</option><option value="all">All data points</option></select></div></div><div class="checks"><label class="check"><input type="checkbox" checked id="diag-pull-grid"> Grid</label><label class="check"><input type="checkbox" checked id="diag-pull-reference"> Reference line at 0</label><label class="check"><input type="checkbox" checked id="diag-pull-errors"> Uncertainty bars</label></div><p class="hint">Pulls need a positive effective uncertainty. Points without one are left out.</p></details>
-<details class="diagnostic-config" id="diag-settings-ratio" hidden><summary>Data / fit</summary><div class="diagnostic-fields"><div class="field"><label for="diag-ratio-title">Plot title</label><input type="text" id="diag-ratio-title" placeholder="Data / fit"></div><div class="field"><label for="diag-ratio-x_title">X-axis label</label><input type="text" id="diag-ratio-x_title" placeholder="Same as main X axis"></div><div class="field"><label for="diag-ratio-y_title">Y-axis label</label><input type="text" id="diag-ratio-y_title" placeholder="ratio to the fitted curve"></div><div class="field"><label for="diag-ratio-y_min">Y minimum</label><input type="text" id="diag-ratio-y_min" placeholder="Automatic"></div><div class="field"><label for="diag-ratio-y_max">Y maximum</label><input type="text" id="diag-ratio-y_max" placeholder="Automatic"></div><div class="field"><label for="diag-ratio-height">Panel height (px)</label><input type="number" min="180" max="480" step="1" value="240" id="diag-ratio-height"></div><div class="field"><label for="diag-ratio-scope">Include points</label><select id="diag-ratio-scope"><option value="fit">Within the fit range</option><option value="all">All data points</option></select></div></div><div class="checks"><label class="check"><input type="checkbox" checked id="diag-ratio-grid"> Grid</label><label class="check"><input type="checkbox" checked id="diag-ratio-reference"> Reference line at 1</label><label class="check"><input type="checkbox" checked id="diag-ratio-errors"> Uncertainty bars</label></div><p class="hint">The bars show the measurement uncertainty with the fitted curve held fixed — not a confidence band for the fit. Points where the fitted value is zero are left out.</p></details>
-<details class="diagnostic-config" id="diag-settings-percent" hidden><summary>Percentage difference</summary><div class="diagnostic-fields"><div class="field"><label for="diag-percent-title">Plot title</label><input type="text" id="diag-percent-title" placeholder="Percentage difference"></div><div class="field"><label for="diag-percent-x_title">X-axis label</label><input type="text" id="diag-percent-x_title" placeholder="Same as main X axis"></div><div class="field"><label for="diag-percent-y_title">Y-axis label</label><input type="text" id="diag-percent-y_title" placeholder="100 × (data − fit) / fit"></div><div class="field"><label for="diag-percent-y_min">Y minimum</label><input type="text" id="diag-percent-y_min" placeholder="Automatic"></div><div class="field"><label for="diag-percent-y_max">Y maximum</label><input type="text" id="diag-percent-y_max" placeholder="Automatic"></div><div class="field"><label for="diag-percent-height">Panel height (px)</label><input type="number" min="180" max="480" step="1" value="240" id="diag-percent-height"></div><div class="field"><label for="diag-percent-scope">Include points</label><select id="diag-percent-scope"><option value="fit">Within the fit range</option><option value="all">All data points</option></select></div></div><div class="checks"><label class="check"><input type="checkbox" checked id="diag-percent-grid"> Grid</label><label class="check"><input type="checkbox" checked id="diag-percent-reference"> Reference line at 0</label><label class="check"><input type="checkbox" checked id="diag-percent-errors"> Uncertainty bars</label></div><p class="hint">The bars show the measurement uncertainty with the fitted curve held fixed — not a confidence band for the fit. Points where the fitted value is zero are left out.</p></details>
+<details class="diagnostic-config" id="diag-settings-pull" hidden><summary>Pulls</summary><div class="diagnostic-fields"><div class="field"><label for="diag-pull-title">Plot title</label><input type="text" id="diag-pull-title" placeholder="Pulls"></div><div class="field"><label for="diag-pull-x_title">X-axis label</label><input type="text" id="diag-pull-x_title" placeholder="Same as main X axis"></div><div class="field"><label for="diag-pull-y_title">Y-axis label</label><input type="text" id="diag-pull-y_title" placeholder="(data − fit) / effective uncertainty"></div><div class="field"><label for="diag-pull-y_min">Y minimum</label><input type="text" id="diag-pull-y_min" placeholder="Automatic"></div><div class="field"><label for="diag-pull-y_max">Y maximum</label><input type="text" id="diag-pull-y_max" placeholder="Automatic"></div><div class="field"><label for="diag-pull-height">Panel height (px)</label><input type="number" min="180" max="480" step="1" value="240" id="diag-pull-height"></div><div class="field"><label for="diag-pull-scope">Include points</label><select id="diag-pull-scope"><option value="fit">Within the fit range</option><option value="all">All data points</option></select></div></div><div class="checks"><label class="check"><input type="checkbox" checked id="diag-pull-grid"> Grid</label><label class="check"><input type="checkbox" checked id="diag-pull-reference"> Reference line at 0</label><label class="check"><input type="checkbox" checked id="diag-pull-errors"> Uncertainty bars</label></div><p class="hint">Pulls require positive effective uncertainties; other points are excluded.</p></details>
+<details class="diagnostic-config" id="diag-settings-ratio" hidden><summary>Data / fit</summary><div class="diagnostic-fields"><div class="field"><label for="diag-ratio-title">Plot title</label><input type="text" id="diag-ratio-title" placeholder="Data / fit"></div><div class="field"><label for="diag-ratio-x_title">X-axis label</label><input type="text" id="diag-ratio-x_title" placeholder="Same as main X axis"></div><div class="field"><label for="diag-ratio-y_title">Y-axis label</label><input type="text" id="diag-ratio-y_title" placeholder="ratio to the fitted curve"></div><div class="field"><label for="diag-ratio-y_min">Y minimum</label><input type="text" id="diag-ratio-y_min" placeholder="Automatic"></div><div class="field"><label for="diag-ratio-y_max">Y maximum</label><input type="text" id="diag-ratio-y_max" placeholder="Automatic"></div><div class="field"><label for="diag-ratio-height">Panel height (px)</label><input type="number" min="180" max="480" step="1" value="240" id="diag-ratio-height"></div><div class="field"><label for="diag-ratio-scope">Include points</label><select id="diag-ratio-scope"><option value="fit">Within the fit range</option><option value="all">All data points</option></select></div></div><div class="checks"><label class="check"><input type="checkbox" checked id="diag-ratio-grid"> Grid</label><label class="check"><input type="checkbox" checked id="diag-ratio-reference"> Reference line at 1</label><label class="check"><input type="checkbox" checked id="diag-ratio-errors"> Uncertainty bars</label></div><p class="hint">Uncertainty bars propagate measurement uncertainties with the fitted model held fixed. Points with zero model predictions are excluded.</p></details>
+<details class="diagnostic-config" id="diag-settings-percent" hidden><summary>Percentage difference</summary><div class="diagnostic-fields"><div class="field"><label for="diag-percent-title">Plot title</label><input type="text" id="diag-percent-title" placeholder="Percentage difference"></div><div class="field"><label for="diag-percent-x_title">X-axis label</label><input type="text" id="diag-percent-x_title" placeholder="Same as main X axis"></div><div class="field"><label for="diag-percent-y_title">Y-axis label</label><input type="text" id="diag-percent-y_title" placeholder="100 × (data − fit) / fit"></div><div class="field"><label for="diag-percent-y_min">Y minimum</label><input type="text" id="diag-percent-y_min" placeholder="Automatic"></div><div class="field"><label for="diag-percent-y_max">Y maximum</label><input type="text" id="diag-percent-y_max" placeholder="Automatic"></div><div class="field"><label for="diag-percent-height">Panel height (px)</label><input type="number" min="180" max="480" step="1" value="240" id="diag-percent-height"></div><div class="field"><label for="diag-percent-scope">Include points</label><select id="diag-percent-scope"><option value="fit">Within the fit range</option><option value="all">All data points</option></select></div></div><div class="checks"><label class="check"><input type="checkbox" checked id="diag-percent-grid"> Grid</label><label class="check"><input type="checkbox" checked id="diag-percent-reference"> Reference line at 0</label><label class="check"><input type="checkbox" checked id="diag-percent-errors"> Uncertainty bars</label></div><p class="hint">Uncertainty bars propagate measurement uncertainties with the fitted model held fixed. Points with zero model predictions are excluded.</p></details>
 <details class="diagnostic-config" id="diag-settings-histogram" hidden><summary>Residual histogram</summary><div class="diagnostic-fields"><div class="field"><label for="diag-histogram-title">Plot title</label><input type="text" id="diag-histogram-title" placeholder="Residual histogram"></div><div class="field"><label for="diag-histogram-x_title">X-axis label</label><input type="text" id="diag-histogram-x_title" placeholder="data − fit"></div><div class="field"><label for="diag-histogram-y_title">Y-axis label</label><input type="text" id="diag-histogram-y_title" placeholder="Number of points"></div><div class="field"><label for="diag-histogram-y_min">Y minimum</label><input type="text" id="diag-histogram-y_min" placeholder="Automatic"></div><div class="field"><label for="diag-histogram-y_max">Y maximum</label><input type="text" id="diag-histogram-y_max" placeholder="Automatic"></div><div class="field"><label for="diag-histogram-height">Panel height (px)</label><input type="number" min="180" max="480" step="1" value="240" id="diag-histogram-height"></div><div class="field"><label for="diag-histogram-bins">Histogram bins</label><input type="number" min="5" max="100" step="1" value="15" id="diag-histogram-bins"></div><div class="field"><label for="diag-histogram-scope">Include points</label><select id="diag-histogram-scope"><option value="fit">Within the fit range</option><option value="all">All data points</option></select></div></div><div class="checks"><label class="check"><input type="checkbox" checked id="diag-histogram-grid"> Grid</label><label class="check"><input type="checkbox" checked id="diag-histogram-reference"> Reference line at 0</label></div></details>
               </div>
             </details>
@@ -245,60 +274,63 @@
       </details>
 
       <details class="fold">
-        <summary>Notes saved with this analysis <span class="tag">optional</span></summary>
+        <summary>Analysis notes</summary>
         <div class="fold-body">
           <div class="field"><label for="doc-notes">Notes</label>
-            <textarea id="doc-notes" rows="3" placeholder="Apparatus, date, anything you want to remember"></textarea></div>
+            <textarea id="doc-notes" rows="3" placeholder="Apparatus, acquisition conditions, calibration"></textarea></div>
         </div>
       </details>
     </section>
 
-    <div class="fit-bar">
-      <button id="btn-fit" type="button" class="primary">Fit the data</button>
-      <span id="fit-status" role="status" aria-live="polite">Ready</span>
-    </div>
+
   </div>
 
   <!-- ==================== the results rail ==================== -->
-  <aside class="rail" id="results" aria-label="Plot and fit report">
-    <div id="message" class="message" role="status" aria-live="polite" hidden></div>
+  <section class="rail card" id="results" aria-label="Plot and fit report" hidden tabindex="-1">
 
     <div class="rail-head">
       <h2>Plot</h2>
       <div class="export-actions">
-        <button id="btn-png" type="button" disabled>PNG</button>
-        <button type="button" data-action="svg" data-needs-plot disabled>SVG</button>
+        <a class="analyze-results-button" href="uncertainties.html" data-analyze-results>Analyze Data</a>
+        <button id="btn-png" type="button" disabled>Export PNG</button>
+        <button type="button" data-action="svg" data-needs-plot disabled>Export SVG</button>
       </div>
     </div>
 
+    <p id="result-input-notice" class="hint" role="status" hidden>Inputs differ from this result. Run the analysis again to update the plot and report.</p>
     <div class="canvas-frame"><div id="plot" class="plot">
-      <p class="placeholder"><span><b>Your plot appears here</b>
-        Enter your measurements, choose a shape, and press <strong>Fit the data</strong>.<br>
-        New here? Open <em>More → Example: straight line</em> and fit it — everything fills in at once.</span></p>
+      <p class="placeholder">No plot generated.</p>
     </div></div>
 
     <div class="report-block">
       <header><h3>Fit report</h3>
         <button type="button" class="help-btn" data-help="report" aria-label="Help on reading the fit report">?</button>
         <div class="row report-tools" id="report-tools" hidden>
-          <button type="button" class="small" data-action="report-copy">Copy</button>
-          <button type="button" class="small" data-action="report-txt">.txt</button>
-          <button type="button" class="small" data-action="report-csv">.csv</button>
+          <button type="button" class="small" data-action="report-copy">Copy as text</button>
+          <button type="button" class="small" data-action="report-txt">Save .txt</button>
+          <button type="button" class="small" data-action="report-csv">Save .csv</button>
         </div>
       </header>
-      <div id="report" class="report"><p class="placeholder-text">The parameters, their uncertainties and χ²/NDF will be listed here after a fit.</p></div>
+      <div id="report" class="report"><p class="placeholder-text">No fit result.</p></div>
     </div>
-  </aside>
+  </section>
+  <div class="fit-bar">
+    <button id="modern-back" type="button" hidden>Back</button>
+    <button id="modern-next" type="button" class="primary">Continue to fit model</button>
+    <button id="btn-fit" type="button" class="primary" hidden>Fit</button>
+    <span id="fit-status" role="status" aria-live="polite">Ready</span>
+  </div>
 </main>
 
 <footer class="site-footer"><div class="inner">
-  <span id="health-status">Checking the fitting service…</span>
+  <span id="health-status">Backend: checking…</span>
+  <button type="button" class="small" data-action="about">About</button>
   <span class="spacer"></span>
-  <span>GAUSS-O-MATIC 3000 · Minh Tran · 2026</span>
+  <span>ROOT-A-TRON 3000 · Minh Tran · 2026</span>
   <span>Powered by <a href="https://root.cern" target="_blank" rel="noopener">CERN ROOT</a></span>
 </div></footer>
 
-<!-- Shared hooks app.js expects; Modern has no desktop menu bar or panel splitter. -->
+<!-- Shared hooks app.js expects; Standard has no desktop menu bar or panel splitter. -->
 <div id="menubar" hidden></div><span id="jsroot-status" hidden></span>
 <input id="file-input" type="file" accept=".json,application/json" hidden>
 <div id="help-pop" class="help-pop" hidden></div>
@@ -310,9 +342,10 @@
   <div class="dialog-body table-body">
     <div class="tabs" id="dataset-tabs"></div>
     <div class="row table-tools">
+      <button type="button" class="small" data-taction="duplicate">Duplicate dataset</button>
       <button type="button" class="small" data-taction="add-rows">+ 10 rows</button>
       <button type="button" class="small" data-taction="delete-empty">Delete empty rows</button>
-      <button type="button" class="small" data-taction="clear">Clear this dataset</button>
+      <button type="button" class="small" data-taction="delete">Delete dataset</button>
       <button type="button" class="small" data-taction="import">Import from text…</button>
       <span class="spacer"></span>
       <span class="hint" id="table-count"></span>
@@ -323,15 +356,15 @@
         <tbody></tbody>
       </table>
     </div>
-    <p class="hint" id="table-histogram-note" hidden>Choose Done to enter this histogram's measurements or bin counts back in step 1.</p>
+    <p class="hint" id="table-histogram-note" hidden>Select Done to enter histogram data in Measurements.</p>
 
     <fieldset class="table-fit-settings"><legend id="table-fit-label">Fit settings for this dataset</legend>
-      <div class="field"><label for="table-fit-formula">Fit function</label>
-        <input id="table-fit-formula" type="text" class="mono" spellcheck="false" placeholder="[0]*x+[1]"></div>
+      <div class="field"><label for="table-fit-formula">ROOT fit expression</label>
+        <input id="table-fit-formula" type="text" class="mono" spellcheck="false" placeholder="[0]*x+[1]"><details class="equation-help"><summary>Typing reference</summary><p>Use <code>x</code> for the independent variable and <code>[0]</code>, <code>[1]</code>, … for fit parameters. Write multiplication as <code>*</code>, division as <code>/</code>, and powers as <code>pow(x,2)</code>. Functions include <code>exp(x)</code>, <code>log(x)</code>, <code>sin(x)</code>, and <code>sqrt(x)</code>. Use <code>TMath::Pi()</code> for π. Example: <code>[0]*exp(-x/[1])+[2]</code>.</p></details></div>
       <div class="field-row">
         <div class="field"><label for="table-fit-param_names">Parameter names</label>
           <input id="table-fit-param_names" type="text" placeholder="slope, intercept"></div>
-        <div class="field"><label for="table-fit-initial_guesses">Starting values</label>
+        <div class="field"><label for="table-fit-initial_guesses">Initial guesses</label>
           <input id="table-fit-initial_guesses" type="text" class="mono" placeholder="1, 0"></div>
       </div>
       <div class="field-row">
@@ -343,11 +376,11 @@
     </fieldset>
 
     <div class="import-panel" id="import-panel" hidden>
-      <p class="hint">Paste a block of text with one point per line. Columns may be separated by tabs, commas, semicolons or spaces. Then say which column is which.</p>
+      <p class="hint">Paste a block of text with one point per line. Columns may be separated by tabs, commas, semicolons or spaces. Assign each column to X, Y, or an uncertainty.</p>
       <textarea id="import-text" rows="6" class="mono" spellcheck="false" placeholder="1&#9;2.3&#9;0.2&#10;2&#9;4.1&#9;0.2"></textarea>
       <div class="row" id="import-mapping"></div>
       <div class="row actions">
-        <button type="button" class="primary" data-taction="import-apply">Replace this dataset with the text</button>
+        <button type="button" class="primary" data-taction="import-apply">Import into dataset</button>
         <button type="button" data-taction="import-cancel">Cancel</button>
       </div>
     </div>
@@ -379,25 +412,11 @@
 </dialog>
 
 <!-- connection settings -->
-<dialog id="settings-dialog" class="tframe">
-  <form method="dialog">
-    <div class="titlebar">Fitting service</div>
-    <div class="dialog-body">
-      <div class="field"><label for="backend-url">Service address</label>
-        <input id="backend-url" type="url" value="http://localhost:8000" spellcheck="false"></div>
-      <p class="hint" style="margin-top:0">This is where ROOT runs. <code>http://localhost:8000</code> is the Docker container on this machine. The address is remembered by this browser.</p>
-      <div class="row actions">
-        <button id="btn-health" type="button">Check connection</button>
-        <button type="submit" class="primary">Close</button>
-      </div>
-    </div>
-  </form>
-</dialog>
 
 <!-- about -->
 <dialog id="about-dialog" class="tframe">
   <form method="dialog">
-    <div class="titlebar">About GAUSS-O-MATIC 3000</div>
+    <div class="titlebar">About ROOT-A-TRON 3000</div>
     <div class="dialog-body">
       <p>Fits are computed by <a href="https://root.cern" target="_blank" rel="noopener">CERN ROOT</a> (Minuit) and drawn
         by <a href="https://root.cern/js/" target="_blank" rel="noopener">JSROOT</a>. Nothing you enter is stored on the
@@ -405,6 +424,7 @@
       <p>Built by <strong>Minh Tran</strong> (2026) as a redesign of Dr. D. Beznosko's
         <a href="https://sos.clayton.edu/physics/chi2/" target="_blank" rel="noopener">chi2 tool</a>
         (Clayton State University), without accounts or server-side storage.</p>
+      <p><a href="about.html">About the project</a></p>
       <p class="hint" id="about-versions"></p>
       <div class="row actions"><button type="submit" class="primary">Close</button></div>
     </div>
@@ -414,7 +434,7 @@
 <dialog id="dataset-type-dialog" class="tframe">
   <div class="titlebar">Add a dataset</div>
   <div class="dialog-body">
-    <p style="margin-top:0">What kind of data will it hold?</p>
+    <p style="margin-top:0">Analysis type</p>
     <div class="row">
       <button type="button" class="primary" data-new-type="xy">XY data</button>
       <button type="button" class="primary" data-new-type="histogram">Histogram</button>
@@ -423,7 +443,14 @@
   </div>
 </dialog>
 
-<script src="modern.js" defer></script>
-<script src="app.js" defer></script>
+<script src="vendor/mathlive/mathlive.min.js" defer></script>
+<script src="equation-parser.js?v=20260919-units" defer></script>
+<script src="equation-editor.js?v=20260918-bidirectional" defer></script>
+<script src="modern.js?v=20260917-audit2" defer></script>
+<script defer src="units.js?v=1"></script><script src="analysis-core.js?v=20260919-units" defer></script>
+<script src="workspace-store.js?v=1" defer></script>
+<script src="app.js?v=shared-session" defer></script>
+<script src="paste-data.js?v=1" defer></script>
+<script defer src="analysis-features.js?v=20260919-export"></script>
 </body>
 </html>

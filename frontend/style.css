@@ -1,5 +1,5 @@
 /* style.css — "classic ROOT GUI, modern comfort".
-   The look of a TBrowser / TCanvas window (flat grey frames, beveled buttons,
+   The look of a TBrowser / TCanvas window (flat gray frames, beveled buttons,
    sunken white text entries, etched group frames, a menu bar and a status bar,
    navy highlight) with today's readability: 14px Helvetica, generous spacing,
    clear hierarchy, visible focus rings, hover states, zebra tables.
@@ -353,3 +353,39 @@ dialog.resizable .titlebar { flex: none; }
 .diagnostic-fields select { width: 100%; }
 .diagnostic-fields input[type=number] { width: 100%; min-height: 30px; font: inherit; padding: 5px 8px; border: 1px solid var(--shadow); background: var(--entry); color: var(--ink); }
 .diagnostic-config > .check { margin: 5px 12px 5px 0; }
+
+/* Histogram controls inherit each workspace's form style. */
+[hidden] { display: none !important; }
+#histogram-data textarea { width: 100%; box-sizing: border-box; font-family: monospace; }
+.analysis-choice { margin-bottom: 14px; }
+.histogram-binning > .field { min-width: 85px; }
+#hist-fit-options { margin-bottom: 16px; }
+
+.table-fit-settings { margin: 12px 0; padding: 12px; }
+.table-fit-settings .row { flex-wrap: wrap; }
+.table-fit-settings input { width: 100%; box-sizing: border-box; }
+
+/* Classic data-section action stays with its heading. */
+fieldset.data-group > legend { width: calc(100% - 12px); box-sizing: border-box; }
+.data-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.data-section-heading > .expand { flex-shrink: 0; }
+
+/* Application prompts use each workspace's existing dialog frame. */
+dialog.app-dialog { width: min(480px, 92vw); max-height: 90vh; }
+.app-dialog .dialog-message { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0 0 14px; }
+.app-dialog .actions { justify-content: flex-end; }
+.app-dialog .dialog-error { color: var(--err); margin: 8px 0; }
+.app-dialog input[aria-invalid="true"] { outline: 2px solid var(--err); }
+body.classic button.danger {
+  --button-top: #fbe1dc; --button-bottom: #e4a49b; --button-edge: #9a5a50; --button-ink: #571f19;
+}
+body.modern button.danger { background: #a72d25; border-color: #a72d25; color: white; }
+body.modern button.danger:hover:not(:disabled) { background: #86221c; border-color: #86221c; }
+
+.app-dialog.save-notice .dialog-message { color: #a1241c; font-weight: 700; line-height: 1.6; }
+
+/* Results navigation uses a link so normal browser navigation remains available. */
+.analyze-results-button{display:inline-flex;align-items:center;justify-content:center;padding:8px 16px;background:var(--accent);color:#fff;text-decoration:none;font-weight:600;border:2px outset #b8b8dc;white-space:nowrap}
+.analyze-results-button:hover{background:#1a1a9a;color:#fff;text-decoration:none}
+.analyze-results-button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.result-navigation{display:flex;justify-content:flex-end;padding:8px 0}

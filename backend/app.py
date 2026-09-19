@@ -3,6 +3,13 @@ app.py — the web server. Two endpoints, no state, no storage.
 
     GET  /health   -> {"status": "ok", "root_version": "...", ...}
     POST /fit      -> runs one fit and returns the result as JSON
+    POST /histogram-> builds (and optionally fits) a histogram
+    GET  /         -> the frontend, when FRONTEND_DIR holds a copy of it
+
+The frontend is optional. `./start` bind-mounts frontend/ into the container so
+the pages and the API share one origin (http://localhost:8000) and no separate
+static server is needed. Without that mount the API works exactly as before and
+/ explains where the pages are.
 
 Request body for /fit (JSON):
     {
@@ -24,18 +31,24 @@ In Docker:      see Dockerfile
 """
 
 import math
+import os
 import threading
 import traceback
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_from_directory
 
 from formula_check import check_formula, allowed_summary
 import fit  # imports ROOT (slow, ~1-2 s) once at start-up
+import histogram_fit
 
 import ROOT
 
 APP_VERSION = "0.1.0"
 MAX_POINTS = 100_000
+
+# Where the frontend lives inside the container. ./start bind-mounts the repo's
+# frontend/ here; override with FRONTEND_DIR when running the server directly.
+FRONTEND_DIR = os.path.abspath(os.environ.get("FRONTEND_DIR", "/app/frontend"))
 
 app = Flask(__name__)
 
@@ -207,6 +220,68 @@ def do_fit():
     except Exception as e:                         # anything else is our problem
         traceback.print_exc()
         return jsonify({"error": "The fitting service ran into a problem. Your inputs are still here; please try Fit again. If this continues, restart the backend."}), 500
+
+
+@app.post('/histogram')
+def do_histogram():
+    try:
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict):
+            raise BadRequest('Enter histogram data before plotting.')
+        fit_model = payload.get('fit_model', True)
+        if not isinstance(fit_model, bool):
+            raise BadRequest('Choose whether to plot only or fit the histogram.')
+        formula = str(payload.get('formula') or '').strip()
+        if fit_model:
+            ok, message = check_formula(formula)
+            if not ok:
+                raise BadRequest(f'The function could not be read: {message}')
+        with root_lock:
+            result = histogram_fit.run_histogram(
+                payload.get('histogram'), formula=formula, fit_model=fit_model,
+                par_names=string_list(payload, 'param_names'),
+                par_guesses=guess_list(payload, 'initial_guesses'),
+                x_range=payload.get('x_range'), title=payload.get('title', ''),
+                x_title=payload.get('x_title', ''), y_title=payload.get('y_title', ''),
+                plot=payload.get('plot') if isinstance(payload.get('plot'), dict) else {})
+        require_finite_result(result)
+        return jsonify(result)
+    except ValueError as exc:
+        return jsonify(error=str(exc)), 400
+    except Exception:
+        traceback.print_exc()
+        return jsonify(error='The histogram could not be completed. Your inputs are still here; please try again.'), 500
+
+
+def frontend_available():
+    return os.path.isfile(os.path.join(FRONTEND_DIR, "index.html"))
+
+
+@app.route("/")
+def frontend_index():
+    """The landing page, when the frontend is mounted alongside the API."""
+    if not frontend_available():
+        return jsonify({
+            "service": "rootfit-backend",
+            "message": "The API is running. The frontend is not mounted here; "
+                       "open frontend/index.html, or start everything with ./start.",
+            "endpoints": ["/health", "/allowed", "/fit", "/histogram"],
+        })
+    return send_from_directory(FRONTEND_DIR, "index.html")
+
+
+@app.route("/<path:filename>")
+def frontend_file(filename):
+    """Serve the rest of the frontend. Flask matches the fixed API rules above
+    before this catch-all, so /fit and /health are never shadowed.
+    send_from_directory rejects paths that escape FRONTEND_DIR."""
+    if not frontend_available():
+        return jsonify({"error": "Not found."}), 404
+    response = send_from_directory(FRONTEND_DIR, filename)
+    # The directory is bind-mounted from the repo, so an edit should show up on
+    # reload rather than being served from the browser cache.
+    response.headers["Cache-Control"] = "no-cache"
+    return response
 
 
 if __name__ == "__main__":

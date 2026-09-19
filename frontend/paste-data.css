@@ -1,0 +1,10 @@
+#spreadsheet-dialog{width:min(900px,calc(100vw - 32px));max-height:90vh;overflow:auto}
+.spreadsheet-options{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+#spreadsheet-text{width:100%;min-height:140px;tab-size:18}
+.spreadsheet-scroll{overflow:auto;max-height:280px;margin:12px 0}
+.spreadsheet-scroll table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+.spreadsheet-scroll th,.spreadsheet-scroll td{padding:8px 12px;border:1px solid var(--line,#b0b0b0);text-align:left;white-space:nowrap}
+.spreadsheet-scroll select{min-width:140px;width:100%}
+.spreadsheet-error{color:#a1241c;white-space:pre-line}
+body.classic [data-paste-spreadsheet]{background:#e3edf8}
+@media(max-width:600px){.spreadsheet-options{grid-template-columns:1fr;gap:8px}}

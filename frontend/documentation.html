@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Documentation for ROOT-A-TRON 3000: choosing initial fit parameters from measurements and checking fitted results.">
+  <title>Documentation · ROOT-A-TRON 3000</title>
+  <link rel="stylesheet" href="home.css?v=20260917-primary-tools">
+  <link rel="stylesheet" href="site-brand.css?v=1">
+  <link rel="stylesheet" href="documentation.css?v=1">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to documentation</a>
+<header class="site-header"><a class="site-name" href="index.html">ROOT-A-TRON 3000</a><nav aria-label="Main"><a href="index.html">Home</a></nav></header>
+<main id="main" class="documentation-page" tabindex="-1">
+  <h1>Documentation</h1>
+  <p class="documentation-status">Work in progress. The first guide covers initial fit parameters; documentation for other features will follow.</p>
+  <section aria-labelledby="guides">
+    <h2 id="guides">Guides</h2>
+  <article aria-labelledby="initial-parameters">
+    <h3 id="initial-parameters">Choosing initial fit parameters</h3>
+    <p>A fit adjusts the parameters of a function to describe your measurements. Initial guesses are the values from which that adjustment starts. They are not measurement uncertainties, and entering a guess does not fix a parameter at that value.</p>
+    <p>For nonlinear functions, such as decays and oscillations, the starting values can determine whether the fit converges and which solution it reaches. Estimates from the measured shape are usually more useful than assigning every parameter the same value.</p>
+    <nav class="contents" aria-label="On this page">
+      <a href="#parameter-order">Parameter order and units</a>
+      <a href="#examples">Estimating starting values</a>
+      <a href="#blank-values">Leaving guesses blank</a>
+      <a href="#check-fit">Checking the fit</a>
+    </nav>
+
+    <section aria-labelledby="parameter-order">
+      <h4 id="parameter-order">Parameter order and units</h4>
+      <p>In a ROOT expression, <code>[0]</code>, <code>[1]</code>, and so on identify parameters. Their meanings follow from the expression, not their display names. For example, in <code>[0]*x+[1]</code>, <code>[0]</code> is the slope and <code>[1]</code> is the intercept. Renaming them does not change the equation.</p>
+      <p>Enter guesses in this order in the parameter table or comma-separated field. In Standard, expand <strong>Paste comma-separated parameters</strong> to enter a list. Parameter settings belong to the selected dataset.</p>
+      <p>Use values consistent with the numerical units of your X and Y data. If X is time in seconds and Y is voltage in volts, a slope has units of V/s and an intercept has units of V. Graph labels do not convert the numbers used in a fit. A width or decay time appearing in a denominator needs a nonzero starting value.</p>
+    </section>
+
+    <section aria-labelledby="examples">
+      <h4 id="examples">Estimating starting values</h4>
+      <p>First identify the approximate background, positions of important features, and the scale over which the signal changes. Use the part of the data you intend to fit. The examples below use ROOT expression syntax; the parameter meanings also apply when entering the same model in the equation editor.</p>
+
+      <h5>Straight line</h5>
+      <pre><code>[0]*x+[1]</code></pre>
+      <p>Estimate the slope from two well-separated representative points: <var>m</var> ≈ (y₂ − y₁)/(x₂ − x₁). Then estimate the intercept with <var>b</var> ≈ y₁ − <var>m</var>x₁. Points near (1 s, 3 V) and (5 s, 11 V) give <code>2, 1</code>: a slope of 2 V/s and an intercept of 1 V. Exact starting values are generally less important for a line than for a nonlinear model.</p>
+
+      <h5>Exponential decay with background</h5>
+      <pre><code>[0]*exp(-x/[1])+[2]</code></pre>
+      <p>The parameters are amplitude at x = 0 above background, decay time constant, and constant background. Estimate the background from a region where the decay is nearly complete. Subtract it before estimating the amplitude or time constant.</p>
+      <p>Suppose the signal is about 105 at x = 0 and approaches 5 at late times. Start with amplitude 100 and background 5. If the signal reaches about 42 at x = 2 s, its excess above background has fallen to approximately 100/e ≈ 37, giving a time constant near 2 s. Enter <code>100, 2, 5</code>.</p>
+      <p>If you can estimate the half-life instead, divide it by ln(2) ≈ 0.693 to obtain the time constant. ROOT’s named function <code>expo</code> uses a different convention, exp([0] + [1]x); its parameters are not amplitude and time constant.</p>
+
+      <h5>Gaussian peak with background</h5>
+      <pre><code>[0]*exp(-0.5*((x-[1])/[2])^2)+[3]</code></pre>
+      <p>The parameters are peak height above background, peak center, standard deviation σ, and background. Estimate the width at half the peak’s height <em>above background</em>, then divide that full width by approximately 2.355 to estimate σ.</p>
+      <p>For a peak at x = 10 with maximum Y = 135, background 15, and full width at half height 3.53, enter <code>120, 10, 1.5, 15</code>. The center and σ have the same units as X; the height and background have the same units as Y.</p>
+      <p>For histograms, this tool displays counts divided by bin width. Estimate peak height from that density, not directly from a bin’s count. The named function <code>gaus</code> uses peak height, while <code>gausn</code> uses total area as its first parameter. For an isolated Gaussian fully covered by the measured range, the total number of entries provides an approximate area estimate.</p>
+
+      <h5>Periodic patterns</h5>
+      <p>Read the frequency convention directly from the expression. In <code>[0]*sin([1]*x+[2])+[3]</code>, estimate <code>[1]</code> as 2π divided by the period in X. When X is time, this parameter is angular frequency. The amplitude is approximately half the peak-to-trough difference, and the offset is their midpoint. Choose the phase to match where the cycle begins.</p>
+      <p>For a squared-cosine model <code>[0]*pow(cos([1]*(x-[2])),2)+[3]</code>, such as the interference factor in a double-slit pattern, neighboring maxima are instead separated by π/k, where k is <code>[1]</code>. A fringe spacing of 0.74 mm suggests k ≈ 4.25 mm<sup>−1</sup>. Confusing these two conventions gives a frequency estimate that differs by a factor of two.</p>
+    </section>
+
+    <section aria-labelledby="blank-values">
+      <h4 id="blank-values">Leaving guesses blank</h4>
+      <p>A blank entry leaves that parameter unspecified. The fit uses a default or an automatic estimate where available. Blank does not mean “try all possible values.” In a comma-separated list, <code>100,,5</code> supplies values for <code>[0]</code> and <code>[2]</code>, while leaving <code>[1]</code> unspecified.</p>
+      <p>ROOT can initialize some named functions automatically. This tool also estimates starting values for supported histogram models. Custom expressions and combinations of functions may require explicit guesses. For XY fits, ROOT’s automatic initialization of named functions can replace supplied guesses; use an explicit expression such as the Gaussian above when you need control of those starting values. See the <a href="https://root.cern.ch/manual/fitting/" target="_blank" rel="noopener">ROOT fitting manual</a> for its initialization conventions.</p>
+    </section>
+
+    <section aria-labelledby="check-fit">
+      <h4 id="check-fit">Checking the fit</h4>
+      <p>After fitting, check the convergence status, fitted curve, parameter uncertainties, and residuals. Convergence means the fitting procedure met its stopping conditions; it does not establish that the model describes the experiment adequately.</p>
+      <p>If a nonlinear fit fails or gives implausible values, check the parameter order, signs, units, and function definition first. Then try other physically reasonable starting values. If substantially different guesses lead to the same fitted curve and parameters, that supports the numerical stability of the result. If they lead to different solutions, compare the fit statistic and residuals, and consider whether the measured range can distinguish those solutions.</p>
+      <p>Large uncertainties or strong parameter correlations can indicate that the data do not determine the parameters separately. Changing starting values cannot supply information missing from the measurements. Do not adjust measurement uncertainties simply to make a fit appear acceptable.</p>
+    </section>
+  </article>
+  </section>
+  <a class="button secondary" href="index.html">Back to Home</a>
+</main>
+<footer class="site-footer"><span>ROOT-A-TRON 3000 <span class="divider">/</span> Minh Tran · 2026</span><span>Powered by CERN ROOT</span></footer>
+</body>
+</html>
