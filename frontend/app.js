@@ -26,7 +26,7 @@
 
 const $ = (id) => document.getElementById(id);
 
-const DEFAULT_BACKEND = 'http://localhost:8000';
+const DEFAULT_BACKEND = 'https://root-plotting-tool.onrender.com';
 const RENDER_BACKEND = 'https://root-plotting-tool.onrender.com';
 const LOCAL_BACKEND = 'http://localhost:8000';
 const BACKEND_KEY = 'rootfit.backendUrl';
