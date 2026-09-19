@@ -231,7 +231,7 @@ body.modern details.fold > .fold-body { padding: 4px 0 18px; }
 .dataset-row .swatch { width: 10px; height: 10px; border-radius: 2px; border: 1px solid rgba(0,0,0,.25); flex: none; }
 .dataset-row select { flex: 1 1 200px; width: auto; min-height: 38px; padding: 6px 10px; font-size: 14px; }
 .dataset-row button { min-height: 38px; }
-.dataset-row .expand { margin-left: auto; color: var(--blue); border-color: #b9cde2; }
+.dataset-row .expand { margin-left: 0; }  /* Data table now sits inline in the data-tools group */
 
 .columns { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
 @media (max-width: 560px) { .columns { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
@@ -614,4 +614,4 @@ body.modern .analyze-results-button{background:var(--blue);border:1px solid var(
 body.modern .analyze-results-button:hover{background:var(--blue-dark);border-color:var(--blue-dark)}
 .rail-head .export-actions{flex-wrap:wrap;align-items:center}
 
-.parameter-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}.parameter-heading .preset-label{margin:0}.parameter-guide-button{display:inline-block;padding:8px 14px;border:1px solid var(--line);border-radius:4px;background:white;color:var(--blue);font-size:14px;text-decoration:none;min-height:38px}.parameter-guide-button:hover{background:var(--blue-soft);border-color:#b9cde2}
+.parameter-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}.parameter-heading .preset-label{margin:0}body.modern .parameter-guide-button{display:inline-block;padding:8px 16px;border:1px solid var(--blue);border-radius:4px;background:var(--blue);color:#fff;font-size:14px;font-weight:600;text-decoration:none;min-height:38px;cursor:pointer}body.modern .parameter-guide-button:hover:not(:disabled){background:var(--blue-dark);border-color:var(--blue-dark)}

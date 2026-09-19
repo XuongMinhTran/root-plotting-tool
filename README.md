@@ -91,9 +91,8 @@ Both interfaces provide **Paste data…** beside the dataset selector. Paste a r
 You can also open `frontend/classic.html` or `frontend/modern.html` directly.
 Serving the pages from one address (which `./start` does) keeps autosave shared
 when you switch between Classic and Modern. The page uses whichever origin
-served it if that origin answers `/health`, and otherwise the Cloudflare
-deployment (`DEFAULT_BACKEND` in `frontend/app.js`); the "Backend URL" setting
-overrides both.
+served it if that origin answers `/health`, and otherwise
+`http://localhost:8000`; the "Backend URL" setting overrides both.
 
 ### Using the page
 
@@ -161,91 +160,6 @@ measurements and 2–2,000 bins.
 Run histogram checks with `node tests/histogram_frontend_test.cjs` and
 `docker run --rm --platform linux/amd64 -v "$PWD":/work -w /work/backend rootfit-backend python3 -m unittest histogram_test`.
 
-### Simultaneous fits
-
-**Fit together…** (next to the dataset selector in Compact and Standard, and in
-Compact's Fit menu) fits two or more XY datasets at once. Every parameter of
-every model gets a role: **shared** (one value fitted to all datasets that use
-it), **this dataset only**, or **fixed value**. Each dataset keeps its own
-function, fit range, initial guesses and point exclusions. The backend
-minimizes the sum of the per-dataset χ² values with `ROOT::Fit::Fitter` and a
-combined FCN built from per-dataset `ROOT::Fit::Chi2Function` objects (the
-pattern of ROOT's `combinedFit.C`), so X uncertainties enter through the same
-effective-variance rule as single fits. NDF = fitted points in all datasets −
-free unique parameters; the covariance matrix covers every unique parameter.
-
-The report lists the shared parameters once, then each dataset's own
-parameters, the totals, and every dataset's χ² contribution and point count.
-The plot draws every dataset and its curve in its own colour with a legend;
-optional plots overlay the datasets in the same colours. Results are stored on
-the group (`inputs.simultaneous_fits` in the session JSON; absent in older
-documents, which open unchanged), appear as one fit object in Analyze Data with
-the full covariance, and are included in text, CSV, LaTeX and PDF exports.
-Confidence bands are not available for simultaneous fits. The guide in
-`frontend/documentation.html#simultaneous-fits` explains when a shared
-parameter is appropriate and how to read the per-dataset χ² contributions.
-`examples/two-decays-shared-tau.json` (also in the examples menus) is a
-ready-made case, and `examples/simultaneous-fit-playground.json` holds three
-prepared fits: two decay runs with a common time constant, the same runs plus
-a third whose time constant is really different (watch its χ² share), and a
-projectile's x(t) and y(t) tracks with timing uncertainties sharing the launch
-time.
-
-`POST /simultaneous-fit` accepts `{"datasets": [{name, x, y, ex, ey, formula,
-param_names, x_range, excluded_points}, …], "parameters": {"shared": [{name,
-guess, min, max}], "mapping": [[{kind: "shared", ref} | {kind: "local", guess}
-| {kind: "fixed", value}, …], …]}, title, x_title, y_title, plot}` and returns
-`params[]` (with `kind`, `dataset`, `fixed`, `label`), `covariance`, `chi2`,
-`ndf`, `prob`, `datasets[]` (each with `chi2`, `n_points`, `range`) and the
-usual `canvas_json`.
-
-Tests: `node tests/simultaneous_frontend_test.cjs` (session model, payload,
-exact round trips, old documents, Analyze Data propagation against a hand
-calculation) and, inside the ROOT container,
-`./root-run python3 backend/simultaneous_test.py` (shared time constant
-recovered with a smaller uncertainty than either run alone, all-local fits
-equal to the individual fits including X uncertainties, NDF with fixed
-parameters and exclusions, refused requests, canvas contents).
-`python3 backend/simultaneous_reference.py` is the ROOT-free reference
-minimizer the ROOT test compares against.
-
-## Deploy on Cloudflare
-
-The public site runs on Cloudflare as one Worker (`wrangler.jsonc`,
-`cloudflare/worker.js`):
-
-- the pages in `frontend/` are static assets;
-- `/health`, `/allowed`, `/fit`, `/histogram` and `/simultaneous-fit` go to a
-  **Cloudflare Container** built from `backend/Dockerfile` (Flask + CERN ROOT).
-
-Pages and API share one address, so the page finds the API on its own origin.
-The container sleeps after 15 minutes without requests and Cloudflare stops
-charging for it; the first fit after that waits several seconds while ROOT
-loads. Containers need the **Workers Paid** plan ($5/month; the `standard-1`
-instance used here includes about 6 awake hours per month, then costs a few
-cents per awake hour — see Cloudflare's Containers pricing).
-
-Workers Builds deploys on every push to `main`. Its settings (Worker →
-Settings → Builds) must be:
-
-| | |
-|---|---|
-| Root directory | *(empty — the repository root, where `wrangler.jsonc` is)* |
-| Build command | `npm ci` |
-| Deploy command | `npx wrangler deploy` |
-
-The Worker name in the dashboard must stay `root-plotting-tool` (the `name` in
-`wrangler.jsonc`). The first deploy builds and uploads the ROOT image and then
-provisions the container, so allow several minutes before fits work; after
-that, `https://root-plotting-tool.tranxuongminh.workers.dev/health` shows the
-backend version and its `features`. To deploy from your own computer instead:
-`npm ci && npx wrangler login && npx wrangler deploy`, with Docker running
-(Wrangler builds the image for `linux/amd64`).
-
-`node tests/cloudflare_worker_test.cjs` checks the Worker's routing and error
-messages, and that the Worker, `wrangler.jsonc` and Flask list the same API
-routes.
-
 ## Talk to the backend directly
 
 ```sh
@@ -284,6 +198,8 @@ Run `node tests/workspace_store_test.cjs` for shared-session round trips, fit li
 ```
 
 Run HTTP regression checks with `docker run --rm --platform linux/amd64 -v "$PWD":/work -w /work/backend rootfit-backend python3 app_test.py`, and frontend checks with `node tests/frontend_test.cjs`.
+
+Check the multivariate (Rⁿ→Rᵐ) fit against its numpy/scipy reference with `./root-run python3 backend/multivariate_test.py`, and the multivariate frontend with `node tests/multivariate_frontend_test.cjs`.
 
 The self-test fits `tests/linear_reference.json` and checks ROOT against the closed-form
 weighted least-squares answer.

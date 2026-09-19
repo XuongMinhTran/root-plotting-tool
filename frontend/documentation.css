@@ -1,3 +1,40 @@
 .site-header{display:flex;justify-content:space-between;align-items:center;gap:24px}.site-header a{color:white;text-decoration:none}.site-header nav a:hover{text-decoration:underline}.documentation-page{flex:1;width:min(840px,calc(100% - 48px));margin:0 auto;padding:48px 0 56px;font-size:16px;line-height:1.75}.documentation-page h1{margin-bottom:16px}.documentation-status{color:#526273;margin:0 0 36px;padding-bottom:24px;border-bottom:1px solid var(--line)}.documentation-page h2{font-size:27px;margin:0 0 18px;line-height:1.35}.documentation-page h3{font-size:22px;margin:36px 0 14px;line-height:1.4;color:#343434}.documentation-page h4{font-size:18px;font-weight:600;margin:28px 0 12px}.documentation-page p{margin:0 0 18px}.documentation-page .documentation-status{margin-bottom:36px}.documentation-page code{font-family:Menlo,Consolas,monospace;font-size:.88em;overflow-wrap:anywhere}.documentation-page pre{white-space:pre-wrap;background:#f3f6fa;border:1px solid #dfe5ec;border-radius:4px;padding:12px 16px;margin:12px 0 18px;line-height:1.6}.contents{display:flex;flex-direction:column;align-items:flex-start;gap:6px;padding:18px 0;border-block:1px solid var(--line);margin:26px 0}.documentation-page [id]{scroll-margin-top:24px}.documentation-page>.button{margin-top:24px}@media(max-width:600px){.site-header{padding:18px 24px}.documentation-page{padding-top:32px}.documentation-page h2{font-size:24px}.documentation-page h3{font-size:21px}}
 
 .documentation-page #initial-parameters{font-size:25px;margin-top:24px}.documentation-page section>h4{font-size:21px;font-weight:500;margin-top:32px}.documentation-page h5{font-size:18px;font-weight:600;margin:28px 0 12px}
+
+
+/* ---- reorganised documentation: TOC, lists, note box, glossary -------- */
+.doc-toc{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:2px 20px}
+.doc-toc a{padding:5px 0}
+.documentation-page ol,.documentation-page ul{margin:0 0 18px;padding-left:24px;line-height:1.7}
+.documentation-page li{margin-bottom:6px}
+.documentation-page h3{font-size:21px;margin:30px 0 12px;color:#26303c}
+.documentation-page h4{font-size:17px;font-weight:600;margin:20px 0 8px;color:#343434}
+.documentation-page sup{font-size:.75em}
+.hint-note{background:#eef3fb;border-left:3px solid #000080;padding:11px 15px;margin:0 0 18px;color:#33414f;font-size:15px}
+.doc-glossary{display:grid;grid-template-columns:max-content 1fr;gap:9px 20px;margin:0 0 18px}
+.doc-glossary dt{font-weight:600;color:#26303c}
+.doc-glossary dd{margin:0;color:#3a4553}
+@media(max-width:560px){.doc-glossary{grid-template-columns:1fr;gap:2px 0}.doc-glossary dd{margin-bottom:10px}.doc-toc{grid-template-columns:1fr}}
+
+/* ---- multi-page docs: hub cards, breadcrumb, and guides catalog ------- */
+.doc-hub{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:16px;margin:24px 0 28px}
+.doc-card{display:block;border:1px solid #dfe5ec;border-radius:6px;padding:18px 20px;text-decoration:none;color:inherit;background:#fff;transition:border-color .1s,box-shadow .1s}
+.doc-card:hover{border-color:#000080;box-shadow:0 2px 10px rgba(0,0,0,.07)}
+.doc-card h2{font-size:18px;margin:0 0 6px;color:#000080}
+.doc-card p{margin:0;font-size:14px;color:#3a4553}
+.doc-tip{color:#526273;font-size:15px}
+.doc-crumb{color:#6a7686;font-size:14px;margin:0 0 6px}
+.doc-crumb a{color:#346295}
+.doc-back{display:inline-block;color:#346295;text-decoration:none;font-weight:600;margin-top:24px}
+.doc-back:hover{text-decoration:underline}
+.sp-catnav{background:#f3f6fa;border:1px solid #dfe5ec;border-radius:4px;padding:10px 14px;margin:18px 0 24px;font-size:14px;line-height:1.9}
+.sp-catnav span{color:#526273;margin-right:6px}
+.sp-model{border:1px solid #e5eaf0;border-left:3px solid #346295;border-radius:4px;padding:12px 16px;margin:0 0 14px;background:#fbfcfe}
+.sp-model h3{margin:0 0 4px;font-size:18px;color:#26303c}
+.sp-fits{margin:0 0 8px;color:#3a4553;font-size:14px}
+.sp-model pre{margin:0 0 8px}
+.sp-default{font-size:13px;color:#526273;margin:0 0 8px}
+.sp-guide{margin:0;padding-left:20px}
+.sp-guide li{margin-bottom:4px;line-height:1.55}
+.site-header nav{display:flex;gap:20px}

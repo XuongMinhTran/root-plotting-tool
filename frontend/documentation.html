@@ -3,123 +3,17 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Documentation for ROOT-A-TRON 3000: choosing initial fit parameters from measurements and checking fitted results.">
+  <meta name="description" content="Documentation for ROOT-A-TRON 3000: fitting data, choosing a model and starting values, reading results, and exporting.">
   <title>Documentation · ROOT-A-TRON 3000</title>
   <link rel="stylesheet" href="home.css?v=20260917-primary-tools">
   <link rel="stylesheet" href="site-brand.css?v=1">
-  <link rel="stylesheet" href="documentation.css?v=1">
+  <link rel="stylesheet" href="documentation.css?v=3">
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to documentation</a>
-<header class="site-header"><a class="site-name" href="index.html">ROOT-A-TRON 3000</a><nav aria-label="Main"><a href="index.html">Home</a></nav></header>
+<header class="site-header"><a class="site-name" href="index.html">ROOT-A-TRON 3000</a><nav aria-label="Main"><a href="index.html">Home</a><a href="documentation.html">Documentation</a></nav></header>
 <main id="main" class="documentation-page" tabindex="-1">
-  <h1>Documentation</h1>
-  <p class="documentation-status">Work in progress. The guides cover initial fit parameters and fitting several datasets together; documentation for other features will follow.</p>
-  <section aria-labelledby="guides">
-    <h2 id="guides">Guides</h2>
-  <article aria-labelledby="initial-parameters">
-    <h3 id="initial-parameters">Choosing initial fit parameters</h3>
-    <p>A fit adjusts the parameters of a function to describe your measurements. Initial guesses are the values from which that adjustment starts. They are not measurement uncertainties, and entering a guess does not fix a parameter at that value.</p>
-    <p>For nonlinear functions, such as decays and oscillations, the starting values can determine whether the fit converges and which solution it reaches. Estimates from the measured shape are usually more useful than assigning every parameter the same value.</p>
-    <nav class="contents" aria-label="On this page">
-      <a href="#parameter-order">Parameter order and units</a>
-      <a href="#examples">Estimating starting values</a>
-      <a href="#blank-values">Leaving guesses blank</a>
-      <a href="#check-fit">Checking the fit</a>
-    </nav>
-
-    <section aria-labelledby="parameter-order">
-      <h4 id="parameter-order">Parameter order and units</h4>
-      <p>In a ROOT expression, <code>[0]</code>, <code>[1]</code>, and so on identify parameters. Their meanings follow from the expression, not their display names. For example, in <code>[0]*x+[1]</code>, <code>[0]</code> is the slope and <code>[1]</code> is the intercept. Renaming them does not change the equation.</p>
-      <p>Enter guesses in this order in the parameter table or comma-separated field. In Standard, expand <strong>Paste comma-separated parameters</strong> to enter a list. Parameter settings belong to the selected dataset.</p>
-      <p>Use values consistent with the numerical units of your X and Y data. If X is time in seconds and Y is voltage in volts, a slope has units of V/s and an intercept has units of V. Graph labels do not convert the numbers used in a fit. A width or decay time appearing in a denominator needs a nonzero starting value.</p>
-    </section>
-
-    <section aria-labelledby="examples">
-      <h4 id="examples">Estimating starting values</h4>
-      <p>First identify the approximate background, positions of important features, and the scale over which the signal changes. Use the part of the data you intend to fit. The examples below use ROOT expression syntax; the parameter meanings also apply when entering the same model in the equation editor.</p>
-
-      <h5>Straight line</h5>
-      <pre><code>[0]*x+[1]</code></pre>
-      <p>Estimate the slope from two well-separated representative points: <var>m</var> ≈ (y₂ − y₁)/(x₂ − x₁). Then estimate the intercept with <var>b</var> ≈ y₁ − <var>m</var>x₁. Points near (1 s, 3 V) and (5 s, 11 V) give <code>2, 1</code>: a slope of 2 V/s and an intercept of 1 V. Exact starting values are generally less important for a line than for a nonlinear model.</p>
-
-      <h5>Exponential decay with background</h5>
-      <pre><code>[0]*exp(-x/[1])+[2]</code></pre>
-      <p>The parameters are amplitude at x = 0 above background, decay time constant, and constant background. Estimate the background from a region where the decay is nearly complete. Subtract it before estimating the amplitude or time constant.</p>
-      <p>Suppose the signal is about 105 at x = 0 and approaches 5 at late times. Start with amplitude 100 and background 5. If the signal reaches about 42 at x = 2 s, its excess above background has fallen to approximately 100/e ≈ 37, giving a time constant near 2 s. Enter <code>100, 2, 5</code>.</p>
-      <p>If you can estimate the half-life instead, divide it by ln(2) ≈ 0.693 to obtain the time constant. ROOT’s named function <code>expo</code> uses a different convention, exp([0] + [1]x); its parameters are not amplitude and time constant.</p>
-
-      <h5>Gaussian peak with background</h5>
-      <pre><code>[0]*exp(-0.5*((x-[1])/[2])^2)+[3]</code></pre>
-      <p>The parameters are peak height above background, peak center, standard deviation σ, and background. Estimate the width at half the peak’s height <em>above background</em>, then divide that full width by approximately 2.355 to estimate σ.</p>
-      <p>For a peak at x = 10 with maximum Y = 135, background 15, and full width at half height 3.53, enter <code>120, 10, 1.5, 15</code>. The center and σ have the same units as X; the height and background have the same units as Y.</p>
-      <p>For histograms, this tool displays counts divided by bin width. Estimate peak height from that density, not directly from a bin’s count. The named function <code>gaus</code> uses peak height, while <code>gausn</code> uses total area as its first parameter. For an isolated Gaussian fully covered by the measured range, the total number of entries provides an approximate area estimate.</p>
-
-      <h5>Periodic patterns</h5>
-      <p>Read the frequency convention directly from the expression. In <code>[0]*sin([1]*x+[2])+[3]</code>, estimate <code>[1]</code> as 2π divided by the period in X. When X is time, this parameter is angular frequency. The amplitude is approximately half the peak-to-trough difference, and the offset is their midpoint. Choose the phase to match where the cycle begins.</p>
-      <p>For a squared-cosine model <code>[0]*pow(cos([1]*(x-[2])),2)+[3]</code>, such as the interference factor in a double-slit pattern, neighboring maxima are instead separated by π/k, where k is <code>[1]</code>. A fringe spacing of 0.74 mm suggests k ≈ 4.25 mm<sup>−1</sup>. Confusing these two conventions gives a frequency estimate that differs by a factor of two.</p>
-    </section>
-
-    <section aria-labelledby="blank-values">
-      <h4 id="blank-values">Leaving guesses blank</h4>
-      <p>A blank entry leaves that parameter unspecified. The fit uses a default or an automatic estimate where available. Blank does not mean “try all possible values.” In a comma-separated list, <code>100,,5</code> supplies values for <code>[0]</code> and <code>[2]</code>, while leaving <code>[1]</code> unspecified.</p>
-      <p>ROOT can initialize some named functions automatically. This tool also estimates starting values for supported histogram models. Custom expressions and combinations of functions may require explicit guesses. For XY fits, ROOT’s automatic initialization of named functions can replace supplied guesses; use an explicit expression such as the Gaussian above when you need control of those starting values. See the <a href="https://root.cern.ch/manual/fitting/" target="_blank" rel="noopener">ROOT fitting manual</a> for its initialization conventions.</p>
-    </section>
-
-    <section aria-labelledby="check-fit">
-      <h4 id="check-fit">Checking the fit</h4>
-      <p>After fitting, check the convergence status, fitted curve, parameter uncertainties, and residuals. Convergence means the fitting procedure met its stopping conditions; it does not establish that the model describes the experiment adequately.</p>
-      <p>If a nonlinear fit fails or gives implausible values, check the parameter order, signs, units, and function definition first. Then try other physically reasonable starting values. If substantially different guesses lead to the same fitted curve and parameters, that supports the numerical stability of the result. If they lead to different solutions, compare the fit statistic and residuals, and consider whether the measured range can distinguish those solutions.</p>
-      <p>Large uncertainties or strong parameter correlations can indicate that the data do not determine the parameters separately. Changing starting values cannot supply information missing from the measurements. Do not adjust measurement uncertainties simply to make a fit appear acceptable.</p>
-    </section>
-  </article>
-
-  <article aria-labelledby="simultaneous-fits">
-    <h3 id="simultaneous-fits">Fitting several datasets together</h3>
-    <p>A simultaneous fit adjusts the models of two or more XY datasets at the same time. Some parameters are <strong>shared</strong>: they have one value that must describe every dataset that uses them. The others belong to one dataset only, or are held at a fixed value. The fit minimizes the sum of the χ² values of all datasets over all of these parameters at once.</p>
-    <p>Open it with <strong>Fit together…</strong> next to the dataset selector (Compact and Standard) or from the Fit menu. Each dataset keeps its own fit function, fit range, initial guesses and point exclusions.</p>
-    <nav class="contents" aria-label="On this page">
-      <a href="#shared-when">When a shared parameter is appropriate</a>
-      <a href="#shared-roles">Assigning roles</a>
-      <a href="#shared-results">Reading the results</a>
-      <a href="#shared-caveat">What a good combined fit does not show</a>
-      <a href="#shared-details">Details</a>
-    </nav>
-
-    <section aria-labelledby="shared-when">
-      <h4 id="shared-when">When a shared parameter is appropriate</h4>
-      <p>Share a parameter only when the same physical quantity enters every dataset that uses it. Typical cases: several decay runs of one source, where the amplitude and background differ from run to run but the time constant does not; the horizontal and vertical positions of a projectile against time, which share the launch time and, for the vertical track, the gravitational acceleration; or a calibration measurement fitted together with the measurement it calibrates.</p>
-      <p>Amplitudes, backgrounds, offsets and other quantities that depend on the conditions of each run belong to that dataset only. If you are not sure whether a quantity is common, fit the datasets separately first and compare the values with their uncertainties. Values that disagree by several standard uncertainties should not be forced to share one value.</p>
-      <p>The datasets should also have comparable uncertainties. A dataset without uncertainties enters with weight 1 for every point, so its χ² is on a different scale from the others and it can dominate or be ignored by the shared parameter. Enter uncertainties for every dataset before fitting them together.</p>
-    </section>
-
-    <section aria-labelledby="shared-roles">
-      <h4 id="shared-roles">Assigning roles</h4>
-      <p>Choose the datasets, then set the role of every parameter of every model in the table: <strong>Shared</strong>, <strong>This dataset only</strong>, or <strong>Fixed value</strong>. A shared parameter is listed once in the shared-parameter table with its own name, initial guess and optional limits. Parameters of different datasets can use the same shared parameter even when their models are written differently, as long as they mean the same quantity in the same units.</p>
-      <p>Initial guesses matter here as much as in a single fit, and ROOT’s automatic starting values for named functions such as <code>gaus</code> are not used. A local parameter starts from the initial guess of its dataset; a shared parameter starts from the guess in the shared-parameter table. A fixed value is not fitted and is reported without an uncertainty.</p>
-    </section>
-
-    <section aria-labelledby="shared-results">
-      <h4 id="shared-results">Reading the results</h4>
-      <p>The report lists the shared parameters once, then each dataset with its own parameters, and finally the total χ², the degrees of freedom (all fitted points minus all free parameters) and the p-value of that total. The plot shows every dataset with its own fitted curve in its own colour, with a legend; optional plots such as residuals and pulls use the same colours.</p>
-      <p>The table <em>χ² by dataset</em> shows each dataset’s contribution to the total and its χ² per point. When the shared model describes all datasets, these contributions are similar per point. A dataset whose χ² per point is much larger than the others’ is the one the shared parameter fits worst: look at its residuals for a trend, and consider whether the quantity really is the same there. The contributions are a diagnostic; only the total has a p-value.</p>
-      <p>The uncertainty of a shared parameter is usually smaller than in any single fit, because all datasets constrain it. Local parameters are correlated with the shared ones; the correlation matrix below the report and Analyze Data show these correlations, and calculations that use a shared and a local parameter together take them into account.</p>
-    </section>
-
-    <section aria-labelledby="shared-caveat">
-      <h4 id="shared-caveat">What a good combined fit does not show</h4>
-      <p>A combined fit assumes that the shared parameter is common; it cannot prove it. An acceptable total χ² only means that one value is compatible with all datasets within their uncertainties. It does not exclude values that differ between datasets by less than the uncertainties can resolve.</p>
-      <p>To test the assumption, compare the separate fits with the combined one. The combined χ² is always at least as large as the sum of the separate χ² values; the increase is what the constraint costs. For one shared parameter across N datasets, the constraint removes N − 1 free parameters, so an increase much larger than about N − 1 indicates that the datasets prefer different values. Report both the separate values and the shared value when this matters for your conclusion.</p>
-    </section>
-
-    <section aria-labelledby="shared-details">
-      <h4 id="shared-details">Details</h4>
-      <p>X uncertainties enter exactly as in a single-dataset fit, through ROOT’s effective variance σ² = ey² + (f′(x)·ex)², re-evaluated as the parameters change; the report notes when this applies. Fit ranges and point exclusions of each dataset are respected, and excluded points are drawn as open gray markers. Confidence bands are not available for simultaneous fits. Editing the data, model, range or roles of a member dataset marks the stored result as outdated until you fit again.</p>
-      <p>Saved sessions store the group definition and its result; older documents without simultaneous fits open unchanged. Text and CSV exports include the shared and local parameters, each dataset’s χ² contribution and the full covariance matrix.</p>
-    </section>
-  </article>
-  </section>
-  <a class="button secondary" href="index.html">Back to Home</a>
+<h1>Documentation</h1><p class="documentation-status">A guide to fitting data with ROOT-A-TRON 3000. Choose a topic.</p><div class="doc-hub"><a class="doc-card" href="docs-getting-started.html"><h2>Getting started</h2><p>The workflow, and the three workspaces.</p></a><a class="doc-card" href="docs-analysis-types.html"><h2>Analysis types</h2><p>XY data, histograms, and multivariate (Rⁿ→Rᵐ) fits.</p></a><a class="doc-card" href="docs-fit-functions.html"><h2>Fit functions &amp; the model library</h2><p>Writing a ROOT expression, named functions, and the guided model library.</p></a><a class="doc-card" href="docs-starting-values.html"><h2>Starting parameter guides</h2><p>How to choose starting parameter values, with guidance for each model.</p></a><a class="doc-card" href="docs-results.html"><h2>Reading the results</h2><p>Convergence, χ²/NDF, p-value, residuals and pulls, and excluding points.</p></a><a class="doc-card" href="docs-uncertainties.html"><h2>Uncertainties &amp; Analyze Data</h2><p>How uncertainties enter the fit, and propagating them in Analyze Data.</p></a><a class="doc-card" href="docs-exporting.html"><h2>Exporting</h2><p>PDF and LaTeX reports, images, CSV, and complete sessions.</p></a><a class="doc-card" href="docs-glossary.html"><h2>Glossary</h2><p>Short definitions of the terms used throughout.</p></a></div><p class="doc-tip">Start with <a href="docs-getting-started.html">Getting started</a>, then <a href="docs-fit-functions.html">Fit functions</a> and the <a href="docs-starting-values.html">Starting parameter guides</a>.</p>
 </main>
 <footer class="site-footer"><span>ROOT-A-TRON 3000 <span class="divider">/</span> Minh Tran · 2026</span><span>Powered by CERN ROOT</span></footer>
 </body>

@@ -31,7 +31,9 @@
       const type = $('analysis-type').value;
       const hasNumbers = id => /[0-9]/.test($(id)?.value || '');
       const hasData = type === 'xy' ? hasNumbers('col-x') && hasNumbers('col-y')
-        : type === 'histogram' ? hasNumbers($('hist-source').value === 'counts' ? 'hist-counts' : 'hist-samples') : false;
+        : type === 'histogram' ? hasNumbers($('hist-source').value === 'counts' ? 'hist-counts' : 'hist-samples')
+        : type === 'multivariate' ? /[0-9]/.test((((typeof datasets!=='undefined'&&datasets[activeIdx]&&datasets[activeIdx].mv&&datasets[activeIdx].mv.inVals)||[]).join('') + ((typeof datasets!=='undefined'&&datasets[activeIdx]&&datasets[activeIdx].mv&&datasets[activeIdx].mv.outVals)||[]).join('')))
+        : false;
       if (!hasData) {
         step = 'data';
         if (typeof askDialog === 'function') askDialog({title:'Enter data first',
@@ -80,7 +82,6 @@
     const notice = $('result-input-notice');
     if (!notice) return;
     if (typeof lastResult === 'undefined' || !lastResult || !lastPayload) { notice.hidden = true; return; }
-    if (lastResult.analysis_type === 'simultaneous') { notice.hidden = true; return; }   // the Fit together dialog reports staleness itself
     try {
       notice.hidden = JSON.stringify(buildPayload(readForm(), lastResult.fit_performed !== false)) === JSON.stringify(lastPayload);
     } catch (_) {

@@ -223,6 +223,24 @@ body.resizing-y, body.resizing-y * { cursor: row-resize !important; user-select:
 .swatch { display: inline-block; width: 12px; height: 12px; border: 1px solid var(--dark); flex: none; }
 button.small { min-height: 26px; padding: 0 10px; font-size: 13px; }
 button.expand { margin-left: auto; }
+
+/* ---- dataset-row: colour-coded, grouped actions -----------------------
+   New plot (create) = green · data tools (Paste data / Data table / Point
+   exclusions) = blue · Delete (destructive) = red, set apart on the right.
+   Only backgrounds/text are tinted, so the ROOT bevel is preserved; disabled
+   buttons fall back to the neutral look. */
+.dataset-row [data-action="dataset-add"] { background: #dcf0e3; color: #1b6b39; }
+.dataset-row [data-action="dataset-add"]:hover:not(:disabled) { background: #d5ecdd; }
+.dataset-row [data-paste-spreadsheet],
+.dataset-row #btn-table,
+.dataset-row #point-exclusions { background: #e2ecfb; color: #1f5390; }
+.dataset-row [data-paste-spreadsheet]:hover:not(:disabled),
+.dataset-row #btn-table:hover:not(:disabled),
+.dataset-row #point-exclusions:hover:not(:disabled) { background: #d2e0f6; }
+.dataset-row [data-action="dataset-remove"] { background: #fdeceb; color: #a3231b; margin-left: 12px; }
+.dataset-row [data-action="dataset-remove"]:hover:not(:disabled) { background: #f8dad7; }
+.dataset-row .expand { margin-left: 0; }               /* keep Data table inline with its group */
+.dataset-row button:disabled { background: var(--frame); color: var(--shadow); }
 .columns textarea { font-family: var(--mono); font-size: 12.5px; padding: 6px; }
 .count { color: var(--muted); font-size: 12px; font-family: var(--mono); }
 .count::before { content: "n="; }
@@ -389,3 +407,41 @@ body.modern button.danger:hover:not(:disabled) { background: #86221c; border-col
 .analyze-results-button:hover{background:#1a1a9a;color:#fff;text-decoration:none}
 .analyze-results-button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 .result-navigation{display:flex;justify-content:flex-end;padding:8px 0}
+
+
+/* ---- guided model library dialog -------------------------------------- */
+#model-library-btn { background: #eef3fb; color: #1f5390; }
+#model-library-btn:hover:not(:disabled) { background: #dde8f8; }
+.model-library-dialog { width: min(720px, 94vw); max-height: 88vh; padding: 0; }
+.model-library-dialog .ml-body { padding: 16px 18px; overflow: auto; max-height: 72vh; }
+.ml-intro { margin: 0 0 12px; color: #3a4553; font-size: 14px; }
+.model-library-dialog .ml-search { width: 100%; margin-bottom: 12px; }
+.ml-cats { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+.ml-cat { min-height: 28px; padding: 0 12px; font-size: 13px; }
+.ml-cat.active { background: var(--accent); color: var(--accent-ink); border-color: #6a6ab8 #000050 #000050 #6a6ab8; }
+.ml-cat-head { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--accent); margin: 18px 0 8px; }
+.ml-card { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid #dfe5ec; border-radius: 4px; margin-bottom: 8px; background: #fff; }
+.ml-card:hover { border-color: var(--accent); background: #fbfcfe; }
+.ml-card-main { flex: 1; min-width: 0; }
+.ml-name { font-weight: 600; margin-bottom: 3px; }
+.ml-desc { margin: 0 0 6px; font-size: 13px; line-height: 1.5; color: #3a4553; }
+.ml-meta { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; }
+.ml-formula { font-size: 12px; background: #f3f6fa; padding: 2px 6px; border-radius: 3px; overflow-wrap: anywhere; }
+.ml-axes { font-size: 12px; color: #6a7686; }
+.ml-use { min-height: 30px; padding: 0 18px; background: #e2ecfb; color: #1f5390; align-self: center; flex: none; font-weight: 600; }
+.ml-use:hover:not(:disabled) { background: #cfe0f6; }
+.ml-empty { color: #6a7686; }
+.model-library-dialog .actions { padding: 10px 18px; border-top: 1px solid #dfe5ec; margin: 0; }
+@media (max-width: 560px) { .ml-card { flex-direction: column; align-items: stretch; } .ml-use { align-self: stretch; } }
+.ml-guide { margin-top: 8px; }
+.ml-guide > summary { cursor: pointer; color: #1f5390; font-size: 12.5px; font-weight: 600; list-style: none; }
+.ml-guide > summary::-webkit-details-marker { display: none; }
+.ml-guide > summary::before { content: "\25B8  "; }
+.ml-guide[open] > summary::before { content: "\25BE  "; }
+.ml-guide ul { margin: 8px 0 2px; padding-left: 20px; }
+.ml-guide li { font-size: 13px; line-height: 1.55; color: #3a4553; margin-bottom: 4px; }
+.param-help-btn { margin-top: 8px; font-weight: 600; }
+.help-model-guide { background: #eef3fb; border: 1px solid #cfe0f6; border-radius: 4px; padding: 9px 12px; margin: 0 0 12px; }
+.help-model-name { margin: 0 0 6px; }
+.help-model-guide ul { margin: 0; padding-left: 18px; }
+.help-model-guide li { margin-bottom: 4px; line-height: 1.5; }

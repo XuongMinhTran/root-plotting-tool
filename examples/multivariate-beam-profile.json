@@ -1,0 +1,60 @@
+{
+ "version": 1,
+ "app": "rootfit",
+ "app_version": "0.1.0",
+ "created": "2026-09-19T00:00:00Z",
+ "modified": "2026-09-19T00:00:00Z",
+ "title": "Beam profile (R²→R surface)",
+ "notes": "A 2-D Gaussian beam profile measured on a 7×7 grid (49 points): counts vs position (x0, x1), an R²→R fit. Poisson √N uncertainties on the counts. Model A·exp(−((x0−x0c)²+(x1−y0c)²)/(2σ²)) + background. Expected near A≈98, centre (0.38, −0.33), σ≈1.53, background≈4.8, χ²/NDF≈0.66. The fit draws the fitted surface over the measured points; edit a guess to see the fit move.",
+ "inputs": {
+  "datasets": [
+   {
+    "name": "Beam profile",
+    "analysis_type": "multivariate",
+    "x": "",
+    "y": "",
+    "ex": "",
+    "ey": "",
+    "mv": {
+     "n": 2,
+     "m": 1,
+     "inNames": [
+      "x0",
+      "x1"
+     ],
+     "inVals": [
+      "-4\n-2.667\n-1.333\n0\n1.333\n2.667\n4\n-4\n-2.667\n-1.333\n0\n1.333\n2.667\n4\n-4\n-2.667\n-1.333\n0\n1.333\n2.667\n4\n-4\n-2.667\n-1.333\n0\n1.333\n2.667\n4\n-4\n-2.667\n-1.333\n0\n1.333\n2.667\n4\n-4\n-2.667\n-1.333\n0\n1.333\n2.667\n4\n-4\n-2.667\n-1.333\n0\n1.333\n2.667\n4",
+      "-4\n-4\n-4\n-4\n-4\n-4\n-4\n-2.667\n-2.667\n-2.667\n-2.667\n-2.667\n-2.667\n-2.667\n-1.333\n-1.333\n-1.333\n-1.333\n-1.333\n-1.333\n-1.333\n0\n0\n0\n0\n0\n0\n0\n1.333\n1.333\n1.333\n1.333\n1.333\n1.333\n1.333\n2.667\n2.667\n2.667\n2.667\n2.667\n2.667\n2.667\n4\n4\n4\n4\n4\n4\n4"
+     ],
+     "inErr": [
+      "",
+      ""
+     ],
+     "outNames": [
+      "counts"
+     ],
+     "outVals": [
+      "6\n7\n9\n13\n10\n5\n8\n8\n8\n28\n29\n30\n23\n9\n4\n16\n48\n78\n69\n27\n9\n7\n15\n59\n92\n93\n37\n9\n6\n10\n42\n52\n55\n23\n10\n6\n6\n13\n22\n16\n6\n3\n4\n10\n9\n5\n10\n5\n4"
+     ],
+     "outErr": [
+      "2.45\n2.65\n3\n3.61\n3.16\n2.24\n2.83\n2.83\n2.83\n5.29\n5.39\n5.48\n4.8\n3\n2\n4\n6.93\n8.83\n8.31\n5.2\n3\n2.65\n3.87\n7.68\n9.59\n9.64\n6.08\n3\n2.45\n3.16\n6.48\n7.21\n7.42\n4.8\n3.16\n2.45\n2.45\n3.61\n4.69\n4\n2.45\n1.73\n2\n3.16\n3\n2.24\n3.16\n2.24\n2"
+     ],
+     "models": [
+      "[0]*exp(-((x0-[1])*(x0-[1])+(x1-[2])*(x1-[2]))/(2*[3]*[3])) + [4]"
+     ],
+     "parNames": "A, x0, y0, sigma, background",
+     "parGuesses": "80, 0, 0, 2, 5"
+    }
+   }
+  ],
+  "active": 0,
+  "graph_title": "Beam profile",
+  "x_title": "x0",
+  "y_title": "x1",
+  "options": {
+   "grid": true
+  }
+ },
+ "results": null,
+ "backend_url": "http://localhost:8000"
+}

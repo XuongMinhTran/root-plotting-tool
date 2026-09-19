@@ -68,9 +68,14 @@ TOKEN = re.compile(r"""
 """, re.VERBOSE)
 
 
-def check_formula(formula):
+def check_formula(formula, variables=("x",)):
     """Return (True, "") if the formula only uses allowed pieces,
-    otherwise (False, "<human-readable reason>")."""
+    otherwise (False, "<human-readable reason>").
+
+    `variables` is the set of allowed independent-variable names. The default is
+    the single-variable ("x",) used by /fit and /histogram; the multivariate
+    endpoint passes ("x0", "x1", ...) so each input dimension is a valid name."""
+    variables = tuple(variables)
     if formula is None or not str(formula).strip():
         return False, "The fit function is empty."
     formula = str(formula)
@@ -93,13 +98,15 @@ def check_formula(formula):
             continue
 
         if kind == "ident":
-            if text == "x" or text in CONSTANTS or text in FUNCTIONS or text in NAMED_FUNCTIONS:
+            if text in variables or text in CONSTANTS or text in FUNCTIONS or text in NAMED_FUNCTIONS:
                 continue
             if any(p.match(text) for p in NAMED_FUNCTION_PATTERNS):
                 continue
             hint = ""
-            if text in ("y", "z", "t"):
+            if text in ("y", "z", "t") and variables == ("x",):
                 hint = " Only one variable, x, is supported."
+            elif re.fullmatch(r"x\d+", text) and text not in variables:
+                hint = f" Inputs here are {', '.join(variables)}."
             elif text.lower() in FUNCTIONS:
                 hint = f" Did you mean '{text.lower()}'?"
             return False, f"'{text}' is not an allowed name.{hint} Parameters are written [0], [1], ..."

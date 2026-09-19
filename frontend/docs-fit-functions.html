@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Writing a ROOT fit expression, named functions, and the guided model library.">
+  <title>Fit functions &amp; the model library · ROOT-A-TRON 3000</title>
+  <link rel="stylesheet" href="home.css?v=20260917-primary-tools">
+  <link rel="stylesheet" href="site-brand.css?v=1">
+  <link rel="stylesheet" href="documentation.css?v=3">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to documentation</a>
+<header class="site-header"><a class="site-name" href="index.html">ROOT-A-TRON 3000</a><nav aria-label="Main"><a href="index.html">Home</a><a href="documentation.html">Documentation</a></nav></header>
+<main id="main" class="documentation-page" tabindex="-1">
+<p class="doc-crumb"><a href="documentation.html">Documentation</a> › Fit functions &amp; the model library</p><h1>Fit functions &amp; the model library</h1>
+<p>The fit function is written as a ROOT expression. Use <code>x</code> for the independent variable and <code>[0]</code>, <code>[1]</code>, … for the parameters to be fitted. Multiplication is <code>*</code>, division <code>/</code>, and powers <code>pow(x,2)</code> or <code>x^2</code>. Supported functions include <code>exp</code>, <code>log</code>, <code>sqrt</code>, <code>sin</code>, <code>cos</code>, and the <code>TMath::</code> family; <code>TMath::Pi()</code> is π. ROOT also provides named functions such as <code>gaus</code>, <code>expo</code>, <code>landau</code>, and polynomials <code>pol0</code>…<code>polN</code>, which can be combined with parameter offsets, for example <code>gaus(0)+pol1(3)</code>.</p>
+<p>The Standard workspace additionally offers an <strong>equation editor</strong>: type an ordinary formula such as <code>A exp(-x/tau) + B</code> and it is translated to the ROOT expression for you, with the symbols becoming fit parameters.</p>
+<h2>The model library</h2>
+<p>Rather than remember the expression for every experiment, press <strong>Model library…</strong> next to the fit function. It opens a browsable, searchable collection of the models most common in undergraduate labs, grouped by topic — mechanics and motion, waves and optics, thermal and statistical, electricity and magnetism, modern physics, and general shapes.</p>
+<p>Each entry shows the model, a one-line description of the experiment it fits, and the variables it expects. Choosing <strong>Use</strong> fills in the fit function, the parameter names, and starting guesses. Those guesses are a starting point, not an answer — adjust them to your own data before fitting.</p>
+<p>For how to estimate the starting values for each model — whether or not you used the library — see the full <a href="docs-starting-values.html"><strong>Starting parameter guides</strong></a>.</p><p><a class="doc-back" href="documentation.html">← All documentation</a></p>
+</main>
+<footer class="site-footer"><span>ROOT-A-TRON 3000 <span class="divider">/</span> Minh Tran · 2026</span><span>Powered by CERN ROOT</span></footer>
+</body>
+</html>

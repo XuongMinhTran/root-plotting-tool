@@ -8,6 +8,7 @@
 <link rel="stylesheet" href="classic.css?v=20260918-button-colors">
 <link rel="stylesheet" href="paste-data.css?v=1">
 <link rel="stylesheet" href="analysis-features.css?v=20260919-export">
+<link rel="stylesheet" href="multivariate.css?v=1">
 <script defer src="analysis-export.js?v=20260919-pdf"></script>
 </head>
 <body class="classic">
@@ -40,13 +41,12 @@
     <span class="menu-title" tabindex="0">Fit</span>
     <div class="dropdown">
       <button type="button" data-action="fit">Run fit <span class="shortcut">Enter</span></button>
-      <button type="button" data-action="simultaneous">Fit datasets together…</button>
       <hr>
       <button type="button" data-action="example" data-example="linear">Example: straight line</button>
       <button type="button" data-action="example" data-example="exp">Example: exponential decay</button>
       <button type="button" data-action="example" data-example="gaus">Example: Gaussian peak</button>
         <button type="button" data-action="example" data-example="histogram">Example: count histogram</button>
-      <button type="button" data-action="example" data-example="simultaneous">Example: two decays, shared time constant</button>
+        <button type="button" data-action="example" data-example="multivariate">Example: beam profile (Rⁿ→Rᵐ)</button>
     </div>
   </div>
   <div class="menu">
@@ -104,13 +104,13 @@
 
     <fieldset class="group data-group">
       <legend><span class="data-section-heading"><span>Data <button type="button" class="help-btn" data-help="data" aria-label="Help on data entry">?</button></span><button type="button" class="small expand" data-action="table" title="Open the spreadsheet-style editor">Expand ⤢</button></span></legend>
-      <div class="field analysis-choice"><label for="analysis-type">Analysis type</label><select id="analysis-type"><option value="" disabled selected>Select analysis type…</option><option value="xy">XY data</option><option value="histogram">Histogram</option></select></div>
+      <div class="field analysis-choice"><label for="analysis-type">Analysis type</label><select id="analysis-type"><option value="" disabled selected>Select analysis type…</option><option value="xy">XY data</option><option value="histogram">Histogram</option><option value="multivariate">Multivariate — Rⁿ→Rᵐ</option></select></div>
       <div class="row dataset-row">
         <select id="dataset-select" title="Which dataset the columns below show" class="grow"></select>
         <button type="button" class="small" data-action="dataset-add" title="Create a new plot">New plot</button>
-        <button type="button" class="small" data-paste-spreadsheet>Paste data…</button>
         <button type="button" class="small" data-action="dataset-duplicate" title="Copy this dataset and its fit settings">Duplicate</button>
         <button type="button" class="small" data-action="dataset-rename" title="Rename this dataset">Rename</button>
+        <button type="button" class="small" data-paste-spreadsheet>Paste data…</button>
         <button type="button" class="small" data-action="dataset-remove" title="Delete this dataset">Delete</button>
       </div>
 
@@ -143,10 +143,13 @@
       </div>
       <p class="hint">One value per line; commas, tabs or spaces work too. Errors are optional: enter one value for the whole axis, or one per point. Use <em>Paste data…</em> to load spreadsheet columns with a preview.</p>
       </div>
+      <div id="multivariate-data" hidden></div>
     </fieldset>
 
     <fieldset class="group">
       <legend>Fit function <button type="button" class="help-btn" data-help="formula" aria-label="Help on fit functions">?</button></legend>
+      <div id="multivariate-model" hidden></div>
+      <div id="single-fit-block">
 
       <div id="hist-fit-options" hidden>
         <div class="field"><label for="hist-method">Histogram fitting method</label><select id="hist-method"><option value="poisson">Poisson likelihood</option><option value="chi2">χ² with √count uncertainties</option></select></div>
@@ -157,6 +160,7 @@
         <select id="quick-pick" title="Insert a fit function" aria-label="Fit function examples">
           <option value="">Examples…</option>
         </select>
+        <button type="button" id="model-library-btn" class="small">Model library…</button>
       </div>
       <details class="equation-help"><summary>Typing reference</summary><p>Use <code>x</code> for the independent variable and <code>[0]</code>, <code>[1]</code>, … for fit parameters. Write multiplication as <code>*</code>, division as <code>/</code>, and powers as <code>pow(x,2)</code>. Functions include <code>exp(x)</code>, <code>log(x)</code>, <code>sin(x)</code>, and <code>sqrt(x)</code>. Use <code>TMath::Pi()</code> for π. Example: <code>[0]*exp(-x/[1])+[2]</code>.</p></details>
       <p class="hint"><code>x</code> is the variable, parameters are <code>[0]</code>, <code>[1]</code>, … Named functions
@@ -166,9 +170,9 @@
       <div class="field"><label for="param-names">Parameter names <span class="hint-inline">(comma-separated)</span></label>
         <input id="param-names" type="text" placeholder="slope, intercept" spellcheck="false"></div>
       <p class="hint"><strong>Initial guesses matter for nonlinear fits.</strong> Estimate slopes, peak heights, positions, and widths from the data, using the model’s units. Poor guesses can prevent convergence or lead to a different minimum. Leave a value blank to use its default or automatic estimate, where available.</p>
-      <div class="field"><label for="initial-guesses">Initial guesses <span class="hint-inline">(comma-separated)</span>
-          <button type="button" class="help-btn" data-help="guesses" aria-label="Help on initial guesses">?</button></label>
-        <input id="initial-guesses" type="text" class="mono" placeholder="1, 0" spellcheck="false"></div>
+      <div class="field"><label for="initial-guesses">Initial guesses <span class="hint-inline">(comma-separated)</span></label>
+        <input id="initial-guesses" type="text" class="mono" placeholder="1, 0" spellcheck="false">
+        <button type="button" class="param-help-btn" data-help="guesses">Help with parameters</button></div>
 
       <details class="expander" id="param-expander">
         <summary>Parameter table &amp; fit range</summary>
@@ -185,6 +189,7 @@
           <button type="button" class="help-btn" data-help="range" aria-label="Help on the fit range">?</button>
         </div>
       </details>
+      </div><!-- /single-fit-block -->
     </fieldset>
 
     <fieldset class="group">
@@ -354,7 +359,8 @@
   </div>
 </dialog>
 <script src="paste-data.js?v=1" defer></script>
+<script src="multivariate.js?v=1" defer></script>
+<script src="model-library.js?v=1" defer></script>
 <script defer src="analysis-features.js?v=20260919-export"></script>
-<script defer src="simultaneous-fit.js?v=1"></script>
 </body>
 </html>

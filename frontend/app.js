@@ -26,9 +26,8 @@
 
 const $ = (id) => document.getElementById(id);
 
-// The Cloudflare deployment serves the pages and the fitting API from one address
-// (see wrangler.jsonc). Pages opened from disk or another host use it as well.
-const DEFAULT_BACKEND = 'https://root-plotting-tool.tranxuongminh.workers.dev';
+const DEFAULT_BACKEND = 'https://root-plotting-tool.onrender.com';
+const RENDER_BACKEND = 'https://root-plotting-tool.onrender.com';
 const LOCAL_BACKEND = 'http://localhost:8000';
 const BACKEND_KEY = 'rootfit.backendUrl';
 
@@ -256,7 +255,7 @@ const HELP = {
       <p>Initial guesses specify the parameter values used to initialize minimization. Enter values in parameter-index order: <code>[0]</code>, <code>[1]</code>, …, using the units defined by the model.</p>
       <p>For <code>[0]*exp(-x/[1])</code>, [0] is the amplitude at x = 0 and [1] is the decay time constant. For <code>gaus</code>, the parameters are peak height, mean, and standard deviation.</p>
       <p>Blank entries retain the model’s default or automatic estimate. Automatic initialization depends on the function and analysis type; custom functions may require explicit guesses. In a comma-separated list, <code>1,,3</code> specifies [0] and [2] while leaving [1] unspecified.</p>
-      <p>For nonlinear models, different initial guesses may converge to different local minima. Check the fit status, parameter uncertainties, and residuals.</p><p><a href="documentation.html#initial-parameters" target="_blank" rel="noopener">Guide to choosing initial values</a></p>`,
+      <p>For nonlinear models, different initial guesses may converge to different local minima. Check the fit status, parameter uncertainties, and residuals.</p><p><a href="docs-starting-values.html" target="_blank" rel="noopener"><b>Starting parameter guides</b> — a recipe for every model</a></p>`,
   },
   range: {
     title: 'Fit range',
@@ -299,7 +298,14 @@ function showHelp(key, anchor) {
   const h = HELP[key];
   if (!h) return;
   if (helpOpen === key && !pop.hidden) { hideHelp(); return; }
-  pop.innerHTML = `<div class="help-title">${h.title}<button type="button" class="help-close" aria-label="Close">×</button></div><div class="help-body">${h.html}</div>`;
+  let bodyHtml = h.html;
+  if (key === 'guesses' && window.ModelLibrary && window.ModelLibrary.guideFor) {
+    const g = window.ModelLibrary.guideFor($('formula') ? $('formula').value : '');
+    if (g && g.guide && g.guide.length) {
+      bodyHtml = `<div class="help-model-guide"><p class="help-model-name">Starting values for <b>${escapeHtml(g.name)}</b></p><ul>${g.guide.map((t) => `<li>${escapeHtml(t)}</li>`).join('')}</ul></div>` + bodyHtml;
+    }
+  }
+  pop.innerHTML = `<div class="help-title">${h.title}<button type="button" class="help-close" aria-label="Close">×</button></div><div class="help-body">${bodyHtml}</div>`;
   pop.hidden = false;
   helpOpen = key;
   pop.querySelector('.help-close').addEventListener('click', hideHelp);
@@ -332,23 +338,6 @@ const COLUMN_LABEL = { x: 'X', y: 'Y', ex: 'X errors', ey: 'Y errors' };
 
 let datasets = [newDataset('Dataset 1', '')];
 let activeIdx = 0;
-// Simultaneous fits: groups of XY datasets fitted together with shared
-// parameters (shape documented in workspace-store.js). Their results live on
-// the group, not on a dataset.
-let simultaneousFits = [];
-let viewingGroup = null;   // id of the simultaneous fit whose result is on screen, or null
-
-/** Drop members whose dataset no longer exists, and groups left with fewer than two. */
-function pruneSimultaneousFits() {
-  const ids = new Set(datasets.map(d => d.id));
-  simultaneousFits = simultaneousFits.filter(g => {
-    const members = g.members.filter(m => ids.has(m.datasetId));
-    if (members.length !== g.members.length) { g.members = members; delete g.result; }
-    return members.length >= 2;
-  });
-  if (viewingGroup && !simultaneousFits.some(g => g.id === viewingGroup && g.result)) viewingGroup = null;
-  return simultaneousFits;
-}
 
 function defaultFitSettings() { return {formula:'[0]*x+[1]', param_names:'', initial_guesses:'', x_min:'', x_max:''}; }
 function normalizeFitSettings(settings = {}) {
@@ -362,7 +351,9 @@ function normalizeFitSettings(settings = {}) {
 function newDataset(name, type = 'xy') {
   const fit = defaultFitSettings();
   if (type === 'histogram') Object.assign(fit, {formula:'gausn', param_names:'norm, mean, sigma'});
-  return {id:window.WorkspaceStore?.id(), name, analysis_type:type, x:'', y:'', ex:'', ey:'', fit};
+  const d = {id:window.WorkspaceStore?.id(), name, analysis_type:type, x:'', y:'', ex:'', ey:'', fit};
+  if (type === 'multivariate' && window.Multivariate) d.mv = window.Multivariate.defaultMv();
+  return d;
 }
 function readDatasetFit() {
   const fit = {formula:$('formula').value, param_names:$('param-names').value,
@@ -569,8 +560,12 @@ function syncAnalysisControls() {
   for (const el of document.querySelectorAll('[data-action="dataset-duplicate"], [data-action="dataset-rename"]')) el.disabled = !type;
   syncFunctionExamples(histogram);
   const samples = $('hist-source').value === 'samples';
+  const multivariate = type === 'multivariate';
   $('xy-data').hidden = type !== 'xy';
   $('histogram-data').hidden = !histogram;
+  if ($('multivariate-data')) $('multivariate-data').hidden = !multivariate;
+  if ($('multivariate-model')) $('multivariate-model').hidden = !multivariate;
+  if ($('single-fit-block')) $('single-fit-block').hidden = multivariate;
   $('hist-fit-options').hidden = !histogram;
   $('hist-samples-group').hidden = !samples;
   $('hist-counts-group').hidden = samples;
@@ -585,6 +580,7 @@ function syncAnalysisControls() {
   // Keep the XY-specific introduction out of histogram mode.
   const intro = document.querySelector('#panel-data .section-description');
   if (intro) intro.textContent = !type ? 'Select an analysis type to get started.' : histogram ? 'Enter individual measurements to group into bins, or provide existing bin edges and counts.' : 'Paste columns from a spreadsheet, or use the table editor to enter several columns at once. Each point needs an X and a Y value.';
+  if (intro && multivariate) intro.textContent = 'Enter each input and output as a column, give one model per output with inputs x0, x1, … and shared parameters [0], [1], …, then Fit.';
 }
 function buildHistogramPayload(inputs, fitModel = true) {
   const h = inputs.histogram || {}, options = inputs.options || {};
@@ -640,7 +636,7 @@ function syncActiveFromColumns() {
 
 /** The active dataset object -> the four text boxes. */
 function showActiveInColumns() {
-  setTimeout(() => { window.AnalysisFeatures?.refresh(); window.SimultaneousFit?.refresh?.(); }, 0);
+  setTimeout(() => window.AnalysisFeatures?.refresh(), 0);
   if (window.WorkspaceStore && workspaceDocument) {
     if (window.WorkspaceStore.reconcileDatasets) {
       workspaceDocument = window.WorkspaceStore.reconcileDatasets(workspaceDocument, datasets);
@@ -662,6 +658,7 @@ function showActiveInColumns() {
   for (const key of HISTOGRAM_FIELDS) $('hist-' + key).value = d.histogram?.[key] ?? defaults[key] ?? '';
   writeDatasetFit(d.fit);
   syncAnalysisControls();
+  if (d.analysis_type === 'multivariate' && window.Multivariate) window.Multivariate.load(d);
   updateCounts();
   showDatasetResult();
 }
@@ -692,7 +689,8 @@ function renderDatasetSelector() {
     const unit = histogram ? (source === 'counts' ? 'bins' : 'measurements') : 'points';
     const opt = document.createElement('option');
     opt.value = String(i);
-    opt.textContent = `${d.name} — ${histogram ? 'Histogram' : 'XY'} (${n} ${unit})`;
+    const mv = d.analysis_type === 'multivariate';
+    opt.textContent = mv ? `${d.name} — Multivariate ${window.Multivariate ? window.Multivariate.label(d) : ''}` : `${d.name} — ${histogram ? 'Histogram' : 'XY'} (${n} ${unit})`;
     sel.appendChild(opt);
   });
   sel.value = String(activeIdx);
@@ -703,7 +701,7 @@ function renderDatasetSelector() {
     if (!d.analysis_type || d.analysis_type !== $('analysis-type').value) return;
     const option = document.createElement('option');
     option.value = String(i);
-    option.textContent = d.name + ' — ' + (d.analysis_type === 'histogram' ? 'Histogram' : 'XY');
+    option.textContent = d.name + ' — ' + (d.analysis_type === 'histogram' ? 'Histogram' : d.analysis_type === 'multivariate' ? 'Multivariate' : 'XY');
     fitSelect.appendChild(option);
   });
   fitSelect.value = String(activeIdx);
@@ -711,7 +709,7 @@ function renderDatasetSelector() {
   const summary = $('modern-data-summary');
   if (summary) {
     const d = datasets[activeIdx];
-    summary.textContent = d.analysis_type ? d.name + ' — ' + (d.analysis_type === 'histogram' ? 'Histogram' : 'XY') : 'Select an analysis type to get started.';
+    summary.textContent = d.analysis_type ? d.name + ' — ' + (d.analysis_type === 'histogram' ? 'Histogram' : d.analysis_type === 'multivariate' ? 'Multivariate' : 'XY') : 'Select an analysis type to get started.';
   }
   if ($('fit-dataset-label')) $('fit-dataset-label').textContent = 'These settings belong to ' + datasets[activeIdx].name + '. The expanded data table edits the same settings; choose Done there to apply changes.';
   const removeBtns = document.querySelectorAll('[data-action="dataset-remove"]');
@@ -721,7 +719,6 @@ function renderDatasetSelector() {
 
 // Each dataset retains its latest result; selection never reruns a fit.
 function showDatasetResult() {
-  viewingGroup = null;
   const saved = datasets[activeIdx]?.result;
   if (!saved && !lastResult && !fitBusy) return;
   fitRequestVersion++;
@@ -744,22 +741,6 @@ function showDatasetResult() {
   }
 }
 
-/** Put a stored simultaneous-fit result on screen (plot, report, status bar). */
-function showSimultaneousResult(group, navigate = true) {
-  const saved = group?.result;
-  if (!saved?.response?.params) return false;
-  fitRequestVersion++;
-  fitBusy = false;
-  viewingGroup = group.id;
-  lastResult = saved.response;
-  lastPayload = { ...(saved.payload || {}), dataset_name: group.name };
-  showMessage('');
-  renderReport(lastResult);
-  drawPlot(lastResult, !navigate);
-  setStatus($('fit-status'), 'Simultaneous fit — ' + group.name);
-  return true;
-}
-
 function setActiveDataset(i) {
   if (i === activeIdx) return;
   syncActiveFromColumns();
@@ -775,7 +756,7 @@ function openDatasetTypeChooser(inTable) {
   $('dataset-type-dialog').showModal();
 }
 async function requestNewDataset(type, inTable = addingInTable) {
-  if (!['xy', 'histogram'].includes(type)) return;
+  if (!['xy', 'histogram', 'multivariate'].includes(type)) return;
   const name = await askDialog({title:'New dataset', label:'Dataset name', value:'', accept:'Create',
     validate: value => { if (!value.trim()) throw new Error('Enter a dataset name.'); return value.trim(); }});
   if (name === null) {
@@ -786,7 +767,7 @@ async function requestNewDataset(type, inTable = addingInTable) {
   createTypedDataset(type, name);
 }
 function createTypedDataset(type, name) {
-  if (!['xy', 'histogram'].includes(type)) return;
+  if (!['xy', 'histogram', 'multivariate'].includes(type)) return;
   if (addingInTable) {
     if (readGridToDataset() === false) return;
     if (!tableDatasets[tableActive].analysis_type) tableDatasets.splice(tableActive, 1);
@@ -806,7 +787,7 @@ function createTypedDataset(type, name) {
   $('dataset-type-dialog').close();
 }
 function changeAnalysisType(type) {
-  if (!['xy', 'histogram'].includes(type)) return;
+  if (!['xy', 'histogram', 'multivariate'].includes(type)) return;
   syncActiveFromColumns();
   let next = datasets.findIndex(d => d.analysis_type === type);
   if (next < 0) {
@@ -1279,8 +1260,6 @@ function readForm() {
   const active = datasets[activeIdx];
   return {
     datasets: datasets.map((d) => ({ ...d })),
-    // Only present when a document has simultaneous fits, so older documents round-trip unchanged.
-    ...(pruneSimultaneousFits().length ? { simultaneous_fits: simultaneousFits } : {}),
     active: activeIdx,
     analysis_type: active.analysis_type ?? 'xy',
     histogram: active.histogram,
@@ -1311,7 +1290,7 @@ function writeForm(inputs) {
       ...d,
       id: d?.id || window.WorkspaceStore?.id(),
       name: String((d && d.name) || `Dataset ${i + 1}`),
-      analysis_type: d?.analysis_type === '' ? '' : d?.analysis_type === 'histogram' ? 'histogram' : 'xy',
+      analysis_type: d?.analysis_type === '' ? '' : ['histogram','multivariate'].includes(d?.analysis_type) ? d.analysis_type : 'xy',
       result: d?.result?.response && Array.isArray(d.result.response.params) ? d.result : null,
       histogram: d?.histogram && typeof d.histogram === 'object' ? {...d.histogram} : {},
       fit: normalizeFitSettings(d?.fit && typeof d.fit === 'object' ? d.fit : legacyFit),
@@ -1323,8 +1302,6 @@ function writeForm(inputs) {
     datasets = [{ id:window.WorkspaceStore?.id(), name: 'Dataset 1', fit:{...legacyFit}, x: String(d.x || ''), y: String(d.y || ''), ex: String(d.ex || ''), ey: String(d.ey || '') }];
     activeIdx = 0;
   }
-  simultaneousFits = window.WorkspaceStore?.normalizeSimultaneousFits ? window.WorkspaceStore.normalizeSimultaneousFits(inputs.simultaneous_fits, datasets) : [];
-  viewingGroup = null;
   showActiveInColumns();
   $('graph-title').value = inputs.graph_title || '';
   $('x-title').value = inputs.x_title || '';
@@ -1362,7 +1339,6 @@ function resetResult() {
   fitRequestVersion++;
   plotDrawVersion++;
   fitBusy = false;
-  viewingGroup = null;
   clearReport();
   $('plot').innerHTML = '<p class="placeholder">The plot appears here after a fit.</p>';
   setPngEnabled(false);
@@ -1568,18 +1544,8 @@ async function callBackend(path, options = {}, timeoutMs = 60000) {
   try { body = JSON.parse(text); } catch (_) { /* not JSON */ }
 
   if (!response.ok) {
-    if (body && body.error) throw new Error(body.error);
-    // 404/405 without a JSON error: the server does not have this endpoint at all. Usually the
-    // backend is an older deployment, or the backend URL points at a site that only hosts the pages.
-    if ([502, 503, 504].includes(response.status)) {
-      throw new Error(`The fitting service is starting or temporarily unavailable (HTTP ${response.status}). If it was asleep, the first request can take up to a minute; please try again. Your inputs are still here.`);
-    }
-    if (response.status === 404 || response.status === 405) {
-      let host = url;
-      try { host = new URL(url).host; } catch (_) { /* keep the full URL */ }
-      throw new Error(`The fitting service at ${host} does not offer this function (HTTP ${response.status}). It is probably running an older version of ROOT-A-TRON: redeploy or restart the backend from the latest code, then try again. Your inputs are still here.`);
-    }
-    throw new Error('The fitting service could not finish this request. Your inputs are still here; please try Fit again.');
+    const msg = body && body.error ? body.error : 'The fitting service could not finish this request. Your inputs are still here; please try Fit again.';
+    throw new Error(msg);
   }
   if (body === null) throw new Error('The fitting service sent a response the app could not read. Your inputs are still here. Please try Fit again; if this continues, contact the site maintainer.');
   return body;
@@ -1588,16 +1554,12 @@ async function callBackend(path, options = {}, timeoutMs = 60000) {
 async function checkHealth() {
   const el = $('health-status');
   setStatus(el, 'Backend: checking', 'busy');
-  // A fitting server that was asleep (Cloudflare Containers, Render) takes a while to answer.
-  const slow = setTimeout(() => setStatus(el, 'Backend: starting', 'busy'), 4000);
   try {
     await resolveBackend();
-    await callBackend('/health', {}, 90000);
+    await callBackend('/health', {}, 8000);
     setStatus(el, 'Backend: connected', 'ok');
   } catch (e) {
     setStatus(el, 'Backend: disconnected', 'err');
-  } finally {
-    clearTimeout(slow);
   }
 }
 
@@ -1609,6 +1571,7 @@ let lastPayload = null;   // what was sent for it
 async function runFit(fitModel = true) {
   fitModel = fitModel !== false;
   if ($('btn-fit').disabled || fitBusy) return;
+  if (datasets[activeIdx]?.analysis_type === 'multivariate') return runMultivariate();
   showMessage('');
   hideHelp();
   let payload;
@@ -1636,7 +1599,6 @@ async function runFit(fitModel = true) {
     });
     if (requestVersion !== fitRequestVersion) return;
     datasets[activeIdx].result = {response:result, payload, sourceSignature:window.WorkspaceStore?.signature(datasets[activeIdx])};
-    viewingGroup = null;
     lastResult = result;
     lastPayload = payload;
     renderReport(result);
@@ -1650,6 +1612,56 @@ async function runFit(fitModel = true) {
       showMessage('warn', `Fit did not converge. ${result.status_message} Check initial guesses, parameter identifiability, and the fit range before interpreting the result.` + (plotNote ? '\n' + plotNote : ''));
     } else if (plotNote) showMessage('info', plotNote);
     setStatus($('fit-status'), result.converged ? `${result.fit_performed === false ? 'Histogram plotted' : 'Fit done'} — ${payload.dataset_name}` : 'Fit not converged', result.converged ? 'ok' : 'warn');
+  } catch (e) {
+    if (requestVersion !== fitRequestVersion) return;
+    showMessage('error', e.message + (lastResult ? ' The plot and report below are from the previous fit.' : ''));
+    setStatus($('fit-status'), 'Fit not completed', 'err');
+  } finally {
+    if (requestVersion === fitRequestVersion) {
+      fitBusy = false;
+      syncAnalysisControls();
+      $('btn-histogram').disabled = false;
+    }
+  }
+}
+
+async function runMultivariate() {
+  if ($('btn-fit').disabled || fitBusy) return;
+  showMessage('');
+  hideHelp();
+  let payload;
+  try {
+    payload = window.Multivariate.buildPayload(datasets[activeIdx]);
+  } catch (e) {
+    showMessage('error', e.message);
+    return;
+  }
+  const requestVersion = ++fitRequestVersion;
+  fitBusy = true;
+  $('btn-fit').disabled = true;
+  $('btn-histogram').disabled = true;
+  setStatus($('fit-status'), 'Fitting', 'busy');
+  try {
+    const result = await callBackend('/multivariate-fit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (requestVersion !== fitRequestVersion) return;
+    datasets[activeIdx].result = { response: result, payload, sourceSignature: window.WorkspaceStore?.signature(datasets[activeIdx]) };
+    lastResult = result;
+    lastPayload = payload;
+    renderReport(result);
+    await drawPlot(result);
+    if (requestVersion !== fitRequestVersion) return;
+    autosave();
+    const notes = (result.plot_notes || []).join('\n');
+    if (!result.converged) {
+      showMessage('warn', `Fit did not converge. ${result.status_message} Check the models, starting guesses, and that the data constrain every parameter.` + (notes ? '\n' + notes : ''));
+    } else if (notes) {
+      showMessage('info', notes);
+    }
+    setStatus($('fit-status'), result.converged ? `Fit done — ${payload.dataset_name}` : 'Fit not converged', result.converged ? 'ok' : 'warn');
   } catch (e) {
     if (requestVersion !== fitRequestVersion) return;
     showMessage('error', e.message + (lastResult ? ' The plot and report below are from the previous fit.' : ''));
@@ -1685,7 +1697,7 @@ function renderHistogramReport(r) {
 
 function renderReport(r) {
   if (r.analysis_type === 'histogram') { renderHistogramReport(r); return; }
-  if (r.analysis_type === 'simultaneous') { renderSimultaneousReport(r); return; }
+  if (r.analysis_type === 'multivariate') { window.Multivariate.renderReport(r, lastPayload); setResultEnabled(true); return; }
   const rows = r.params.map((p) => `
     <tr>
       <td>${escapeHtml(p.name)}</td>
@@ -1713,48 +1725,6 @@ function renderReport(r) {
       <div class="stat ${chi2Class(r)}"><span class="k">χ² / NDF</span><span class="v">${r.chi2_ndf === null ? '—' : fmtNum(r.chi2_ndf, 4)}</span></div>
       <div class="stat"><span class="k">p-value</span><span class="v">${fmtNum(r.prob, 4)}</span></div>
     </div>`;
-  setResultEnabled(true);
-}
-
-/** The report of a simultaneous fit: shared parameters once, then each
- *  dataset's own parameters, the totals, and every dataset's share of chi2. */
-function renderSimultaneousReport(r) {
-  const conv = r.converged
-    ? `<span class="converged">${escapeHtml(r.status_message)}</span>`
-    : `<span class="not-converged">${escapeHtml(r.status_message)}</span>`;
-  const head = '<thead><tr><th>Parameter</th><th>Value ± uncertainty</th><th>Value (8 s.f.)</th><th>Uncertainty (4 s.f.)</th></tr></thead>';
-  const row = (p, note = '') => `<tr>
-      <td>${escapeHtml(p.name)}${note}</td>
-      <td class="num" title="${p.value} ± ${p.error}">${p.fixed ? fmtNum(p.value, 8) + ' (fixed)' : fmtPair(p.value, p.error)}</td>
-      <td class="num">${fmtNum(p.value, 8)}</td>
-      <td class="num">${p.fixed ? '—' : fmtNum(p.error, 4)}</td>
-    </tr>`;
-  const shared = r.params.filter(p => p.kind === 'shared');
-  const sharedTable = shared.length
-    ? `<h4 class="report-heading">Shared parameters</h4><table class="report-table">${head}<tbody>${shared.map(p => row(p, ` <span class="fine">(${(p.used_by || []).length} datasets)</span>`)).join('')}</tbody></table>`
-    : '<p class="fine">No shared parameters: every parameter belongs to one dataset, so this is equivalent to fitting the datasets separately.</p>';
-  const perDataset = r.datasets.map(d => {
-    const rows = d.params.map(p => p.kind === 'shared'
-      ? `<tr><td>${escapeHtml(p.name)}</td><td colspan="3" class="fine">shared parameter, listed above</td></tr>`
-      : row(p, p.kind === 'fixed' ? ' <span class="fine">(fixed value)</span>' : '')).join('');
-    const notes = [`<code>${escapeHtml(d.formula)}</code>`, `x ∈ [${fmtNum(d.range[0])}, ${fmtNum(d.range[1])}]`, `${d.n_points} points${d.n_excluded ? ` (${d.n_excluded} excluded)` : ''}`, `χ² contribution ${fmtNum(d.chi2)}`];
-    return `<h4 class="report-heading">${escapeHtml(d.name)}</h4><p class="fine">${notes.join(' · ')}${d.weighted === false ? ' · <strong>no uncertainties: weight 1 per point</strong>' : ''}</p><table class="report-table">${head}<tbody>${rows}</tbody></table>`;
-  }).join('');
-  const shares = `<h4 class="report-heading">χ² by dataset</h4><table class="report-table"><thead><tr><th>Dataset</th><th>Points</th><th>χ²</th><th>χ² per point</th><th>Share of total</th></tr></thead><tbody>${r.datasets.map(d => `<tr><td>${escapeHtml(d.name)}</td><td class="num">${d.n_points}</td><td class="num">${fmtNum(d.chi2)}</td><td class="num">${fmtNum(d.chi2 / d.n_points, 4)}</td><td class="num">${r.chi2 > 0 ? fmtNum(100 * d.chi2 / r.chi2, 3) + ' %' : '—'}</td></tr>`).join('')}</tbody></table>
-    <p class="fine">A dataset with a much larger χ² per point than the others is the one the shared model describes least well. Only the total χ² has a p-value; the shares are a diagnostic, not separate tests.</p>`;
-  $('report').innerHTML = `
-    <p>Simultaneous fit <span class="ds-name">${escapeHtml(r.name || lastPayload?.dataset_name || '')}</span>: ${r.n_datasets} datasets, ${r.n_points} points, ${r.n_free} free parameters. ${conv}</p>
-    ${r.x_error_note ? `<p class="fine">${escapeHtml(r.x_error_note)}</p>` : ''}
-    ${residualSummary(r)}
-    ${sharedTable}
-    ${perDataset}
-    <div class="summary">
-      <div class="stat"><span class="k">χ² (total)</span><span class="v">${fmtNum(r.chi2)}</span></div>
-      <div class="stat"><span class="k">NDF</span><span class="v">${r.ndf}</span></div>
-      <div class="stat"><span class="k">χ² / NDF</span><span class="v">${r.chi2_ndf === null ? '—' : fmtNum(r.chi2_ndf, 4)}</span></div>
-      <div class="stat"><span class="k">p-value</span><span class="v">${r.prob === null || r.prob === undefined ? '—' : fmtNum(r.prob, 4)}</span></div>
-    </div>
-    ${shares}`;
   setResultEnabled(true);
 }
 
@@ -1786,68 +1756,8 @@ function clearReport() {
   setResultEnabled(false);
 }
 
-/** The report of a simultaneous fit as plain text. */
-function simultaneousReportText(r) {
-  const L = [];
-  L.push(`ROOT-A-TRON 3000 report — ${$('doc-title').value || 'untitled'}`);
-  L.push(`Date:      ${new Date().toISOString()}`);
-  L.push(`Simultaneous fit: ${r.name || ''} (${r.n_datasets} datasets, ${r.n_points} points used, ${r.n_free} free parameters)`);
-  L.push(`Status:    ${r.status_message} (Minuit status ${r.status})`);
-  if (r.x_error_note) L.push(`Note:      ${r.x_error_note}`);
-  L.push('');
-  const w = Math.max(9, ...r.params.map(p => p.name.length));
-  const line = (p, extra) => `${p.name.padEnd(w)}  ${String(p.value).padStart(16)}  ${(p.fixed ? 'fixed' : String(p.error)).padStart(16)}${extra ? '  ' + extra : ''}`;
-  const shared = r.params.filter(p => p.kind === 'shared');
-  L.push('Shared parameters:');
-  L.push(`${'Parameter'.padEnd(w)}  ${'Value'.padStart(16)}  ${'Uncertainty'.padStart(16)}  Used by`);
-  if (!shared.length) L.push('  (none)');
-  for (const p of shared) L.push(line(p, (p.used_by || []).map(i => r.datasets[i]?.name).join(', ')));
-  for (const d of r.datasets) {
-    L.push('');
-    L.push(`Dataset:   ${d.name} (${d.n_points} points${d.n_excluded ? `, ${d.n_excluded} excluded` : ''})${d.weighted === false ? ' — no uncertainties, weight 1 per point' : ''}`);
-    L.push(`Function:  ${d.formula}`);
-    L.push(`Fit range: [${d.range[0]}, ${d.range[1]}]`);
-    L.push(`chi2 contribution = ${d.chi2}`);
-    L.push(`${'Parameter'.padEnd(w)}  ${'Value'.padStart(16)}  ${'Uncertainty'.padStart(16)}  Role`);
-    for (const p of d.params) L.push(line(p, p.kind === 'shared' ? 'shared' : p.kind === 'fixed' ? 'fixed value' : 'this dataset only'));
-  }
-  L.push('');
-  L.push(`NDF      = ${r.ndf}`);
-  L.push(`chi2     = ${r.chi2}`);
-  L.push(`chi2/NDF = ${r.chi2_ndf}`);
-  L.push(`p-value  = ${r.prob}`);
-  if (r.covariance && r.covariance.length) {
-    L.push('');
-    L.push('Covariance matrix (rows and columns: ' + r.params.map(p => p.label || p.name).join(', ') + '):');
-    for (const row of r.covariance) L.push('  ' + row.map((v) => String(v).padStart(16)).join(' '));
-  }
-  return L.join('\n') + '\n';
-}
-
-/** The report of a simultaneous fit as CSV. */
-function simultaneousReportCsv(r) {
-  const q = (s) => `"${String(s).replace(/"/g, '""')}"`;
-  const L = ['parameter,dataset,role,value,error'];
-  for (const p of r.params) L.push(`${q(p.name)},${q(p.dataset_name || '')},${p.kind === 'shared' ? 'shared' : p.kind === 'fixed' ? 'fixed' : 'local'},${p.value},${p.fixed ? '' : p.error}`);
-  L.push('');
-  L.push('quantity,value');
-  L.push('analysis_type,simultaneous', `name,${q(r.name || '')}`, `n_datasets,${r.n_datasets}`, `n_points,${r.n_points}`, `n_free,${r.n_free}`);
-  L.push(`ndf,${r.ndf}`, `chi2,${r.chi2}`, `chi2_ndf,${r.chi2_ndf}`, `prob,${r.prob}`, `status,${q(r.status_message)}`);
-  if (r.x_error_note) L.push(`note,${q(r.x_error_note)}`);
-  L.push('');
-  L.push('dataset,formula,x_min,x_max,points,excluded,chi2,weighted');
-  for (const d of r.datasets) L.push(`${q(d.name)},${q(d.formula)},${d.range[0]},${d.range[1]},${d.n_points},${d.n_excluded || 0},${d.chi2},${d.weighted === false ? 'no' : 'yes'}`);
-  if (r.covariance && r.covariance.length) {
-    L.push('');
-    L.push('covariance,' + r.params.map(p => q(p.label || p.name)).join(','));
-    r.covariance.forEach((row, i) => L.push(`${q(r.params[i].label || r.params[i].name)},${row.join(',')}`));
-  }
-  return L.join('\n') + '\n';
-}
-
 /** The report as plain text (for the clipboard and .txt export). */
 function reportText(r) {
-  if (r.analysis_type === 'simultaneous') return simultaneousReportText(r);
   const L = [];
   L.push(`ROOT-A-TRON 3000 report — ${$('doc-title').value || 'untitled'}`);
   L.push(`Date:      ${new Date().toISOString()}`);
@@ -1881,7 +1791,6 @@ function reportText(r) {
 }
 
 function reportCsv(r) {
-  if (r.analysis_type === 'simultaneous') return simultaneousReportCsv(r);
   const q = (s) => `"${String(s).replace(/"/g, '""')}"`;
   const L = ['parameter,value,error'];
   for (const p of r.params) L.push(`${q(p.name)},${p.value},${p.error}`);
@@ -2158,7 +2067,7 @@ function initResizers() {
 // ================================================================ 10. documents
 
 const DOC_VERSION = 1;
-const APP_VERSION = '0.3.0';
+const APP_VERSION = '0.2.0';
 const AUTOSAVE_KEY = 'rootfit.autosave';
 let documentCreated = null;
 let workspaceDocument = null;
@@ -2176,9 +2085,8 @@ function buildDocument() {
     title: $('doc-title').value,
     notes: $('doc-notes').value,
     inputs: readForm(),
-    // The legacy mirror of the active dataset's result; a simultaneous fit's result lives on its group.
-    results: viewingGroup ? (datasets[activeIdx]?.result?.response || null) : lastResult,
-    results_payload: viewingGroup ? (datasets[activeIdx]?.result?.payload || null) : lastPayload,
+    results: lastResult,
+    results_payload: lastPayload,      // which dataset / options produced the results
     backend_url: backendUrl(),
   };
 }
@@ -2339,7 +2247,7 @@ function applyDocument(doc) {
 
   lastResult = (doc.results && Array.isArray(doc.results.params)) ? doc.results : null;
   lastPayload = lastResult ? (doc.results_payload || null) : null;
-  if (lastResult && lastResult.analysis_type !== 'simultaneous' && !datasets.some(d => d.result)) {
+  if (lastResult && !datasets.some(d => d.result)) {
     const owner = datasets.find(d => d.name === lastPayload?.dataset_name) || datasets[activeIdx];
     owner.result = {response:lastResult, payload:lastPayload};
   }
@@ -2496,20 +2404,9 @@ const EXAMPLES = {
   },
 };
 
-EXAMPLES.simultaneous = {
-  title: 'Two decay runs with one time constant',
-  notes: 'Synthetic data: both runs decay with the same true time constant (2.5 s) but differ in amplitude and background. Open Fit together, choose Decays, and press Fit together. Expected: shared tau about 2.46 ± 0.11 s with chi2 about 30 for 37 degrees of freedom; fitting either run alone gives a larger uncertainty on tau.',
-  inputs: { datasets: [
-    { id: 'decay-run-a', name: 'Run A (high rate)', analysis_type: 'xy', x: '0\n0.5\n1\n1.5\n2\n2.5\n3\n3.5\n4\n4.5\n5\n5.5\n6\n6.5\n7\n7.5\n8\n8.5\n9\n9.5\n10', y: '108.31\n88.77\n68.22\n56.68\n55.26\n43.67\n31.37\n30.16\n25.7\n27.21\n18.06\n16.91\n13.95\n10.37\n11.4\n7.32\n6.38\n6.89\n9.93\n3.61\n5.58', ex: '', ey: '3', fit: { formula: '[0]*exp(-x/[1])+[2]', param_names: 'A, tau, B', initial_guesses: '100, 2, 5', x_min: '', x_max: '' } },
-    { id: 'decay-run-b', name: 'Run B (low rate)', analysis_type: 'xy', x: '0\n0.5\n1\n1.5\n2\n2.5\n3\n3.5\n4\n4.5\n5\n5.5\n6\n6.5\n7\n7.5\n8\n8.5\n9\n9.5\n10', y: '43.65\n36.43\n29.61\n24.28\n19.93\n14.83\n15.15\n12\n7.92\n8.73\n6.62\n6.1\n7.74\n4.4\n5.63\n5.18\n2.95\n3.47\n0.61\n4.61\n2.08', ex: '', ey: '1.5', fit: { formula: '[0]*exp(-x/[1])+[2]', param_names: 'A, tau, B', initial_guesses: '40, 2, 2', x_min: '', x_max: '' } }],
-    simultaneous_fits: [{ id: 'decays-shared-tau', name: 'Decays', members: [
-      { datasetId: 'decay-run-a', parameters: [{ role: 'local' }, { role: 'shared', shared: 'tau' }, { role: 'local' }] },
-      { datasetId: 'decay-run-b', parameters: [{ role: 'local' }, { role: 'shared', shared: 'tau' }, { role: 'local' }] }],
-      shared: [{ name: 'tau', guess: '2', min: '', max: '' }] }],
-    active: 0, graph_title: 'Decay runs', x_title: 't (s)', y_title: 'counts', options: {} },
-};
-
 EXAMPLES.histogram = {"version": 1, "title": "Count histogram", "notes": "A count distribution fitted with a normalized Gaussian. Norm is the model\u2019s total area over the full real line.", "inputs": {"datasets": [{"name": "Count distribution", "analysis_type": "histogram", "x": "", "y": "", "ex": "", "ey": "", "histogram": {"source": "counts", "counts": "1 3 12 40 80 80 40 12 3 1", "edges": "0 1 2 3 4 5 6 7 8 9 10", "samples": "", "bins": "", "min": "", "max": "", "method": "poisson"}}], "active": 0, "formula": "gausn", "param_names": "norm, mean, sigma", "initial_guesses": "", "graph_title": "Count distribution", "x_title": "Measurement", "y_title": "Counts / unit X", "options": {"grid": true, "diagnostics": []}}};
+
+EXAMPLES.multivariate = {"title": "Beam profile (R²→R surface)", "notes": "A 2-D Gaussian beam profile measured on a 7×7 grid (49 points): counts vs position (x0, x1), an R²→R fit. Poisson √N uncertainties on the counts. Model A·exp(−((x0−x0c)²+(x1−y0c)²)/(2σ²)) + background. Expected near A≈98, centre (0.38, −0.33), σ≈1.53, background≈4.8, χ²/NDF≈0.66. The fit draws the fitted surface over the measured points; edit a guess to see the fit move.", "inputs": {"datasets": [{"name": "Beam profile", "analysis_type": "multivariate", "x": "", "y": "", "ex": "", "ey": "", "mv": {"n": 2, "m": 1, "inNames": ["x0", "x1"], "inVals": ["-4\n-2.667\n-1.333\n0\n1.333\n2.667\n4\n-4\n-2.667\n-1.333\n0\n1.333\n2.667\n4\n-4\n-2.667\n-1.333\n0\n1.333\n2.667\n4\n-4\n-2.667\n-1.333\n0\n1.333\n2.667\n4\n-4\n-2.667\n-1.333\n0\n1.333\n2.667\n4\n-4\n-2.667\n-1.333\n0\n1.333\n2.667\n4\n-4\n-2.667\n-1.333\n0\n1.333\n2.667\n4", "-4\n-4\n-4\n-4\n-4\n-4\n-4\n-2.667\n-2.667\n-2.667\n-2.667\n-2.667\n-2.667\n-2.667\n-1.333\n-1.333\n-1.333\n-1.333\n-1.333\n-1.333\n-1.333\n0\n0\n0\n0\n0\n0\n0\n1.333\n1.333\n1.333\n1.333\n1.333\n1.333\n1.333\n2.667\n2.667\n2.667\n2.667\n2.667\n2.667\n2.667\n4\n4\n4\n4\n4\n4\n4"], "inErr": ["", ""], "outNames": ["counts"], "outVals": ["6\n7\n9\n13\n10\n5\n8\n8\n8\n28\n29\n30\n23\n9\n4\n16\n48\n78\n69\n27\n9\n7\n15\n59\n92\n93\n37\n9\n6\n10\n42\n52\n55\n23\n10\n6\n6\n13\n22\n16\n6\n3\n4\n10\n9\n5\n10\n5\n4"], "outErr": ["2.45\n2.65\n3\n3.61\n3.16\n2.24\n2.83\n2.83\n2.83\n5.29\n5.39\n5.48\n4.8\n3\n2\n4\n6.93\n8.83\n8.31\n5.2\n3\n2.65\n3.87\n7.68\n9.59\n9.64\n6.08\n3\n2.45\n3.16\n6.48\n7.21\n7.42\n4.8\n3.16\n2.45\n2.45\n3.61\n4.69\n4\n2.45\n1.73\n2\n3.16\n3\n2.24\n3.16\n2.24\n2"], "models": ["[0]*exp(-((x0-[1])*(x0-[1])+(x1-[2])*(x1-[2]))/(2*[3]*[3])) + [4]"], "parNames": "A, x0, y0, sigma, background", "parGuesses": "80, 0, 0, 2, 5"}}], "active": 0, "graph_title": "Beam profile", "x_title": "x0", "y_title": "x1", "options": {"grid": true}}};
 
 async function loadExample(key) {
   const ex = EXAMPLES[key];
@@ -2521,7 +2418,7 @@ async function loadExample(key) {
   applyDocument({ revision:workspaceDocument?.revision || null, version: DOC_VERSION, title: ex.title, notes: ex.notes, inputs: ex.inputs, results: null });
   documentCreated = null;
   restoredUnsavedChanges = true;
-  showMessage('info', `Loaded the example "${ex.title}". ${ex.inputs.simultaneous_fits ? 'Open Fit together… and press Fit together.' : 'Press Fit.'}`);
+  showMessage('info', `Loaded the example "${ex.title}". Press Fit.`);
   autosave();
 }
 
@@ -2564,7 +2461,6 @@ const ACTIONS = {
   'dataset-duplicate': duplicateDataset,
   'dataset-rename': renameDataset,
   'dataset-remove': removeDataset,
-  simultaneous: () => window.SimultaneousFit?.open(),
   'reset-layout': resetLayout,
   'report-copy': copyReport,
   'report-txt': () => { if (lastResult) downloadText(reportText(lastResult), fileBaseName() + '-report.txt'); },
@@ -2605,7 +2501,7 @@ function init() {
     if (fn) el.addEventListener('click', (ev) => { ev.stopPropagation(); fn(el); });
   }
   // "?" buttons
-  for (const el of document.querySelectorAll('.help-btn')) {
+  for (const el of document.querySelectorAll('[data-help]')) {
     el.addEventListener('click', (ev) => { ev.stopPropagation(); ev.preventDefault(); showHelp(el.dataset.help, el); });
   }
   $('help-pop').addEventListener('click', (ev) => ev.stopPropagation());
@@ -2720,6 +2616,7 @@ function init() {
     if (el.type === 'checkbox' || el.tagName === 'SELECT') el.addEventListener('change', autosave);
   }
   markAnalysisSaved();
+  if (window.Multivariate) window.Multivariate.setAutosave(autosave);
   restoreAutosave();
   checkHealth();
   showFirstVisitSaveNotice();

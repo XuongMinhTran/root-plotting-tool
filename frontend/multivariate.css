@@ -1,0 +1,115 @@
+/* multivariate.css — data grid, model editors and result tables for the
+   Multivariate (R^n -> R^m) analysis type. Styled to match the Classic GUI. */
+
+#multivariate-data .mv-dims {
+  display: flex;
+  align-items: end;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+#multivariate-data .mv-dims label {
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+}
+#multivariate-data .mv-dims input {
+  width: 72px;
+}
+.mv-shape {
+  font-weight: 600;
+  padding: 4px 8px;
+  background: #eef2f7;
+  border: 1px solid #ccd5df;
+  border-radius: 4px;
+  align-self: center;
+}
+.mv-section-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #5a6675;
+  margin: 12px 0 6px;
+}
+.mv-cols {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+.mv-col {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 128px;
+  flex: 1 0 128px;
+}
+.mv-col .mv-name {
+  font-weight: 600;
+  text-align: center;
+  padding: 4px 6px;
+}
+.mv-col textarea {
+  width: 100%;
+  resize: vertical;
+  font-family: var(--mono, ui-monospace, Menlo, Consolas, monospace);
+  font-size: 13px;
+}
+.mv-col .mv-err {
+  background: #f6f8fb;
+}
+.mv-col .mv-count {
+  font-size: 12px;
+  color: #5a6675;
+  text-align: center;
+  min-height: 15px;
+}
+.mv-col .mv-count.mismatch {
+  color: #a1241c;
+  font-weight: 600;
+}
+
+.mv-models {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.mv-model-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.mv-model-label {
+  min-width: 72px;
+  font-weight: 600;
+  text-align: right;
+  white-space: nowrap;
+}
+.mv-params {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.mv-params label {
+  display: grid;
+  gap: 4px;
+  flex: 1;
+  min-width: 200px;
+  font-size: 13px;
+}
+
+.mv-model-summary {
+  margin: 6px 0 10px;
+  padding-left: 18px;
+}
+.mv-model-summary li {
+  margin: 2px 0;
+}
+.mv-residuals {
+  margin-top: 12px;
+}
+
+@media (max-width: 640px) {
+  .mv-model-row { flex-wrap: wrap; }
+  .mv-model-label { min-width: 0; text-align: left; }
+}

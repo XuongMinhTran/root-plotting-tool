@@ -4,7 +4,6 @@ app.py — the web server. Two endpoints, no state, no storage.
     GET  /health   -> {"status": "ok", "root_version": "...", ...}
     POST /fit      -> runs one fit and returns the result as JSON
     POST /histogram-> builds (and optionally fits) a histogram
-    POST /simultaneous-fit -> fits several XY datasets at once with shared parameters
     GET  /         -> the frontend, when FRONTEND_DIR holds a copy of it
 
 The frontend is optional. `./start` bind-mounts frontend/ into the container so
@@ -41,11 +40,11 @@ from flask import Flask, jsonify, request, send_from_directory
 from formula_check import check_formula, allowed_summary
 import fit  # imports ROOT (slow, ~1-2 s) once at start-up
 import histogram_fit
-import simultaneous_fit
+import multivariate_fit
 
 import ROOT
 
-APP_VERSION = "0.3.0"
+APP_VERSION = "0.1.0"
 MAX_POINTS = 100_000
 
 # Where the frontend lives inside the container. ./start bind-mounts the repo's
@@ -155,8 +154,6 @@ def health():
         "service": "rootfit-backend",
         "version": APP_VERSION,
         "root_version": str(ROOT.gROOT.GetVersion()),
-        # What this build can do, so a page (or a person) can tell an outdated deployment apart.
-        "features": ["fit", "histogram", "simultaneous-fit"],
     })
 
 
@@ -257,26 +254,115 @@ def do_histogram():
         return jsonify(error='The histogram could not be completed. Your inputs are still here; please try again.'), 500
 
 
-@app.post('/simultaneous-fit')
-def do_simultaneous_fit():
-    """Fit two or more XY datasets together. The body lists the datasets (each
-    with its own formula, range and excluded points) and how every parameter
-    of every model maps to one global parameter: shared, local or fixed. See
-    simultaneous_fit.parse_request for the exact shape."""
+def _named_columns(payload, key, count, required, label):
+    """Read `count` columns of numbers from payload[key] (a list of lists)."""
+    raw = payload.get(key)
+    if not isinstance(raw, list) or len(raw) != count:
+        raise BadRequest(f"Expected {count} {label} column(s).")
+    cols = []
+    for j, col in enumerate(raw):
+        cols.append(number_list({"c": col if col is not None else []}, "c", required=required))
+    return cols
+
+
+def _error_columns(payload, key, count, npoints, labels):
+    """Optional per-column uncertainties: each may be [], one value, or npoints."""
+    raw = payload.get(key) or []
+    if not isinstance(raw, list):
+        raise BadRequest(f"'{key}' must be a list.")
+    raw = list(raw) + [[] for _ in range(count - len(raw))]
+    cols = []
+    for j in range(count):
+        vals = number_list({"c": raw[j] if raw[j] is not None else []}, "c", required=False)
+        if len(vals) not in (0, 1, npoints):
+            raise BadRequest(f"The uncertainty column for {labels[j]} has {len(vals)} value(s) "
+                             f"for {npoints} points. Enter one value, {npoints} values, or leave it blank.")
+        if any(v < 0 for v in vals):
+            raise BadRequest(f"Uncertainties for {labels[j]} describe a size, so use zero or a positive number.")
+        cols.append(vals)
+    return cols
+
+
+@app.post("/multivariate-fit")
+def do_multivariate():
     try:
         payload = request.get_json(force=True, silent=True)
         if not isinstance(payload, dict):
             raise BadRequest("Request body must be a JSON object.")
-        spec = simultaneous_fit.parse_request(payload, check_formula)
+
+        try:
+            n = int(payload.get("n_inputs"))
+            m = int(payload.get("n_outputs"))
+        except (TypeError, ValueError):
+            raise BadRequest("n_inputs and n_outputs must be whole numbers.")
+        if not (1 <= n <= 20) or not (1 <= m <= 20):
+            raise BadRequest("Choose between 1 and 20 inputs and outputs.")
+
+        inputs = _named_columns(payload, "inputs", n, required=True, label="input")
+        outputs = _named_columns(payload, "outputs", m, required=True, label="output")
+        npoints = len(inputs[0])
+        for d, col in enumerate(inputs):
+            if len(col) != npoints:
+                raise BadRequest(f"Input {d + 1} has {len(col)} values but input 1 has {npoints}.")
+        for k, col in enumerate(outputs):
+            if len(col) != npoints:
+                raise BadRequest(f"Output {k + 1} has {len(col)} values but there are {npoints} points.")
+
+        input_names = string_list(payload, "input_names")
+        output_names = string_list(payload, "output_names")
+        in_labels = [input_names[d] if d < len(input_names) and input_names[d] else f"x{d}" for d in range(n)]
+        out_labels = [output_names[k] if k < len(output_names) and output_names[k] else f"y{k}" for k in range(m)]
+
+        input_errors = _error_columns(payload, "input_errors", n, npoints, in_labels)
+        output_errors = _error_columns(payload, "output_errors", m, npoints, out_labels)
+
+        models = payload.get("models")
+        if not isinstance(models, list) or len(models) != m:
+            raise BadRequest(f"Give one model per output: expected {m} formula(s).")
+        models = [str(s or "").strip() for s in models]
+        variables = tuple(f"x{d}" for d in range(n))
+        for k, s in enumerate(models):
+            if not s:
+                raise BadRequest(f"Enter a model for {out_labels[k]}.")
+            ok, message = check_formula(s, variables=variables)
+            if not ok:
+                raise BadRequest(f"The model for {out_labels[k]} could not be read: {message}")
+
+        par_names = string_list(payload, "param_names")
+        par_guesses = guess_list(payload, "initial_guesses")
+
+        ranges = payload.get("input_ranges") or []
+        input_ranges = []
+        for d in range(n):
+            r = ranges[d] if d < len(ranges) else None
+            if r in (None, "", []):
+                input_ranges.append(None)
+            else:
+                try:
+                    input_ranges.append((float(r[0]), float(r[1])))
+                except (TypeError, ValueError, IndexError):
+                    raise BadRequest(f"The fit range for {in_labels[d]} must be [from, to].")
+
         with root_lock:
-            result = simultaneous_fit.run_simultaneous(spec)
+            result = multivariate_fit.run_multivariate(
+                inputs, outputs, models,
+                input_errors=input_errors, output_errors=output_errors,
+                param_names=par_names, param_guesses=par_guesses,
+                input_names=in_labels, output_names=out_labels,
+                input_ranges=input_ranges,
+                title=payload.get("title", ""),
+                plot=payload.get("plot") if isinstance(payload.get("plot"), dict) else None,
+            )
         require_finite_result(result)
         return jsonify(result)
-    except (BadRequest, ValueError) as e:
+
+    except BadRequest as e:
+        return jsonify({"error": str(e)}), 400
+    except ValueError as e:
         return jsonify({"error": str(e)}), 400
     except Exception:
         traceback.print_exc()
-        return jsonify({"error": "The fitting service ran into a problem with the simultaneous fit. Your inputs are still here; please try again. If this continues, restart the backend."}), 500
+        return jsonify({"error": "The multivariate fit ran into a problem. Your inputs are still here; please try again."}), 500
 
 
 def frontend_available():
@@ -291,7 +377,7 @@ def frontend_index():
             "service": "rootfit-backend",
             "message": "The API is running. The frontend is not mounted here; "
                        "open frontend/index.html, or start everything with ./start.",
-            "endpoints": ["/health", "/allowed", "/fit", "/histogram", "/simultaneous-fit"],
+            "endpoints": ["/health", "/allowed", "/fit", "/histogram"],
         })
     return send_from_directory(FRONTEND_DIR, "index.html")
 

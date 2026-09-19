@@ -134,55 +134,5 @@ class FitResponseTests(unittest.TestCase):
             self.assertIn('error', body)
 
 
-class SimultaneousFitTests(unittest.TestCase):
-    """The endpoint itself; the numerical checks live in simultaneous_test.py."""
-
-    def setUp(self):
-        self.client = app.test_client()
-        example = json.loads((pathlib.Path(__file__).resolve().parent.parent / 'examples' / 'two-decays-shared-tau.json').read_text())
-        numbers = lambda text: [float(v) for v in text.split()]
-        self.datasets = [{'name': d['name'], 'x': numbers(d['x']), 'y': numbers(d['y']), 'ey': numbers(d['ey']), 'ex': [],
-                          'formula': d['fit']['formula'], 'param_names': ['A', 'tau', 'B'], 'x_range': None, 'excluded_points': []}
-                         for d in example['inputs']['datasets']]
-        self.parameters = {'shared': [{'name': 'tau', 'guess': 2, 'min': None, 'max': None}],
-                           'mapping': [[{'kind': 'local', 'guess': 100}, {'kind': 'shared', 'ref': 0}, {'kind': 'local', 'guess': 5}],
-                                       [{'kind': 'local', 'guess': 40}, {'kind': 'shared', 'ref': 0}, {'kind': 'local', 'guess': 2}]]}
-
-    def post(self, payload):
-        response = self.client.post('/simultaneous-fit', json=payload)
-        return response.status_code, json.loads(response.data)
-
-    def test_example_fits_with_one_shared_time_constant(self):
-        status, body = self.post({'name': 'Decays', 'datasets': self.datasets, 'parameters': self.parameters,
-                                  'plot': {'diagnostics': [{'kind': 'residual'}]}})
-        self.assertEqual(status, 200, body)
-        self.assertEqual(body['analysis_type'], 'simultaneous')
-        self.assertTrue(body['converged'])
-        self.assertEqual([p['kind'] for p in body['params']], ['shared', 'local', 'local', 'local', 'local'])
-        self.assertAlmostEqual(body['params'][0]['value'], 2.46, delta=0.05)
-        self.assertEqual(body['ndf'], 42 - 5)
-        self.assertEqual(len(body['datasets']), 2)
-        self.assertAlmostEqual(sum(d['chi2'] for d in body['datasets']), body['chi2'], places=6)
-        self.assertEqual(len(body['covariance']), 5)
-        self.assertEqual(body['canvas_json']['_typename'], 'TCanvas')
-        self.assertEqual(len(body['diagnostics'][0]['series']), 2)
-
-    def test_health_lists_simultaneous_fits(self):
-        body = self.client.get('/health').get_json()
-        self.assertIn('simultaneous-fit', body['features'])
-
-    def test_bad_requests_are_explained(self):
-        status, body = self.post({'datasets': self.datasets[:1], 'parameters': self.parameters})
-        self.assertEqual(status, 400)
-        self.assertIn('at least two datasets', body['error'])
-        broken = {**self.parameters, 'mapping': [self.parameters['mapping'][0][:2], self.parameters['mapping'][1]]}
-        status, body = self.post({'datasets': self.datasets, 'parameters': broken})
-        self.assertEqual(status, 400)
-        self.assertIn('assignment', body['error'])
-        status, body = self.post({'datasets': self.datasets, 'parameters': self.parameters, 'plot': {'confidence_level': 0.68}})
-        self.assertEqual(status, 400)
-        self.assertIn('Confidence bands', body['error'])
-
-
 if __name__ == '__main__':
     unittest.main()
