@@ -352,7 +352,16 @@ body.modern .message.warn::before { content: "Warning"; }
 body.modern .message.info { background: #ebf5f8; border-color: #cfe4ec; border-left-color: #3b9cba; color: #1f5062; }
 body.modern .message.info::before { content: ""; display: none; }
 
-.canvas-frame { border: 1px solid var(--sand); border-radius: var(--radius); background: #fff; padding: 10px; box-shadow: none; }
+.canvas-frame { border: 1px solid var(--sand); border-radius: var(--radius); background: #fff; padding: 10px; box-shadow: none; position: relative; scroll-margin-top: calc(var(--masthead-h) + 14px); }
+body.modern .plot-expand-btn {
+  position: absolute; top: 14px; right: 14px; z-index: 6;
+  font-size: 12px; font-weight: 600; line-height: 1; min-height: 0;
+  padding: 6px 11px; border-radius: 5px; color: var(--blue);
+  background: rgba(255, 255, 255, 0.94); border: 1px solid var(--sand);
+  box-shadow: 0 1px 3px rgba(52, 98, 149, 0.18);
+}
+body.modern .plot-expand-btn:hover:not(:disabled) { background: var(--blue-soft); border-color: #b9cde2; }
+body.modern .plot-expand-btn[aria-pressed="true"] { background: var(--blue); color: #fff; border-color: var(--blue); }
 .plot { width: 100%; height: clamp(340px, 46vh, 560px); background: #fff; position: relative; overflow: hidden; }
 .plot .placeholder {
   position: absolute; inset: 0; display: grid; place-items: center;

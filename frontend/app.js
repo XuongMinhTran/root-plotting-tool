@@ -1887,8 +1887,7 @@ async function drawPlot(result, selection = false) {
   const drawVersion = ++plotDrawVersion;
   if (!selection) document.dispatchEvent(new CustomEvent('rootfit:draw'));
   const plot = $('plot');
-  const configuredHeight = loadLayout().plotH;
-  plot.style.height = result.plot_height ? `${result.plot_height}px` : configuredHeight ? `${configuredHeight}px` : '';
+  applyPlotHeight(result);
   const src = drawableFrom(result);
   setPngEnabled(false);
   lastDrawn = null;
@@ -1932,6 +1931,48 @@ async function drawPlot(result, selection = false) {
 function replotToSize() {
   if (window.JSROOT && lastDrawn) {
     try { window.JSROOT.resize($('plot').querySelector('[data-plot-surface]') || $('plot'), true); } catch (_) { /* ignore */ }
+  }
+}
+
+// --- expanded mode: grow the plot downward so it isn't boxed in by the page ---
+let plotExpanded = false;
+
+/** A generous height that grows the plot down the page (the page scrolls to it). */
+function expandedPlotHeight() {
+  return Math.max(700, Math.round((window.innerHeight || 900) * 0.88));
+}
+
+/** Set the plot height from the current state. Expanded mode wins; otherwise a
+ *  backend-supplied height, then a manually dragged height, then the CSS default. */
+function applyPlotHeight(result = lastResult) {
+  const plot = $('plot');
+  if (!plot) return;
+  let h = null;
+  if (plotExpanded) h = expandedPlotHeight();
+  else if (result && result.plot_height) h = result.plot_height;
+  else h = loadLayout().plotH || null;
+  plot.style.height = h ? h + 'px' : '';
+}
+
+/** Reflect the current expanded state on the toggle button. */
+function syncExpandButton() {
+  const btn = $('plot-expand');
+  if (!btn) return;
+  btn.setAttribute('aria-pressed', plotExpanded ? 'true' : 'false');
+  btn.textContent = plotExpanded ? 'Collapse plot' : 'Expand plot';
+  btn.title = plotExpanded
+    ? 'Return the plot to its normal height'
+    : 'Grow the plot downward for a bigger view';
+}
+
+function toggleExpandPlot() {
+  plotExpanded = !plotExpanded;
+  syncExpandButton();
+  applyPlotHeight();
+  replotToSize();
+  if (plotExpanded) {
+    const frame = $('plot').closest('.canvas-frame') || $('plot');
+    if (frame.scrollIntoView) frame.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 }
 
@@ -2012,6 +2053,7 @@ function applyLayout() {
 function resetLayout() {
   storageRemove(LAYOUT_KEY);
   $('main').style.removeProperty('--left-w');
+  plotExpanded = false; syncExpandButton();
   $('plot').style.height = '';
   replotToSize();
 }
@@ -2050,18 +2092,19 @@ function initResizers() {
     document.body.classList.add('resizing-y');
     const startY = ev.clientY;
     const startH = plot.clientHeight;
-    const move = (e) => { plot.style.height = Math.max(240, Math.min(1400, startH + e.clientY - startY)) + 'px'; };
+    const move = (e) => { plot.style.height = Math.max(240, Math.min(3200, startH + e.clientY - startY)) + 'px'; };
     const up = () => {
       handle.removeEventListener('pointermove', move);
       handle.removeEventListener('pointerup', up);
       document.body.classList.remove('resizing-y');
+      plotExpanded = false; syncExpandButton();
       saveLayout({ plotH: plot.clientHeight });
       replotToSize();
     };
     handle.addEventListener('pointermove', move);
     handle.addEventListener('pointerup', up);
   });
-  handle.addEventListener('dblclick', () => { plot.style.height = ''; saveLayout({ plotH: null }); replotToSize(); });
+  handle.addEventListener('dblclick', () => { plotExpanded = false; syncExpandButton(); plot.style.height = ''; saveLayout({ plotH: null }); replotToSize(); });
 }
 
 // ================================================================ 10. documents
@@ -2452,6 +2495,7 @@ const ACTIONS = {
   'clear-all': clearAll,
   png: exportPng,
   svg: exportSvg,
+  'plot-expand': toggleExpandPlot,
   fit: runFit,
   example: (el) => loadExample(el.dataset.example),
   health: checkHealth,
@@ -2495,6 +2539,7 @@ function initMenus() {
 function init() {
   document.addEventListener('click', handleWorkspaceLink);
   initMenus();
+  syncExpandButton();
   if ($('splitter')) initResizers();
   for (const el of document.querySelectorAll('[data-action]')) {
     const fn = ACTIONS[el.dataset.action];
