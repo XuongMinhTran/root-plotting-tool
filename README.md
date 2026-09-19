@@ -184,7 +184,11 @@ Confidence bands are not available for simultaneous fits. The guide in
 `frontend/documentation.html#simultaneous-fits` explains when a shared
 parameter is appropriate and how to read the per-dataset χ² contributions.
 `examples/two-decays-shared-tau.json` (also in the examples menus) is a
-ready-made case.
+ready-made case, and `examples/simultaneous-fit-playground.json` holds three
+prepared fits: two decay runs with a common time constant, the same runs plus
+a third whose time constant is really different (watch its χ² share), and a
+projectile's x(t) and y(t) tracks with timing uncertainties sharing the launch
+time.
 
 `POST /simultaneous-fit` accepts `{"datasets": [{name, x, y, ex, ey, formula,
 param_names, x_range, excluded_points}, …], "parameters": {"shared": [{name,
