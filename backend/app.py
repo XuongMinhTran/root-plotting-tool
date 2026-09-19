@@ -4,6 +4,7 @@ app.py — the web server. Two endpoints, no state, no storage.
     GET  /health   -> {"status": "ok", "root_version": "...", ...}
     POST /fit      -> runs one fit and returns the result as JSON
     POST /histogram-> builds (and optionally fits) a histogram
+    POST /simultaneous-fit -> fits several XY datasets at once with shared parameters
     GET  /         -> the frontend, when FRONTEND_DIR holds a copy of it
 
 The frontend is optional. `./start` bind-mounts frontend/ into the container so
@@ -40,6 +41,7 @@ from flask import Flask, jsonify, request, send_from_directory
 from formula_check import check_formula, allowed_summary
 import fit  # imports ROOT (slow, ~1-2 s) once at start-up
 import histogram_fit
+import simultaneous_fit
 
 import ROOT
 
@@ -253,6 +255,28 @@ def do_histogram():
         return jsonify(error='The histogram could not be completed. Your inputs are still here; please try again.'), 500
 
 
+@app.post('/simultaneous-fit')
+def do_simultaneous_fit():
+    """Fit two or more XY datasets together. The body lists the datasets (each
+    with its own formula, range and excluded points) and how every parameter
+    of every model maps to one global parameter: shared, local or fixed. See
+    simultaneous_fit.parse_request for the exact shape."""
+    try:
+        payload = request.get_json(force=True, silent=True)
+        if not isinstance(payload, dict):
+            raise BadRequest("Request body must be a JSON object.")
+        spec = simultaneous_fit.parse_request(payload, check_formula)
+        with root_lock:
+            result = simultaneous_fit.run_simultaneous(spec)
+        require_finite_result(result)
+        return jsonify(result)
+    except (BadRequest, ValueError) as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception:
+        traceback.print_exc()
+        return jsonify({"error": "The fitting service ran into a problem with the simultaneous fit. Your inputs are still here; please try again. If this continues, restart the backend."}), 500
+
+
 def frontend_available():
     return os.path.isfile(os.path.join(FRONTEND_DIR, "index.html"))
 
@@ -265,7 +289,7 @@ def frontend_index():
             "service": "rootfit-backend",
             "message": "The API is running. The frontend is not mounted here; "
                        "open frontend/index.html, or start everything with ./start.",
-            "endpoints": ["/health", "/allowed", "/fit", "/histogram"],
+            "endpoints": ["/health", "/allowed", "/fit", "/histogram", "/simultaneous-fit"],
         })
     return send_from_directory(FRONTEND_DIR, "index.html")
 

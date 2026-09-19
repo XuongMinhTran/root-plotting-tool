@@ -80,6 +80,7 @@
     const notice = $('result-input-notice');
     if (!notice) return;
     if (typeof lastResult === 'undefined' || !lastResult || !lastPayload) { notice.hidden = true; return; }
+    if (lastResult.analysis_type === 'simultaneous') { notice.hidden = true; return; }   // the Fit together dialog reports staleness itself
     try {
       notice.hidden = JSON.stringify(buildPayload(readForm(), lastResult.fit_performed !== false)) === JSON.stringify(lastPayload);
     } catch (_) {

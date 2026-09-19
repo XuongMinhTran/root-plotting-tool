@@ -40,11 +40,13 @@
     <span class="menu-title" tabindex="0">Fit</span>
     <div class="dropdown">
       <button type="button" data-action="fit">Run fit <span class="shortcut">Enter</span></button>
+      <button type="button" data-action="simultaneous">Fit datasets together…</button>
       <hr>
       <button type="button" data-action="example" data-example="linear">Example: straight line</button>
       <button type="button" data-action="example" data-example="exp">Example: exponential decay</button>
       <button type="button" data-action="example" data-example="gaus">Example: Gaussian peak</button>
         <button type="button" data-action="example" data-example="histogram">Example: count histogram</button>
+      <button type="button" data-action="example" data-example="simultaneous">Example: two decays, shared time constant</button>
     </div>
   </div>
   <div class="menu">
@@ -353,5 +355,6 @@
 </dialog>
 <script src="paste-data.js?v=1" defer></script>
 <script defer src="analysis-features.js?v=20260919-export"></script>
+<script defer src="simultaneous-fit.js?v=1"></script>
 </body>
 </html>

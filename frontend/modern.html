@@ -72,6 +72,7 @@
           <option value="exp">Exponential decay</option>
           <option value="gaus">Gaussian peak</option>
           <option value="histogram">Count histogram</option>
+          <option value="simultaneous">Two decays, shared time constant</option>
         </select>
       </div>
 
@@ -197,6 +198,7 @@
 
       <div class="param-block">
         <div class="parameter-heading"><p class="preset-label">Parameters</p><a class="parameter-guide-button" href="documentation.html#initial-parameters" target="_blank" rel="noopener" aria-label="Help with parameters (opens in a new tab)">Help with parameters</a></div>
+        <p class="hint">Several XY datasets can share parameters: <button type="button" class="small" data-action="simultaneous">Fit datasets together…</button></p>
         <p class="hint"><strong>Initial guesses matter for nonlinear fits.</strong> Estimate slopes, peak heights, positions, and widths from the data, using the model’s units. Poor guesses can prevent convergence or lead to a different minimum. Leave a value blank to use its default or automatic estimate, where available.</p>
         <details class="fold parameter-paste"><summary>Paste comma-separated parameters</summary><div class="fold-body">
           <div class="field-row">
@@ -452,5 +454,6 @@
 <script src="app.js?v=shared-session" defer></script>
 <script src="paste-data.js?v=1" defer></script>
 <script defer src="analysis-features.js?v=20260919-export"></script>
+<script defer src="simultaneous-fit.js?v=1"></script>
 </body>
 </html>

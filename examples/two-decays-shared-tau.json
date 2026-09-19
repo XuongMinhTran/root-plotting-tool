@@ -1,0 +1,96 @@
+{
+ "version": 1,
+ "app": "rootfit",
+ "app_version": "0.3.0",
+ "title": "Two decay runs with one time constant",
+ "notes": "Synthetic data: both runs decay with the same true time constant (2.5 s) but differ in amplitude and background. Open Fit together, choose Decays, and press Fit together. Expected: shared tau about 2.46 +/- 0.11 s with chi2 about 30 for 37 degrees of freedom; fitting either run alone gives a larger uncertainty on tau.",
+ "inputs": {
+  "datasets": [
+   {
+    "id": "decay-run-a",
+    "name": "Run A (high rate)",
+    "analysis_type": "xy",
+    "x": "0\n0.5\n1\n1.5\n2\n2.5\n3\n3.5\n4\n4.5\n5\n5.5\n6\n6.5\n7\n7.5\n8\n8.5\n9\n9.5\n10",
+    "y": "108.31\n88.77\n68.22\n56.68\n55.26\n43.67\n31.37\n30.16\n25.7\n27.21\n18.06\n16.91\n13.95\n10.37\n11.4\n7.32\n6.38\n6.89\n9.93\n3.61\n5.58",
+    "ex": "",
+    "ey": "3",
+    "fit": {
+     "formula": "[0]*exp(-x/[1])+[2]",
+     "param_names": "A, tau, B",
+     "initial_guesses": "100, 2, 5",
+     "x_min": "",
+     "x_max": ""
+    }
+   },
+   {
+    "id": "decay-run-b",
+    "name": "Run B (low rate)",
+    "analysis_type": "xy",
+    "x": "0\n0.5\n1\n1.5\n2\n2.5\n3\n3.5\n4\n4.5\n5\n5.5\n6\n6.5\n7\n7.5\n8\n8.5\n9\n9.5\n10",
+    "y": "43.65\n36.43\n29.61\n24.28\n19.93\n14.83\n15.15\n12\n7.92\n8.73\n6.62\n6.1\n7.74\n4.4\n5.63\n5.18\n2.95\n3.47\n0.61\n4.61\n2.08",
+    "ex": "",
+    "ey": "1.5",
+    "fit": {
+     "formula": "[0]*exp(-x/[1])+[2]",
+     "param_names": "A, tau, B",
+     "initial_guesses": "40, 2, 2",
+     "x_min": "",
+     "x_max": ""
+    }
+   }
+  ],
+  "simultaneous_fits": [
+   {
+    "id": "decays-shared-tau",
+    "name": "Decays",
+    "members": [
+     {
+      "datasetId": "decay-run-a",
+      "parameters": [
+       {
+        "role": "local"
+       },
+       {
+        "role": "shared",
+        "shared": "tau"
+       },
+       {
+        "role": "local"
+       }
+      ]
+     },
+     {
+      "datasetId": "decay-run-b",
+      "parameters": [
+       {
+        "role": "local"
+       },
+       {
+        "role": "shared",
+        "shared": "tau"
+       },
+       {
+        "role": "local"
+       }
+      ]
+     }
+    ],
+    "shared": [
+     {
+      "name": "tau",
+      "guess": "2",
+      "min": "",
+      "max": ""
+     }
+    ]
+   }
+  ],
+  "active": 0,
+  "graph_title": "Decay runs",
+  "x_title": "t (s)",
+  "y_title": "counts",
+  "options": {}
+ },
+ "results": null,
+ "results_payload": null
+}

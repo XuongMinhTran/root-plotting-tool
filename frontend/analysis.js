@@ -40,43 +40,46 @@ function sourceDataset(o,seen=new Set()){
  const parents=sourceIds(o).map(id=>sourceDataset(doc.objects.find(x=>x.id===id),seen));
  return parents.length&&parents.every(d=>d&&d.id===parents[0]?.id)?parents[0]:null;
 }
+function groupOf(o){return o?.simultaneous?(session.inputs.simultaneous_fits||[]).find(g=>g.id+':fit'===o.id):null;}
+function sharesDataset(o,datasetId){return !!o&&(o.datasetIds||[]).includes(datasetId);}
 function render(){
  $('analysis-title').value=doc.title;$('undo').disabled=!history.length;
  const o=current(),owner=sourceDataset(o);
- const standalone=doc.objects.filter(o=>!sourceDataset(o));
+ const standalone=doc.objects.filter(o=>!sourceDataset(o)&&!o.simultaneous),simultaneous=doc.objects.filter(o=>o.simultaneous);
  const item=(o,label)=>`<button class="source-item" data-select="${esc(o.id)}" aria-current="${o.id===doc.selected}">${esc(label)}</button>`;
  $('object-list').innerHTML=session.inputs.datasets.filter(d=>d.analysis_type).map(d=>{
   const raw=doc.objects.find(x=>x.id===(d.derivedFrom||d.id));
   return raw?`<button class="source-item dataset-item" data-select="${esc(owner?.id===d.id?o.id:raw.id)}" aria-current="${owner?.id===d.id}"><strong>${esc(d.name)}</strong></button>`:'';
- }).join('')+(standalone.length?'<h3 class="quantities-heading">Quantities and calculations</h3>'+standalone.map(o=>item(o,o.name)).join(''):'');
+ }).join('')+(simultaneous.length?'<h3 class="quantities-heading">Simultaneous fits</h3>'+simultaneous.map(o=>item(o,o.name)).join(''):'')+(standalone.length?'<h3 class="quantities-heading">Quantities and calculations</h3>'+standalone.map(o=>item(o,o.name)).join(''):'');
  $('empty').hidden=!!o;$('object-content').hidden=!o;
  $('dataset-views').hidden=!owner;
  $('dataset-views').innerHTML=owner?[
   doc.objects.find(x=>x.id===(owner.derivedFrom||owner.id)),
   doc.objects.find(x=>x.kind==='fit'&&x.datasetId===owner.id&&!x.incomplete&&x.parameters?.length)
- ].map((x,i)=>`<button data-select="${esc(x?.id||'')}" aria-pressed="${x?.id===o.id}" ${x?'':'data-needs-fit="true" aria-haspopup="dialog"'}>${i?'Fit results':owner.derivedFrom?'Calculated data':'Raw data'}</button>`).join(''):'';
+ ].map((x,i)=>`<button data-select="${esc(x?.id||'')}" aria-pressed="${x?.id===o.id}" ${x?'':'data-needs-fit="true" aria-haspopup="dialog"'}>${i?'Fit results':owner.derivedFrom?'Calculated data':'Raw data'}</button>`).join('')
+  +doc.objects.filter(x=>sharesDataset(x,owner.id)&&!x.incomplete).map(x=>`<button data-select="${esc(x.id)}" aria-pressed="${x.id===o.id}">Shared fit: ${esc(x.name)}</button>`).join(''):'';
  $('dataset-calculations').hidden=!owner;
  const linked=owner?doc.objects.filter(x=>x.kind==='calculation'&&x.id!==owner.derivedFrom&&sourceDataset(x)?.id===owner.id):[];
  $('dataset-calculations').innerHTML=linked.length?'<span>Calculations</span>'+linked.map(x=>`<button data-select="${esc(x.id)}" aria-pressed="${x.id===o.id}">${esc(x.name)}</button>`).join(''):'';
  for(const id of ['calculate','export','delete'])$(id).disabled=!o;
  $('delete').textContent=o?({measurements:'Delete dataset',fit:'Delete fit results',calculation:'Delete calculation',values:'Delete quantities'}[o.kind]||'Delete'):'Delete';
- $('plot-selected').disabled=!o || !session.inputs.datasets.some(d=>d.id===o.datasetId||d.id===o.id||d.derivedFrom===o.id);
+ $('plot-selected').disabled=!o || !(o.simultaneous||session.inputs.datasets.some(d=>d.id===o.datasetId||d.id===o.id||d.derivedFrom===o.id));
  $('edit-calculation').hidden=o?.kind!=='calculation';$('edit-source').hidden=!o||!['measurements','values'].includes(o.kind);
  $('edit-exclusions').hidden=!(owner?.analysis_type==='xy'&&o?.kind==='measurements');
  $('edit-data-heading').hidden=$('edit-source').hidden&&$('edit-exclusions').hidden;
  $('edit-exclusions').textContent='Point exclusions'+(owner?.exclusions?.length?' ('+owner.exclusions.length+')':'')+'…';
  $('relationships').innerHTML='';if(!o)return;
- $('object-title').textContent=owner?.name||o.name;$('object-kind').textContent=owner?(o.kind==='calculation'?'Dataset · Calculation: '+o.name:o.kind==='fit'?'Dataset · Fit results':owner.derivedFrom?'Dataset · Calculated data':'Dataset · Raw data'):kinds[o.kind];
- const views=['table'];let multiple=o.kind==='measurements';try{if(o.kind==='calculation')multiple=calculationEngine().get(o.id).length>1;}catch{} if(multiple)views.push('plot','statistics');if(o.kind==='fit'||o.kind==='values')views.push('covariance','correlation');if(o.kind==='fit'&&session.inputs.datasets.find(d=>d.id===o.datasetId)?.result?.response?.canvas_json)views.push('fitted plot');
+ $('object-title').textContent=owner?.name||o.name;$('object-kind').textContent=owner?(o.kind==='calculation'?'Dataset · Calculation: '+o.name:o.kind==='fit'?'Dataset · Fit results':owner.derivedFrom?'Dataset · Calculated data':'Dataset · Raw data'):o.simultaneous?'Simultaneous fit · Fit results':kinds[o.kind];
+ const views=['table'];let multiple=o.kind==='measurements';try{if(o.kind==='calculation')multiple=calculationEngine().get(o.id).length>1;}catch{} if(multiple)views.push('plot','statistics');if(o.kind==='fit'||o.kind==='values')views.push('covariance','correlation');if(o.kind==='fit'&&(session.inputs.datasets.find(d=>d.id===o.datasetId)?.result?.response?.canvas_json||groupOf(o)?.result?.response?.canvas_json))views.push('fitted plot');
  if(!views.includes(view))view='table';
  $('views').innerHTML=views.map(v=>`<button data-view="${v}" aria-pressed="${view===v}">${v==='table'&&!multiple?'Values':v[0].toUpperCase()+v.slice(1)}</button>`).join('');
  const links=ids=>ids.map(id=>{const s=doc.objects.find(x=>x.id===id);return `<div><button class="source-link" data-select="${esc(id)}">${esc(s?.name||'Missing source')}</button></div>`;}).join('');
  const parents=sourceIds(o), children=[...dependants(o.id)];
- $('relationships').innerHTML='<h3>Sources</h3>'+(parents.length?links(parents):'<p>'+esc(o.origin||'Entered measurements or quantities')+'</p>')+(children.length?'<h3>Used by</h3>'+links(children):'');
- if(o.kind==='fit')$('relationships').innerHTML+=(o.stale?'<p class="form-error">The source data or model has changed since this fit. Refit before calculating from these parameters.</p>':'')+'<h3>Fit model</h3><p>'+esc(o.formula||'Imported fit')+'</p><p>'+esc(o.converged===false?'Fit did not converge. Interpret derived results with caution.':'Parameters and covariance from this dataset’s latest fit.')+'</p>';
+ $('relationships').innerHTML='<h3>Sources</h3>'+(parents.length?links(parents):o.simultaneous?links((o.datasetIds||[]).map(id=>session.inputs.datasets.find(d=>d.id===id)?.derivedFrom||id)):'<p>'+esc(o.origin||'Entered measurements or quantities')+'</p>')+(children.length?'<h3>Used by</h3>'+links(children):'');
+ if(o.kind==='fit')$('relationships').innerHTML+=(o.problem?'<p class="form-error">'+esc(o.problem)+'</p>':'')+(o.stale?'<p class="form-error">The source data or model has changed since this fit. Refit before calculating from these parameters.</p>':'')+'<h3>Fit model</h3><p>'+esc(o.formula||'Imported fit')+'</p><p>'+esc(o.converged===false?'Fit did not converge. Interpret derived results with caution.':o.simultaneous?'Parameters and covariance from the simultaneous fit of these datasets. Shared parameters have one value for all of them; correlations between shared and local parameters are kept in calculations.':'Parameters and covariance from this dataset’s latest fit.')+'</p>';
  try{renderRepresentation(o);}catch(e){$('representation').innerHTML='<p class="form-error">'+esc(e.message)+'</p>';}
 }
-function dataFor(o){if(o.incomplete)throw Error('This dataset is incomplete or has no fitted parameters. Open it in the plotting workspace to finish entering data or run a fit.');const engine=calculationEngine();return C.fields(o).map(f=>({...f,rows:engine.get(o.id,f.key)}));}
+function dataFor(o){if(o.incomplete)throw Error(o.problem||'This dataset is incomplete or has no fitted parameters. Open it in the plotting workspace to finish entering data or run a fit.');const engine=calculationEngine();return C.fields(o).map(f=>({...f,rows:engine.get(o.id,f.key)}));}
 function renderRepresentation(o){
  const target=$('representation');
  if(view==='fitted plot'){drawFitCanvas(o);return;}
@@ -95,7 +98,8 @@ function renderRepresentation(o){
   if(cols.length>1){$('plot-x').value='0';$('plot-y').value='1';}
   const draw=()=>scatter(cols);$('plot-x').onchange=draw;$('plot-y').onchange=draw;draw();return;
  }
- if(o.kind==='fit'||o.kind==='values')target.innerHTML=table(['Quantity','Value','Standard uncertainty','Unit'],cols.map(c=>[c.name,fmt(c.rows[0].value),fmt(c.rows[0].uncertainty),c.unit]));
+ if(o.simultaneous)target.innerHTML=table(['Parameter','Belongs to','Value','Standard uncertainty'],cols.map((c,i)=>{const p=o.parameters[i]||{};return[c.name,p.kind==='shared'?'Shared by all':p.kind==='fixed'?'Fixed value · '+(p.dataset_name||''):'Only '+(p.dataset_name||''),fmt(c.rows[0].value),p.fixed?'— (fixed)':fmt(c.rows[0].uncertainty)];}));
+ else if(o.kind==='fit'||o.kind==='values')target.innerHTML=table(['Quantity','Value','Standard uncertainty','Unit'],cols.map(c=>[c.name,fmt(c.rows[0].value),fmt(c.rows[0].uncertainty),c.unit]));
  else if(o.kind==='calculation'&&cols[0].rows.length===1){const r=cols[0].rows[0];target.innerHTML=`<math-field class="formula-display" read-only>${esc(o.expression)}</math-field><p class="result-value">${resultText(r)} ${esc(o.unit)}</p>`+bindingTable(o)+`<details><summary>Numerical values</summary>${table(['Value','Standard uncertainty'],[[r.value,r.uncertainty]])}</details>`;}
  else {
   const excluded=o.kind==='measurements'?(session.inputs.datasets.find(d=>d.id===o.datasetId)?.exclusions||[]):[];
@@ -114,7 +118,7 @@ async function drawFitCanvas(o){
    await rootLoader;
   }
   if(!host.isConnected)return;
-  const r=session.inputs.datasets.find(d=>d.id===o.datasetId)?.result?.response;
+  const r=session.inputs.datasets.find(d=>d.id===o.datasetId)?.result?.response||groupOf(o)?.result?.response;
   if(!r?.canvas_json)throw Error('No saved canvas is available for this fit.');
   host.textContent='';const root=window.JSROOT;root.settings.PreferSavedPoints=true;
   if(rootPainter){try{rootPainter.cleanup();}catch{}}
@@ -163,7 +167,7 @@ function parseSource(){
 }
 function sourceOptions(exclude){
  const blocked=exclude?dependants(exclude):new Set();
- return doc.objects.filter(o=>o.id!==exclude&&!blocked.has(o.id)&&sourceDataset(o)?.id===calculationDatasetId).flatMap(o=>C.fields(o).map(f=>{
+ return doc.objects.filter(o=>o.id!==exclude&&!blocked.has(o.id)&&(sourceDataset(o)?.id===calculationDatasetId||sharesDataset(o,calculationDatasetId))).flatMap(o=>C.fields(o).map(f=>{
   const owner=sourceDataset(o),type=o.kind==='fit'?'Fit parameters':o.kind==='measurements'?'Measurement columns':o.kind==='calculation'?'Calculated quantities':'Entered quantities';
   const group=(owner?.name||o.name)+' — '+type;
   const p=o.kind==='fit'?o.parameters[Number(f.key)]:null;
@@ -205,7 +209,7 @@ function buildBindings(){
 }
 function calculation(){
  const b=readBindings();
- for(const [symbol,binding] of Object.entries(b))if(!binding.literal&&sourceDataset(doc.objects.find(o=>o.id===binding.id))?.id!==calculationDatasetId)throw Error('Choose a source from the selected dataset for '+symbol+'.');
+ for(const [symbol,binding] of Object.entries(b)){const src=doc.objects.find(o=>o.id===binding.id);if(!binding.literal&&sourceDataset(src)?.id!==calculationDatasetId&&!sharesDataset(src,calculationDatasetId))throw Error('Choose a source from the selected dataset for '+symbol+'.');}
  return {id:editing||'preview',kind:'calculation',unitMode:'checked',ownerDatasetId:calculationDatasetId,resultMode:$('calculation-kind').value,name:$('calculation-name').value.trim()||'Calculated quantity',unit:$('calculation-unit').value.trim(),expression:$('calculation-expression').value,bindings:b};
 }
 function preview(){

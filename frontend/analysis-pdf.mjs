@@ -34,6 +34,15 @@ export async function createPDF(doc,ids,options,files,fontBytes){
   }
   if(options.raw&&files[stem+'-data.csv']){heading('Measurements and standard uncertainties');text('Blank uncertainty cells are unspecified.',9);table(files[stem+'-data.csv']);}
  }
+ for(const [k,g] of (doc.inputs.simultaneous_fits||[]).entries()){
+  const r=g.result?.response;if(!r?.params?.length||!(options.fit||options.graphs)||!g.members.some(m=>ids.includes(m.datasetId)))continue;
+  const stem='simultaneous-'+(k+1);heading('Simultaneous fit: '+g.name);
+  if(g.result.sourceSignature&&g.result.sourceSignature!==globalThis.WorkspaceStore.groupSignature(g,doc.inputs.datasets))text('Saved fit: inputs have changed since this result was calculated.');
+  const png=files['figures/'+stem+'.png'];if(options.graphs&&png){const info=pdf.getImageProperties(png),h=Math.min(120,width*info.height/info.width),w=h*info.width/info.height;if(y+h>bottom)page();pdf.addImage(png,'PNG',left+(width-w)/2,y,w,h);y+=h+8;}
+  if(options.fit){text(r.status_message||'');text('Total χ²: '+r.chi2+'   NDF: '+r.ndf+'   Probability: '+(r.prob??'—')+'   Free parameters: '+r.n_free);if(r.x_error_note)text(r.x_error_note,9);
+   for(const [suffix,label] of [['datasets','Datasets and their χ² contributions'],['parameters','Parameters'],['correlation','Parameter correlations']])if(files[stem+'-'+suffix+'.csv']){heading(label);table(files[stem+'-'+suffix+'.csv']);}
+  }
+ }
  for(const [i,o] of (doc.objects||[]).entries())if(options.calculations&&o.kind==='calculation'&&options.calculationIds.includes(o.id)){
   heading(o.name);text('Expression: '+o.expression);const result=files['calculation-'+(i+1)+'.csv'];if(result)table(result);
   text('First-order numerical uncertainty propagation, retaining source covariance.',9);text(o.unitMode==='checked'?'Units converted and dimensions checked.':'Legacy calculation: units treated as labels without conversion.',9);

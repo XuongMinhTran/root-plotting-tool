@@ -160,6 +160,50 @@ measurements and 2–2,000 bins.
 Run histogram checks with `node tests/histogram_frontend_test.cjs` and
 `docker run --rm --platform linux/amd64 -v "$PWD":/work -w /work/backend rootfit-backend python3 -m unittest histogram_test`.
 
+### Simultaneous fits
+
+**Fit together…** (next to the dataset selector in Compact and Standard, and in
+Compact's Fit menu) fits two or more XY datasets at once. Every parameter of
+every model gets a role: **shared** (one value fitted to all datasets that use
+it), **this dataset only**, or **fixed value**. Each dataset keeps its own
+function, fit range, initial guesses and point exclusions. The backend
+minimizes the sum of the per-dataset χ² values with `ROOT::Fit::Fitter` and a
+combined FCN built from per-dataset `ROOT::Fit::Chi2Function` objects (the
+pattern of ROOT's `combinedFit.C`), so X uncertainties enter through the same
+effective-variance rule as single fits. NDF = fitted points in all datasets −
+free unique parameters; the covariance matrix covers every unique parameter.
+
+The report lists the shared parameters once, then each dataset's own
+parameters, the totals, and every dataset's χ² contribution and point count.
+The plot draws every dataset and its curve in its own colour with a legend;
+optional plots overlay the datasets in the same colours. Results are stored on
+the group (`inputs.simultaneous_fits` in the session JSON; absent in older
+documents, which open unchanged), appear as one fit object in Analyze Data with
+the full covariance, and are included in text, CSV, LaTeX and PDF exports.
+Confidence bands are not available for simultaneous fits. The guide in
+`frontend/documentation.html#simultaneous-fits` explains when a shared
+parameter is appropriate and how to read the per-dataset χ² contributions.
+`examples/two-decays-shared-tau.json` (also in the examples menus) is a
+ready-made case.
+
+`POST /simultaneous-fit` accepts `{"datasets": [{name, x, y, ex, ey, formula,
+param_names, x_range, excluded_points}, …], "parameters": {"shared": [{name,
+guess, min, max}], "mapping": [[{kind: "shared", ref} | {kind: "local", guess}
+| {kind: "fixed", value}, …], …]}, title, x_title, y_title, plot}` and returns
+`params[]` (with `kind`, `dataset`, `fixed`, `label`), `covariance`, `chi2`,
+`ndf`, `prob`, `datasets[]` (each with `chi2`, `n_points`, `range`) and the
+usual `canvas_json`.
+
+Tests: `node tests/simultaneous_frontend_test.cjs` (session model, payload,
+exact round trips, old documents, Analyze Data propagation against a hand
+calculation) and, inside the ROOT container,
+`./root-run python3 backend/simultaneous_test.py` (shared time constant
+recovered with a smaller uncertainty than either run alone, all-local fits
+equal to the individual fits including X uncertainties, NDF with fixed
+parameters and exclusions, refused requests, canvas contents).
+`python3 backend/simultaneous_reference.py` is the ROOT-free reference
+minimizer the ROOT test compares against.
+
 ## Talk to the backend directly
 
 ```sh

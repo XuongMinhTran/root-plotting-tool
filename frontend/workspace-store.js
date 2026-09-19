@@ -10,6 +10,59 @@ const text=a=>(a||[]).join('\n');
 const fitDefaults=()=>({formula:'[0]*x+[1]',param_names:'',initial_guesses:'',x_min:'',x_max:''});
 function empty(){return {app:'rootfit',version:1,workspace_version:1,title:'',notes:'',inputs:{datasets:[],active:0,options:{}},objects:[],workspace:{selected:null},revision:null};}
 function signature(d){const n=list(d.x).length,errors=s=>{const a=list(s);return a.length===1?Array(n).fill(a[0]):a;};return JSON.stringify({type:d.analysis_type||'xy',x:list(d.x),y:list(d.y),ex:errors(d.ex),ey:errors(d.ey),histogram:d.histogram||null,formula:d.fit?.formula||'',...(d.exclusions?.length?{exclusions:d.exclusions}:{} )});}
+/* Simultaneous fits: a group of XY datasets fitted together with shared parameters.
+   {id, name, members:[{datasetId, parameters:[{role:'shared', shared} | {role:'local'} | {role:'fixed', value}]}],
+    shared:[{name, guess, min, max}], result?:{response, payload, sourceSignature}}
+   Local initial guesses live in each member dataset's own fit settings. */
+function normalizeRole(p){
+ const role=p?.role==='shared'||p?.role==='fixed'?p.role:'local',out={role};
+ if(role==='shared')out.shared=String(p.shared||'');
+ if(role==='fixed')out.value=String(p.value??'');
+ return out;
+}
+function normalizeSimultaneousFits(list,datasets){
+ if(!Array.isArray(list))return [];
+ const ids=new Set((datasets||[]).map(d=>d.id)),out=[],used=new Set();
+ for(const g of list){
+  if(!g||typeof g!=='object'||!Array.isArray(g.members))continue;
+  const seen=new Set();
+  const members=g.members.filter(m=>m&&ids.has(m.datasetId)&&!seen.has(m.datasetId)&&seen.add(m.datasetId))
+   .map(m=>({datasetId:m.datasetId,parameters:Array.isArray(m.parameters)?m.parameters.map(normalizeRole):[]}));
+  if(members.length<2)continue;
+  const group={id:g.id&&!used.has(String(g.id))?String(g.id):id(),name:String(g.name||'Simultaneous fit'),members,
+   shared:(Array.isArray(g.shared)?g.shared:[]).map(s=>({name:String(s?.name||'').trim(),guess:String(s?.guess??''),min:String(s?.min??''),max:String(s?.max??'')})).filter(s=>s.name)};
+  used.add(group.id);
+  // A result belongs to the exact set of members it was computed from.
+  if(g.result?.response?.params&&members.length===g.members.length)group.result=clone(g.result);
+  out.push(group);
+ }
+ return out;
+}
+function groupSignature(group,datasets){
+ const byId=new Map((datasets||[]).map(d=>[d.id,d]));
+ return JSON.stringify({members:group.members.map(m=>{const d=byId.get(m.datasetId);return {data:d?signature(d):null,range:[String(d?.fit?.x_min??''),String(d?.fit?.x_max??'')],parameters:m.parameters};}),
+  shared:group.shared.map(s=>({name:s.name,min:s.min,max:s.max}))});
+}
+/* A fit whose covariance matrix cannot be used (not symmetric positive semidefinite) is
+   marked incomplete with an explanation, instead of blocking every calculation in the session. */
+function covarianceProblem(o){
+ if(o.incomplete||!o.parameters?.length)return null;
+ try{C.covariance(o.parameters,o.covariance);return null;}
+ catch(e){return 'The covariance matrix of this fit cannot be used for calculations ('+e.message+'). Fit again, for example with better starting values.';}
+}
+function groupObjects(doc){
+ const out=[];
+ for(const g of doc.inputs.simultaneous_fits||[]){
+  const r=g.result?.response;if(!r?.params?.length)continue;
+  const members=g.members.map(m=>doc.inputs.datasets.find(d=>d.id===m.datasetId)).filter(Boolean);
+  const o={id:g.id+':fit',kind:'fit',simultaneous:true,name:g.name,origin:'Simultaneous fit results',datasetIds:members.map(d=>d.id),formula:r.formula,converged:r.converged,
+   parameters:r.params.map((p,i)=>({name:p.label||p.name||'p'+i,value:p.value,error:p.error,unit:'',kind:p.kind,fixed:!!p.fixed,dataset_name:p.dataset_name||null})),
+   covariance:r.covariance,incomplete:!r.params?.length,stale:!!g.result.sourceSignature&&g.result.sourceSignature!==groupSignature(g,doc.inputs.datasets)};
+  const problem=covarianceProblem(o);if(problem){o.incomplete=true;o.problem=problem;}
+  out.push(o);
+ }
+ return out;
+}
 function sourceColumns(d){
  if(d.analysis_type==='histogram'){
   const h=d.histogram||{};
@@ -45,6 +98,8 @@ function normalize(input){
   if(!d.id||used.has(d.id))d.id=id();used.add(d.id);
   d.name=String(d.name||'Dataset');d.analysis_type=d.analysis_type===''?'':d.analysis_type==='histogram'?'histogram':'xy';d.fit=d.fit||{...fitDefaults(),formula:doc.inputs.formula||'[0]*x+[1]',param_names:doc.inputs.param_names||'',initial_guesses:doc.inputs.initial_guesses||''};
  }
+ if(Array.isArray(doc.inputs.simultaneous_fits)){const groups=normalizeSimultaneousFits(doc.inputs.simultaneous_fits,doc.inputs.datasets);if(groups.length)doc.inputs.simultaneous_fits=groups;else delete doc.inputs.simultaneous_fits;}
+ if(doc.results?.analysis_type==='simultaneous'){doc.results=null;doc.results_payload=null;}
  if(doc.results&&!doc.inputs.datasets.some(d=>d.result)){
   const owner=doc.inputs.datasets.find(d=>d.name===doc.results_payload?.dataset_name)||doc.inputs.datasets[doc.inputs.active||0];
   if(owner)owner.result={response:doc.results,payload:doc.results_payload||null};
@@ -76,10 +131,13 @@ function objects(doc){
   }
   if(d.result?.response){
    const f=d.result.response;
-   out.push({id:d.result.objectId||d.id+':fit',datasetId:d.id,kind:'fit',name:d.name+' — fit',origin:'Fit results',formula:f.formula,converged:f.converged,parameters:(f.params||[]).map((p,i)=>({name:p.name||'p'+i,value:p.value,error:p.error,unit:p.unit||''})),covariance:f.covariance,
-    incomplete:!f.params?.length,stale:!!d.result.sourceSignature&&d.result.sourceSignature!==signature(d)});
+   const o={id:d.result.objectId||d.id+':fit',datasetId:d.id,kind:'fit',name:d.name+' — fit',origin:'Fit results',formula:f.formula,converged:f.converged,parameters:(f.params||[]).map((p,i)=>({name:p.name||'p'+i,value:p.value,error:p.error,unit:p.unit||''})),covariance:f.covariance,
+    incomplete:!f.params?.length,stale:!!d.result.sourceSignature&&d.result.sourceSignature!==signature(d)};
+   const problem=covarianceProblem(o);if(problem){o.incomplete=true;o.problem=problem;}
+   out.push(o);
   }
  }
+ out.push(...groupObjects(doc));
  return out;
 }
 function usableObjects(doc){return objects(doc).filter(o=>!o.incomplete);}
@@ -87,6 +145,10 @@ function syncObjects(doc,updated){
  const old=objects(doc),oldById=new Map(old.map(o=>[o.id,o])),nextIds=new Set(updated.map(o=>o.id));
  doc.inputs.datasets=doc.inputs.datasets.filter(d=>d.derivedFrom?nextIds.has(d.derivedFrom):nextIds.has(d.id)||nextIds.has(d.result?.objectId||d.id+':fit'));
  for(const d of doc.inputs.datasets)if(d.result&&!nextIds.has(d.result.objectId||d.id+':fit'))delete d.result;
+ for(const g of doc.inputs.simultaneous_fits||[]){
+  if(g.result&&!nextIds.has(g.id+':fit'))delete g.result;
+  const renamed=updated.find(o=>o.id===g.id+':fit');if(renamed?.name)g.name=renamed.name;
+ }
  const values=[];
  for(const o of updated){
   if(o.kind==='measurements'){
@@ -127,6 +189,9 @@ function reconcileDatasets(previous,datasets){
  for(const d of previous.inputs.datasets)if(!kept.has(d.id)){
   removed.add(d.id);removed.add(d.result?.objectId||d.id+':fit');if(d.derivedFrom)removed.add(d.derivedFrom);
  }
+ const groups=normalizeSimultaneousFits(doc.inputs.simultaneous_fits,datasets);
+ for(const g of previous.inputs.simultaneous_fits||[])if(g.result&&!groups.some(n=>n.id===g.id&&n.result))removed.add(g.id+':fit');
+ if(groups.length)doc.inputs.simultaneous_fits=groups;else delete doc.inputs.simultaneous_fits;
  let changed=true;
  while(changed){changed=false;for(const o of doc.objects||[])if(!removed.has(o.id)&&(removed.has(o.ownerDatasetId)||Object.values(o.bindings||{}).some(b=>removed.has(b.id)))){removed.add(o.id);changed=true;}
   for(const d of datasets)if(d.derivedFrom&&removed.has(d.derivedFrom)&&!removed.has(d.id)){removed.add(d.id);removed.add(d.result?.objectId||d.id+':fit');changed=true;}
@@ -170,6 +235,6 @@ function migrate(storage){
  }
  return doc;
 }
-const api={KEY,empty,id,normalize,objects,usableObjects,projected,commitView,reconcileDatasets,materialize,measurementDataset,signature,read,write,migrate};
+const api={KEY,empty,id,normalize,objects,usableObjects,projected,commitView,reconcileDatasets,materialize,measurementDataset,signature,read,write,migrate,normalizeSimultaneousFits,groupSignature,groupObjects};
 if(typeof module==='object')module.exports=api;else scope.WorkspaceStore=api;
 })(globalThis);
