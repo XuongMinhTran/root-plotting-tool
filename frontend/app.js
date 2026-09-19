@@ -2092,7 +2092,7 @@ function initResizers() {
     document.body.classList.add('resizing-y');
     const startY = ev.clientY;
     const startH = plot.clientHeight;
-    const move = (e) => { plot.style.height = Math.max(240, startH + e.clientY - startY) + 'px'; };
+    const move = (e) => { plot.style.height = Math.max(240, Math.min(3200, startH + e.clientY - startY)) + 'px'; };
     const up = () => {
       handle.removeEventListener('pointermove', move);
       handle.removeEventListener('pointerup', up);
