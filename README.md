@@ -224,3 +224,23 @@ Reference: [TF1](https://root.cern/doc/master/classTF1.html),
 - **Correlation matrix**: available below the fit report and in Analyze Data. Undefined zero-variance correlations are shown as a dash.
 - **Confidence bands**: choose None, 68%, 95%, or 99% under plot settings and refit. ROOT computes pointwise linearized covariance intervals, without extra chi-square normalization. These are not simultaneous bands or prediction intervals. Bands require a converged fit with an accurate covariance matrix. Histogram bands describe the fitted density (counts per unit X).
 - **Export analysis**: downloads a ZIP with report.tex, PNG/SVG figures, CSV tables, calculation definitions/results, and the complete session.json. Select which datasets appear in the report; all calculations and the complete session remain in the bundle. Compile report.tex with XeLaTeX. The tool does not generate interpretations or conclusions.
+
+## Hosting
+
+The frontend and the fitting backend are hosted separately:
+
+- **Frontend** — the static pages in `frontend/` are served by Cloudflare (a
+  static-assets Worker, configured in `wrangler.jsonc`; no container, works on
+  the free plan). `npx wrangler deploy` on every push to `main`, via the
+  connected Workers build.
+- **Backend** — the Flask + CERN ROOT API (`backend/`) runs on Render as a
+  Docker service. The frontend reaches it over CORS.
+
+`frontend/app.js` picks the backend automatically (`resolveBackend()`): when the
+backend is serving the pages itself (local `./start`, one port), it uses that
+same origin; otherwise it falls back to `DEFAULT_BACKEND` (the Render URL). An
+explicit backend set in the UI always wins. For local development, `./start`
+runs both together on `http://localhost:8000` — no hosting needed.
+
+Cloudflare Containers were tried but dropped: they require the Workers Paid plan
+and are a poor fit for the multi-GB ROOT image.

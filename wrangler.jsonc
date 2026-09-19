@@ -1,0 +1,11 @@
+{
+  // Static hosting only — no Worker script, no container. Cloudflare serves the
+  // pages in frontend/ as static assets, which works on the free plan. The
+  // fitting API (Flask + CERN ROOT) is hosted separately (Render) and reached
+  // over CORS. See resolveBackend() in frontend/app.js: it uses the same origin
+  // when the backend serves the pages (local ./start) and otherwise falls back
+  // to DEFAULT_BACKEND (the Render URL).
+  "name": "root-plotting-tool",
+  "compatibility_date": "2026-09-01",
+  "assets": { "directory": "./frontend" }
+}
