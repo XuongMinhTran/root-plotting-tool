@@ -167,6 +167,10 @@ class SimultaneousFitTests(unittest.TestCase):
         self.assertEqual(body['canvas_json']['_typename'], 'TCanvas')
         self.assertEqual(len(body['diagnostics'][0]['series']), 2)
 
+    def test_health_lists_simultaneous_fits(self):
+        body = self.client.get('/health').get_json()
+        self.assertIn('simultaneous-fit', body['features'])
+
     def test_bad_requests_are_explained(self):
         status, body = self.post({'datasets': self.datasets[:1], 'parameters': self.parameters})
         self.assertEqual(status, 400)

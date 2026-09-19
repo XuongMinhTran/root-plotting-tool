@@ -167,3 +167,15 @@ assert.deepEqual(read('examplePayload.parameters.shared'),[{name:'tau',guess:2,m
 const example=JSON.parse(fs.readFileSync('examples/two-decays-shared-tau.json','utf8'));
 assert.equal(S.normalize(example).inputs.simultaneous_fits.length,1,'the example file normalizes with its group');
 console.log('OK: LaTeX/CSV export sections and the built-in example.');
+
+// ---- an outdated backend without the endpoint gets a specific message, not the generic one
+(async()=>{
+  context.AbortController=AbortController;
+  context.fetch=async()=>({ok:false,status:405,text:async()=>'<!doctype html><title>405 Method Not Allowed</title>'});
+  await assert.rejects(()=>run("callBackend('/simultaneous-fit',{method:'POST',body:'{}'})"),/does not offer this function \(HTTP 405\).*older version/);
+  context.fetch=async()=>({ok:false,status:400,text:async()=>JSON.stringify({error:'A simultaneous fit needs at least two datasets.'})});
+  await assert.rejects(()=>run("callBackend('/simultaneous-fit',{method:'POST',body:'{}'})"),/at least two datasets/);
+  context.fetch=async()=>({ok:false,status:500,text:async()=>'oops'});
+  await assert.rejects(()=>run("callBackend('/fit',{method:'POST',body:'{}'})"),/could not finish this request/);
+  console.log('OK: outdated-backend errors explain themselves; server errors keep their messages.');
+})();

@@ -45,7 +45,7 @@ import simultaneous_fit
 
 import ROOT
 
-APP_VERSION = "0.1.0"
+APP_VERSION = "0.3.0"
 MAX_POINTS = 100_000
 
 # Where the frontend lives inside the container. ./start bind-mounts the repo's
@@ -155,6 +155,8 @@ def health():
         "service": "rootfit-backend",
         "version": APP_VERSION,
         "root_version": str(ROOT.gROOT.GetVersion()),
+        # What this build can do, so a page (or a person) can tell an outdated deployment apart.
+        "features": ["fit", "histogram", "simultaneous-fit"],
     })
 
 

@@ -1567,8 +1567,15 @@ async function callBackend(path, options = {}, timeoutMs = 60000) {
   try { body = JSON.parse(text); } catch (_) { /* not JSON */ }
 
   if (!response.ok) {
-    const msg = body && body.error ? body.error : 'The fitting service could not finish this request. Your inputs are still here; please try Fit again.';
-    throw new Error(msg);
+    if (body && body.error) throw new Error(body.error);
+    // 404/405 without a JSON error: the server does not have this endpoint at all. Usually the
+    // backend is an older deployment, or the backend URL points at a site that only hosts the pages.
+    if (response.status === 404 || response.status === 405) {
+      let host = url;
+      try { host = new URL(url).host; } catch (_) { /* keep the full URL */ }
+      throw new Error(`The fitting service at ${host} does not offer this function (HTTP ${response.status}). It is probably running an older version of ROOT-A-TRON: redeploy or restart the backend from the latest code, then try again. Your inputs are still here.`);
+    }
+    throw new Error('The fitting service could not finish this request. Your inputs are still here; please try Fit again.');
   }
   if (body === null) throw new Error('The fitting service sent a response the app could not read. Your inputs are still here. Please try Fit again; if this continues, contact the site maintainer.');
   return body;
