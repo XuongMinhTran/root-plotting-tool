@@ -362,6 +362,14 @@ body.modern .plot-expand-btn {
 }
 body.modern .plot-expand-btn:hover:not(:disabled) { background: var(--blue-soft); border-color: #b9cde2; }
 body.modern .plot-expand-btn[aria-pressed="true"] { background: var(--blue); color: #fff; border-color: var(--blue); }
+
+/* Grab bar under the plot: drag it down to make the plot taller. */
+body.modern .hsplitter { height: 18px; margin: 8px 0 2px; cursor: row-resize; position: relative; touch-action: none; }
+body.modern .hsplitter::after {
+  content: ""; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: 52px; height: 6px; border: 0; border-radius: 3px; background: var(--sand); transition: background .15s;
+}
+body.modern .hsplitter:hover::after, body.modern.resizing-y .hsplitter::after { background: var(--blue); }
 .plot { width: 100%; height: clamp(340px, 46vh, 560px); background: #fff; position: relative; overflow: hidden; }
 .plot .placeholder {
   position: absolute; inset: 0; display: grid; place-items: center;

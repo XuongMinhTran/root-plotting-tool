@@ -1934,46 +1934,47 @@ function replotToSize() {
   }
 }
 
-// --- expanded mode: grow the plot downward so it isn't boxed in by the page ---
+// --- full-screen mode: the Expand button blows the plot up to fill the window ---
 let plotExpanded = false;
 
-/** A generous height that grows the plot down the page (the page scrolls to it). */
-function expandedPlotHeight() {
-  return Math.max(700, Math.round((window.innerHeight || 900) * 0.88));
+/** Enter or leave full-screen. The plot's frame becomes a fixed overlay that
+ *  covers the whole window (see .plot-fullscreen in the CSS); JSROOT then
+ *  redraws to fill it. */
+function setPlotFullscreen(on) {
+  plotExpanded = !!on;
+  const plot = $('plot');
+  const frame = plot && plot.closest ? plot.closest('.canvas-frame') : null;
+  if (frame) frame.classList.toggle('plot-fullscreen', plotExpanded);
+  try { document.body.style.overflow = plotExpanded ? 'hidden' : ''; } catch (_) { /* ignore */ }
+  syncExpandButton();
+  applyPlotHeight();
+  replotToSize();
 }
 
-/** Set the plot height from the current state. Expanded mode wins; otherwise a
- *  backend-supplied height, then a manually dragged height, then the CSS default. */
+function toggleExpandPlot() { setPlotFullscreen(!plotExpanded); }
+
+/** Set the plot height. In full-screen the CSS overlay owns the size, so the
+ *  inline height is cleared; otherwise use a backend height, then a manually
+ *  dragged height, then the CSS default. */
 function applyPlotHeight(result = lastResult) {
   const plot = $('plot');
   if (!plot) return;
+  if (plotExpanded) { plot.style.height = ''; return; }
   let h = null;
-  if (plotExpanded) h = expandedPlotHeight();
-  else if (result && result.plot_height) h = result.plot_height;
+  if (result && result.plot_height) h = result.plot_height;
   else h = loadLayout().plotH || null;
   plot.style.height = h ? h + 'px' : '';
 }
 
-/** Reflect the current expanded state on the toggle button. */
+/** Reflect the current state on the toggle button. */
 function syncExpandButton() {
   const btn = $('plot-expand');
   if (!btn) return;
   btn.setAttribute('aria-pressed', plotExpanded ? 'true' : 'false');
   btn.textContent = plotExpanded ? 'Collapse plot' : 'Expand plot';
   btn.title = plotExpanded
-    ? 'Return the plot to its normal height'
-    : 'Grow the plot downward for a bigger view';
-}
-
-function toggleExpandPlot() {
-  plotExpanded = !plotExpanded;
-  syncExpandButton();
-  applyPlotHeight();
-  replotToSize();
-  if (plotExpanded) {
-    const frame = $('plot').closest('.canvas-frame') || $('plot');
-    if (frame.scrollIntoView) frame.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
+    ? 'Return the plot to its normal size'
+    : 'Blow the plot up to fill the whole window';
 }
 
 /** The plot exactly as it is on screen, as SVG text. JSROOT's produceImage
@@ -2052,59 +2053,73 @@ function applyLayout() {
 
 function resetLayout() {
   storageRemove(LAYOUT_KEY);
-  $('main').style.removeProperty('--left-w');
-  plotExpanded = false; syncExpandButton();
-  $('plot').style.height = '';
+  const main = $('main');
+  if (main) main.style.removeProperty('--left-w');
+  const plot = $('plot');
+  const frame = plot && plot.closest ? plot.closest('.canvas-frame') : null;
+  plotExpanded = false;
+  if (frame) frame.classList.remove('plot-fullscreen');
+  try { document.body.style.overflow = ''; } catch (_) { /* ignore */ }
+  syncExpandButton();
+  if (plot) plot.style.height = '';
   replotToSize();
 }
 
 function initResizers() {
   applyLayout();
+
+  // Column splitter (Compact only): drag the boundary between inputs and results.
   const main = $('main');
   const splitter = $('splitter');
-  splitter.addEventListener('pointerdown', (ev) => {
-    ev.preventDefault();
-    splitter.setPointerCapture(ev.pointerId);
-    document.body.classList.add('resizing-x');
-    const rect = main.getBoundingClientRect();
-    const move = (e) => {
-      const w = Math.max(300, Math.min(rect.width - 380, e.clientX - rect.left - 16));
-      main.style.setProperty('--left-w', w + 'px');
-    };
-    const up = () => {
-      splitter.removeEventListener('pointermove', move);
-      splitter.removeEventListener('pointerup', up);
-      document.body.classList.remove('resizing-x');
-      const w = parseFloat(getComputedStyle(main).getPropertyValue('--left-w'));
-      if (w) saveLayout({ left: Math.round(w) });
-      replotToSize();
-    };
-    splitter.addEventListener('pointermove', move);
-    splitter.addEventListener('pointerup', up);
-  });
-  splitter.addEventListener('dblclick', resetLayout);
+  if (splitter && main) {
+    splitter.addEventListener('pointerdown', (ev) => {
+      ev.preventDefault();
+      splitter.setPointerCapture(ev.pointerId);
+      document.body.classList.add('resizing-x');
+      const rect = main.getBoundingClientRect();
+      const move = (e) => {
+        const w = Math.max(300, Math.min(rect.width - 380, e.clientX - rect.left - 16));
+        main.style.setProperty('--left-w', w + 'px');
+      };
+      const up = () => {
+        splitter.removeEventListener('pointermove', move);
+        splitter.removeEventListener('pointerup', up);
+        document.body.classList.remove('resizing-x');
+        const w = parseFloat(getComputedStyle(main).getPropertyValue('--left-w'));
+        if (w) saveLayout({ left: Math.round(w) });
+        replotToSize();
+      };
+      splitter.addEventListener('pointermove', move);
+      splitter.addEventListener('pointerup', up);
+    });
+    splitter.addEventListener('dblclick', resetLayout);
+  }
 
+  // Plot height handle (both interfaces): drag the bar under the plot to grow it
+  // downward as far as you like; double-click resets to the default height.
   const handle = $('plot-resizer');
   const plot = $('plot');
-  handle.addEventListener('pointerdown', (ev) => {
-    ev.preventDefault();
-    handle.setPointerCapture(ev.pointerId);
-    document.body.classList.add('resizing-y');
-    const startY = ev.clientY;
-    const startH = plot.clientHeight;
-    const move = (e) => { plot.style.height = Math.max(240, Math.min(3200, startH + e.clientY - startY)) + 'px'; };
-    const up = () => {
-      handle.removeEventListener('pointermove', move);
-      handle.removeEventListener('pointerup', up);
-      document.body.classList.remove('resizing-y');
-      plotExpanded = false; syncExpandButton();
-      saveLayout({ plotH: plot.clientHeight });
-      replotToSize();
-    };
-    handle.addEventListener('pointermove', move);
-    handle.addEventListener('pointerup', up);
-  });
-  handle.addEventListener('dblclick', () => { plotExpanded = false; syncExpandButton(); plot.style.height = ''; saveLayout({ plotH: null }); replotToSize(); });
+  if (handle && plot) {
+    handle.addEventListener('pointerdown', (ev) => {
+      ev.preventDefault();
+      handle.setPointerCapture(ev.pointerId);
+      document.body.classList.add('resizing-y');
+      const startY = ev.clientY;
+      const startH = plot.clientHeight;
+      const move = (e) => { plot.style.height = Math.max(240, startH + e.clientY - startY) + 'px'; };
+      const up = () => {
+        handle.removeEventListener('pointermove', move);
+        handle.removeEventListener('pointerup', up);
+        document.body.classList.remove('resizing-y');
+        plotExpanded = false; syncExpandButton();
+        saveLayout({ plotH: plot.clientHeight });
+        replotToSize();
+      };
+      handle.addEventListener('pointermove', move);
+      handle.addEventListener('pointerup', up);
+    });
+    handle.addEventListener('dblclick', () => { plotExpanded = false; syncExpandButton(); plot.style.height = ''; saveLayout({ plotH: null }); replotToSize(); });
+  }
 }
 
 // ================================================================ 10. documents
@@ -2540,7 +2555,8 @@ function init() {
   document.addEventListener('click', handleWorkspaceLink);
   initMenus();
   syncExpandButton();
-  if ($('splitter')) initResizers();
+  initResizers();
+  document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && plotExpanded) toggleExpandPlot(); });
   for (const el of document.querySelectorAll('[data-action]')) {
     const fn = ACTIONS[el.dataset.action];
     if (fn) el.addEventListener('click', (ev) => { ev.stopPropagation(); fn(el); });

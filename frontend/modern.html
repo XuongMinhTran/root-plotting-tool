@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="description" content="Fit a function to your measurements with CERN ROOT and read off the parameters, uncertainties and goodness of fit.">
 <title>Standard workspace · ROOT-A-TRON 3000</title>
-<link rel="stylesheet" href="style.css?v=20260919-plot-expand">
-<link rel="stylesheet" href="modern.css?v=20260919-plot-expand">
+<link rel="stylesheet" href="style.css?v=20260919-plot-expand4">
+<link rel="stylesheet" href="modern.css?v=20260919-plot-expand3">
 <link rel="stylesheet" href="paste-data.css?v=1">
 <link rel="stylesheet" href="site-brand.css?v=1">
 <link rel="stylesheet" href="analysis-features.css?v=20260919-export">
@@ -309,6 +309,7 @@
     <div class="canvas-frame"><button type="button" id="plot-expand" class="plot-expand-btn" data-action="plot-expand" aria-pressed="false" title="Grow the plot downward for a bigger view">Expand plot</button><div id="plot" class="plot">
       <p class="placeholder">No plot generated.</p>
     </div></div>
+    <div class="hsplitter" id="plot-resizer" title="Drag to change the plot height · double-click to reset"></div>
 
     <div class="report-block">
       <header><h3>Fit report</h3>
@@ -458,7 +459,7 @@
 <script src="modern.js?v=20260917-audit2" defer></script>
 <script defer src="units.js?v=1"></script><script src="analysis-core.js?v=20260919-units" defer></script>
 <script src="workspace-store.js?v=1" defer></script>
-<script src="app.js?v=20260919-plot-expand" defer></script>
+<script src="app.js?v=20260919-plot-expand4" defer></script>
 <script src="paste-data.js?v=1" defer></script>
 <script src="multivariate.js?v=1" defer></script>
 <script src="model-library.js?v=1" defer></script>
