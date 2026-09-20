@@ -1610,7 +1610,11 @@ async function runFit(fitModel = true) {
       : result.plot_notes?.length ? result.plot_notes.join('\n') : (result.residuals?.note || '');
     if (!result.converged) {
       showMessage('warn', `Fit did not converge. ${result.status_message} Check initial guesses, parameter identifiability, and the fit range before interpreting the result.` + (plotNote ? '\n' + plotNote : ''));
-    } else if (plotNote) showMessage('info', plotNote);
+    } else {
+      const gof = goodnessOfFitNote(result);
+      if (gof) showMessage('warn', gof + (plotNote ? '\n' + plotNote : ''));
+      else if (plotNote) showMessage('info', plotNote);
+    }
     setStatus($('fit-status'), result.converged ? `${result.fit_performed === false ? 'Histogram plotted' : 'Fit done'} — ${payload.dataset_name}` : 'Fit not converged', result.converged ? 'ok' : 'warn');
   } catch (e) {
     if (requestVersion !== fitRequestVersion) return;
@@ -1658,8 +1662,10 @@ async function runMultivariate() {
     const notes = (result.plot_notes || []).join('\n');
     if (!result.converged) {
       showMessage('warn', `Fit did not converge. ${result.status_message} Check the models, starting guesses, and that the data constrain every parameter.` + (notes ? '\n' + notes : ''));
-    } else if (notes) {
-      showMessage('info', notes);
+    } else {
+      const gof = goodnessOfFitNote(result);
+      if (gof) showMessage('warn', gof + (notes ? '\n' + notes : ''));
+      else if (notes) showMessage('info', notes);
     }
     setStatus($('fit-status'), result.converged ? `Fit done — ${payload.dataset_name}` : 'Fit not converged', result.converged ? 'ok' : 'warn');
   } catch (e) {
@@ -1679,6 +1685,27 @@ async function runMultivariate() {
 
 function chi2Class(r) {
   // Reduced chi-square alone cannot classify a fit as good or bad.
+  return '';
+}
+
+/** A short, scientific note on the goodness of fit, or '' when there is nothing
+ *  to flag. Reduced χ² is read against its degrees of freedom through the
+ *  p-value; both an implausibly high and an implausibly low value are noted. The
+ *  test is only meaningful when the fit was weighted by real uncertainties. */
+function goodnessOfFitNote(r) {
+  if (!r || r.converged === false || r.chi2_ndf == null) return '';
+  let weighted;
+  if (r.analysis_type === 'histogram') weighted = r.method === 'chi2';           // √count errors
+  else if (r.analysis_type === 'multivariate') weighted = (lastPayload?.output_errors || []).some(c => c && c.length);
+  else weighted = !!((lastPayload?.ey && lastPayload.ey.length) || (lastPayload?.ex && lastPayload.ex.length));
+  if (!weighted) return '';
+  const c = r.chi2_ndf;
+  const p = typeof r.prob === 'number' ? r.prob : null;
+  const stat = `χ²/NDF = ${fmtNum(c, 3)}` + (p == null ? '' : ` (p = ${fmtNum(p, 3)})`);
+  if ((p != null && p < 0.01) || c > 3)
+    return `${stat}: the data depart from the model by more than the stated uncertainties.`;
+  if ((p != null && p > 0.99) || c < 0.3)
+    return `${stat}: residuals lie well within the stated uncertainties, which may be overestimated.`;
   return '';
 }
 
