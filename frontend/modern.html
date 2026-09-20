@@ -6,7 +6,7 @@
 <meta name="description" content="Fit a function to your measurements with CERN ROOT and read off the parameters, uncertainties and goodness of fit.">
 <title>Standard workspace · ROOT-A-TRON 3000</title>
 <link rel="stylesheet" href="style.css?v=20260919-plot-options">
-<link rel="stylesheet" href="modern.css?v=20260920-toolbar">
+<link rel="stylesheet" href="modern.css?v=20260920-types">
 <link rel="stylesheet" href="site-brand.css?v=1">
 <link rel="stylesheet" href="analysis-features.css?v=20260919-export">
 <link rel="stylesheet" href="multivariate.css?v=1">
@@ -347,6 +347,7 @@
 <dialog id="table-dialog" class="tframe resizable">
   <div class="titlebar">Insert data <span class="titlebar-note">type in the grid, or paste from Excel or Sheets - one row per point, columns X · Y · Y err · X err</span></div>
   <div class="dialog-body table-body">
+    <div class="insert-type-tabs" id="insert-type-tabs" role="tablist" aria-label="Data type" hidden></div>
     <div class="tabs" id="dataset-tabs"></div>
     <div class="row table-tools">
       <button type="button" class="small" data-taction="duplicate">Duplicate dataset</button>
@@ -363,6 +364,8 @@
         <tbody></tbody>
       </table>
     </div>
+    <div class="insert-histogram" id="insert-histogram" hidden></div>
+    <div class="insert-multivariate" id="insert-multivariate" hidden></div>
     <p class="hint" id="table-histogram-note" hidden>Select Done to enter histogram data in Measurements.</p>
 
     <fieldset class="table-fit-settings"><legend id="table-fit-label">Fit settings for this dataset</legend>
@@ -458,8 +461,8 @@
 <script defer src="units.js?v=1"></script><script src="analysis-core.js?v=20260919-units" defer></script>
 <script src="workspace-store.js?v=1" defer></script>
 <script src="plot-style.js?v=1" defer></script>
-<script src="insert-data.js?v=20260920-module" defer></script>
-<script src="app.js?v=20260920-insert-module" defer></script>
+<script src="insert-data.js?v=20260920-types" defer></script>
+<script src="app.js?v=20260920-types" defer></script>
 <script src="multivariate.js?v=1" defer></script>
 <script src="model-library.js?v=1" defer></script>
 <script defer src="analysis-features.js?v=20260920-toolbar"></script>

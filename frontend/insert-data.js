@@ -50,10 +50,23 @@
   let tableDeleted = false;
   let renderedGridSnapshot = '[]';
   let wired = false;
+  let histBuilt = false;
+  let mvMounted = false;
+  let mvHomes = null;                 // remembered panel positions for the multivariate editor
   // Grid column order: Y errors before X errors, so a pasted "x y yerr" block lands right.
   const GRID_COLS = ['x', 'y', 'ey', 'ex'];
   const MIN_ROWS = 12;
   const IMPORT_TARGETS = [['x', 'X'], ['y', 'Y'], ['ey', 'Y err'], ['ex', 'X err'], ['', 'ignore']];
+  const TYPE_LABELS = { xy: 'XY data', histogram: 'Histogram', multivariate: 'Multivariate' };
+  const HIST_MAP = { 'ins-hist-source': 'source', 'ins-hist-samples': 'samples', 'ins-hist-counts': 'counts', 'ins-hist-bins': 'bins', 'ins-hist-min': 'min', 'ins-hist-max': 'max', 'ins-hist-edges': 'edges' };
+  function defaultHistogram() { return { source: 'samples', samples: '', counts: '', edges: '', bins: '', min: '', max: '', method: 'poisson' }; }
+  function deepClone(d) { return JSON.parse(JSON.stringify(d)); }
+  function isEmptyDataset(d) {
+    if (!d.analysis_type) return true;
+    if (d.analysis_type === 'histogram') { const h = d.histogram || {}; return !tokens(h.samples).length && !tokens(h.counts).length; }
+    if (d.analysis_type === 'multivariate') { const mv = d.mv; return !mv || !(mv.inVals || []).some((v) => tokens(v).length); }
+    return !tokens(d.x).length && !tokens(d.y).length;   // xy
+  }
 
   function fitEnabled() { return !!(H && H.fitSettings); }
   function msg(kind, text) { if (H && H.message) H.message(kind, text); }
@@ -63,38 +76,127 @@
   function open(host) {
     H = host;
     ensureWired();
-    tableDatasets = H.datasets().map((d) => ({ ...d, fit: { ...(d.fit || {}) } }));
-    tableActive = H.activeIndex();
+    tableDatasets = H.datasets().map(deepClone);
+    tableActive = Math.max(0, Math.min(H.activeIndex(), tableDatasets.length - 1));
+    // A brand-new blank dataset defaults to XY so the grid is ready to type in.
+    if (!tableDatasets[tableActive].analysis_type) tableDatasets[tableActive].analysis_type = 'xy';
     tableDeleted = false;
     const importPanel = $('import-panel'); if (importPanel) importPanel.hidden = true;
-    applyFitVisibility();
-    renderTabs();
-    renderGrid();
+    render();
     $('table-dialog').showModal();
-    setTimeout(() => { const grid = $('grid'); const first = grid && grid.querySelector('tbody input'); if (first) first.focus(); }, 50);
+    focusEntry();
   }
 
-  function applyFitVisibility() {
-    const fieldset = document.querySelector('.table-fit-settings');
-    if (fieldset) fieldset.hidden = !fitEnabled();
+  function focusEntry() {
+    setTimeout(() => {
+      const type = tableDatasets[tableActive].analysis_type;
+      let el = null;
+      if (type === 'xy') { const g = $('grid'); el = g && g.querySelector('tbody input'); }
+      else if (type === 'histogram') el = $('ins-hist-samples') || $('ins-hist-counts');
+      if (el) el.focus();
+    }, 50);
+  }
+
+  /** Re-render the whole dialog body for the active dataset. */
+  function render() {
+    renderTypeSelector();
+    renderTabs();
+    renderEntry();
+  }
+
+  function renderTypeSelector() {
+    const box = $('insert-type-tabs');
+    if (!box) return;
+    const types = (H && H.types) || [];
+    if (types.length < 2) { box.hidden = true; box.innerHTML = ''; return; }
+    box.hidden = false;
+    const active = tableDatasets[tableActive].analysis_type;
+    box.innerHTML = '';
+    for (const t of types) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'type-tab' + (t === active ? ' active' : '');
+      b.textContent = TYPE_LABELS[t] || t;
+      b.setAttribute('aria-pressed', t === active ? 'true' : 'false');
+      b.addEventListener('click', () => setType(t));
+      box.appendChild(b);
+    }
+  }
+
+  function defaultName() {
+    const names = new Set(tableDatasets.map((d) => d.name));
+    let i = tableDatasets.length + 1;
+    while (names.has('Dataset ' + i)) i++;
+    return 'Dataset ' + i;
+  }
+
+  /** Switch to the first dataset of `type`, converting a blank one or creating a new one. */
+  function setType(type) {
+    if (type === tableDatasets[tableActive].analysis_type) return;
+    if (readCurrentEntry() === false) return;
+    if (tableDatasets[tableActive].analysis_type === 'multivariate') unmountMultivariate();
+    let next = tableDatasets.findIndex((d) => d.analysis_type === type);
+    if (next < 0) {
+      if (isEmptyDataset(tableDatasets[tableActive])) {
+        tableDatasets[tableActive] = H.newDataset(tableDatasets[tableActive].name, type);
+        next = tableActive;
+      } else {
+        tableDatasets.push(H.newDataset(defaultName(), type));
+        next = tableDatasets.length - 1;
+      }
+    }
+    tableActive = next;
+    render();
+  }
+
+  /** Show the entry area for the active dataset's type; hide the others. */
+  function renderEntry() {
+    const type = tableDatasets[tableActive].analysis_type || 'xy';
+    if (fitEnabled() && type !== 'multivariate') writeTableFit();
+    for (const button of document.querySelectorAll('[data-taction]')) {
+      if (['add-rows', 'delete-empty', 'import'].includes(button.dataset.taction)) button.disabled = type !== 'xy';
+      if (['duplicate', 'delete'].includes(button.dataset.taction)) button.disabled = !tableDatasets[tableActive].analysis_type;
+    }
+    for (const input of document.querySelectorAll('.table-fit-settings input')) input.disabled = !tableDatasets[tableActive].analysis_type;
+    const fs = document.querySelector('.table-fit-settings');
+    if (fs) fs.hidden = !fitEnabled() || type === 'multivariate';
+    const gridWrap = $('grid-wrap'); if (gridWrap) gridWrap.hidden = type !== 'xy';
+    const hist = $('insert-histogram'); if (hist) hist.hidden = type !== 'histogram';
+    const mv = $('insert-multivariate'); if (mv) mv.hidden = type !== 'multivariate';
+    if (type !== 'multivariate') unmountMultivariate();
+    if (type === 'xy') renderGrid();
+    else if (type === 'histogram') renderHistogram();
+    else if (type === 'multivariate') mountMultivariate();
+    else renderGrid();
   }
 
   function tableDone() {
-    if (fitEnabled()) readTableFit();
-    if (readGridToDataset() === false) return;
+    if (fitEnabled() && tableDatasets[tableActive].analysis_type !== 'multivariate') readTableFit();
+    if (readCurrentEntry() === false) return;
+    unmountMultivariate();
     const out = tableDatasets;
     const activeIndex = Math.min(tableActive, out.length - 1);
     const deleted = tableDeleted;
     tableDeleted = false;
     tableDatasets = null;
-    H.commit({ datasets: out, activeIndex, deleted });
+    H.commit({ datasets: out, activeIndex, deleted });   // host re-renders the panel
     $('table-dialog').close();
   }
 
   function tableCancel() {
     tableDeleted = false;
+    unmountMultivariate();
     tableDatasets = null;
     $('table-dialog').close();
+    if (H && H.afterClose) H.afterClose();               // resync the panel after discarding
+  }
+
+  /** Read whatever entry area is showing into the active working-copy dataset. */
+  function readCurrentEntry() {
+    const type = tableDatasets[tableActive].analysis_type;
+    if (type === 'histogram') { readHistogram(); return true; }
+    if (type === 'multivariate') return true;   // window.Multivariate writes the working copy live
+    return readGridToDataset();
   }
 
   // ---------------------------------------------------------------- tabs
@@ -116,14 +218,25 @@
       });
       box.appendChild(b);
     });
-    if (H.addDataset) {
-      const add = document.createElement('button');
-      add.type = 'button';
-      add.className = 'tab add';
-      add.textContent = H.addLabel || 'New plot';
-      add.addEventListener('click', () => H.addDataset());
-      box.appendChild(add);
-    }
+    const add = document.createElement('button');
+    add.type = 'button';
+    add.className = 'tab add';
+    add.textContent = H.addLabel || 'New';
+    add.addEventListener('click', addNewOfType);
+    box.appendChild(add);
+  }
+
+  /** The "New" tab: add a fresh dataset of the currently selected type. */
+  async function addNewOfType() {
+    const type = tableDatasets[tableActive].analysis_type || 'xy';
+    const suggested = defaultName();
+    let name = suggested;
+    if (H.newName) { name = await H.newName(suggested); if (name === null) return; }
+    if (readCurrentEntry() === false) return;
+    if (tableDatasets[tableActive].analysis_type === 'multivariate') unmountMultivariate();
+    tableDatasets.push(H.newDataset((name || '').trim() || suggested, type));
+    tableActive = tableDatasets.length - 1;
+    render();
   }
 
   function tableSwitch(i) {
@@ -173,19 +286,10 @@
 
   // ---------------------------------------------------------------- grid
 
-  /** Build the grid from the active table dataset. */
+  /** Fill the XY grid from the active table dataset (renderEntry controls visibility). */
   function renderGrid(extraRows = 3) {
-    if (fitEnabled()) writeTableFit();
     const d = tableDatasets[tableActive];
-    const histogram = d.analysis_type === 'histogram';
-    const gridWrap = $('grid-wrap'); if (gridWrap) gridWrap.hidden = d.analysis_type !== 'xy';
-    const histNote = $('table-histogram-note'); if (histNote) histNote.hidden = !histogram;
-    for (const button of document.querySelectorAll('[data-taction]')) {
-      if (['add-rows', 'delete-empty', 'import'].includes(button.dataset.taction)) button.disabled = d.analysis_type !== 'xy';
-      if (['duplicate', 'delete'].includes(button.dataset.taction)) button.disabled = !d.analysis_type;
-    }
-    for (const input of document.querySelectorAll('.table-fit-settings input')) input.disabled = !d.analysis_type;
-    if (d.analysis_type !== 'xy') { renderedGridSnapshot = '[]'; return; }
+    const histNote = $('table-histogram-note'); if (histNote) histNote.hidden = true;
     const cols = GRID_COLS.map((c) => tableColumnCells(d[c]));
     const n = Math.max(MIN_ROWS, Math.max(...cols.map((c) => c.length)) + extraRows);
     const tbody = $('grid').querySelector('tbody');
@@ -402,6 +506,78 @@
     const settings = normalizeFitSettings(d.fit);
     $('table-fit-label').textContent = 'Fit settings for ' + d.name;
     for (const key of Object.keys(defaultFitSettings())) $('table-fit-' + key).value = settings[key];
+  }
+
+  // ---------------------------------------------------------------- histogram (in-dialog)
+
+  function buildHistogramForm() {
+    if (histBuilt) return;
+    const box = $('insert-histogram');
+    if (!box) return;
+    box.innerHTML =
+      '<div class="ins-hist-field"><label for="ins-hist-source">Histogram input</label>' +
+      '<select id="ins-hist-source"><option value="samples">Individual measurements</option><option value="counts">Pre-binned counts</option></select></div>' +
+      '<div class="ins-hist-field" data-hgroup="samples"><label for="ins-hist-samples">Measurements</label>' +
+      '<textarea id="ins-hist-samples" rows="6" spellcheck="false" placeholder="One measurement per line"></textarea></div>' +
+      '<div class="ins-hist-field" data-hgroup="counts" hidden><label for="ins-hist-counts">Bin counts</label>' +
+      '<textarea id="ins-hist-counts" rows="6" spellcheck="false" placeholder="One nonnegative whole count per bin"></textarea></div>' +
+      '<div class="ins-hist-row" data-hgroup="samples">' +
+      '<div class="ins-hist-field"><label for="ins-hist-bins">Number of bins</label><input id="ins-hist-bins" type="number" min="1" max="2000" placeholder="Automatic"></div>' +
+      '<div class="ins-hist-field"><label for="ins-hist-min">Range from</label><input id="ins-hist-min" type="text" placeholder="Automatic"></div>' +
+      '<div class="ins-hist-field"><label for="ins-hist-max">to</label><input id="ins-hist-max" type="text" placeholder="Automatic"></div></div>' +
+      '<div class="ins-hist-field"><label for="ins-hist-edges">Bin edges <span class="hint-inline">optional for measurements; required for counts, in increasing order</span></label>' +
+      '<textarea id="ins-hist-edges" rows="2" spellcheck="false" placeholder="0, 1, 2, 4, 8"></textarea></div>' +
+      '<p class="hint">The plot shows counts per unit X. Choose Done, then Fit (or Plot histogram) to build it.</p>';
+    for (const id of Object.keys(HIST_MAP)) {
+      const el = $(id);
+      el.addEventListener('input', readHistogram);
+      if (id === 'ins-hist-source') el.addEventListener('change', () => { readHistogram(); renderHistogram(); });
+    }
+    histBuilt = true;
+  }
+
+  function renderHistogram() {
+    buildHistogramForm();
+    const d = tableDatasets[tableActive];
+    const h = d.histogram || (d.histogram = defaultHistogram());
+    for (const [id, key] of Object.entries(HIST_MAP)) { const el = $(id); if (el) el.value = h[key] ?? ''; }
+    const counts = h.source === 'counts';
+    for (const g of $('insert-histogram').querySelectorAll('[data-hgroup]')) g.hidden = (g.dataset.hgroup === 'counts') !== counts;
+  }
+
+  function readHistogram() {
+    const d = tableDatasets[tableActive];
+    const h = d.histogram || (d.histogram = defaultHistogram());
+    for (const [id, key] of Object.entries(HIST_MAP)) { const el = $(id); if (el) h[key] = el.value; }
+  }
+
+  // ---------------------------------------------------------------- multivariate (portal)
+  // Reuse the panel's multivariate editor by relocating it into the dialog and
+  // pointing window.Multivariate at the working-copy dataset. Restored on close.
+
+  function mountMultivariate() {
+    const data = $('multivariate-data'), model = $('multivariate-model'), target = $('insert-multivariate');
+    if (!target) return;
+    if (!data || !model || !window.Multivariate) { target.innerHTML = '<p class="hint">The multivariate editor is unavailable here.</p>'; return; }
+    if (!mvMounted) {
+      mvHomes = { data: [data.parentNode, data.nextSibling], model: [model.parentNode, model.nextSibling] };
+      target.appendChild(data);
+      target.appendChild(model);
+      mvMounted = true;
+    }
+    data.hidden = false; model.hidden = false;
+    window.Multivariate.load(tableDatasets[tableActive]);
+  }
+
+  function unmountMultivariate() {
+    if (!mvMounted) return;
+    const data = $('multivariate-data'), model = $('multivariate-model');
+    if (mvHomes && data && model) {
+      mvHomes.data[0].insertBefore(data, mvHomes.data[1]);
+      mvHomes.model[0].insertBefore(model, mvHomes.model[1]);
+      data.hidden = true; model.hidden = true;
+    }
+    mvMounted = false;
   }
 
   // ---------------------------------------------------------------- actions + wiring

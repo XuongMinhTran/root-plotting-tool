@@ -87,3 +87,14 @@ body.classic .param-help-btn {
   --button-edge: #17457c;
   --button-ink: #ffffff;
 }
+
+/* Insert data: data-type selector + per-type entry areas */
+.insert-type-tabs { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+.insert-type-tabs .type-tab { padding: 5px 13px; min-height: 0; font-size: 13px; }
+.insert-type-tabs .type-tab.active { --button-top: #386fb5; --button-bottom: #194781; --button-edge: #103260; --button-ink: #fff; font-weight: bold; }
+.insert-histogram { display: flex; flex-direction: column; gap: 10px; }
+.insert-histogram .ins-hist-field { display: flex; flex-direction: column; gap: 4px; }
+.insert-histogram .ins-hist-field > label { font-size: 12px; font-weight: bold; }
+.insert-histogram .ins-hist-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.insert-histogram .hint-inline { font-weight: normal; color: #6b7684; }
+@media (max-width: 640px) { .insert-histogram .ins-hist-row { grid-template-columns: 1fr; } }

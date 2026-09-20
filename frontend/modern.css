@@ -656,3 +656,16 @@ body.modern .analyze-results-button:hover{background:var(--blue-dark);border-col
 .rail-head .export-actions{flex-wrap:wrap;align-items:center}
 
 .parameter-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}.parameter-heading .preset-label{margin:0}body.modern .parameter-guide-button{display:inline-block;padding:8px 16px;border:1px solid var(--blue);border-radius:4px;background:var(--blue);color:#fff;font-size:14px;font-weight:600;text-decoration:none;min-height:38px;cursor:pointer}body.modern .parameter-guide-button:hover:not(:disabled){background:var(--blue-dark);border-color:var(--blue-dark)}
+
+/* Insert data: data-type selector + per-type entry areas */
+.insert-type-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.insert-type-tabs .type-tab { min-height: 34px; padding: 6px 14px; border-radius: 6px; font-size: 13px; background: var(--paper); border: 1px solid var(--line); color: var(--ink-soft); }
+.insert-type-tabs .type-tab:hover:not(.active) { background: var(--blue-soft); border-color: #b8cbe4; }
+.insert-type-tabs .type-tab.active { background: var(--blue); border-color: var(--blue); color: #fff; font-weight: 600; }
+.insert-histogram { display: flex; flex-direction: column; gap: 12px; }
+.insert-histogram .ins-hist-field { display: flex; flex-direction: column; gap: 4px; }
+.insert-histogram .ins-hist-field > label { font-size: 13px; font-weight: 600; }
+.insert-histogram .ins-hist-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.insert-histogram .hint-inline { font-weight: 400; color: var(--muted); font-size: 12px; }
+.insert-histogram textarea { min-height: 0; }
+@media (max-width: 640px) { .insert-histogram .ins-hist-row { grid-template-columns: 1fr; } }

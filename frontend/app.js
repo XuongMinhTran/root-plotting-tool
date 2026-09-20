@@ -839,14 +839,17 @@ async function removeDataset() {
 const plotInsertHost = {
   fitSettings: true,
   addLabel: 'New plot',
+  types: ['xy', 'histogram', 'multivariate'],
   datasets: () => datasets,
   activeIndex: () => activeIdx,
   color: (i) => datasetColor(i),
   newDataset: (name, type) => newDataset(name, type),
   requestName: (current) => requestDatasetName(current),
+  newName: (suggested) => askDialog({ title: 'New dataset', label: 'Dataset name', value: suggested, accept: 'Create',
+    validate: (value) => { if (!value.trim()) throw new Error('Enter a dataset name.'); return value.trim(); } }),
   confirmDelete: (name, n, unit) => confirmDatasetDeletion(name, n, unit),
   message: (kind, text) => showMessage(kind, text),
-  addDataset: () => openDatasetTypeChooser(true),
+  afterClose: () => showActiveInColumns(),
   commit: ({ datasets: edited, activeIndex, deleted }) => {
     if (deleted) resetResult();
     datasets = edited;
@@ -858,7 +861,6 @@ const plotInsertHost = {
 
 function openTable() {
   if (datasets[activeIdx]?.derivedFrom) { showMessage('info', 'This dataset is calculated. Edit its expression or sources in Analyze Data.'); return; }
-  if ($('analysis-type').value !== 'xy') { showMessage('info', 'Enter histogram measurements or bin counts in the Data section. Insert data is for XY datasets.'); return; }
   syncActiveFromColumns();
   window.InsertData.open(plotInsertHost);
 }

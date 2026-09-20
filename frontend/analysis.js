@@ -276,7 +276,7 @@ const insertHost={
  requestName:cur=>ask('Rename dataset','',cur,'Rename'),
  confirmDelete:(name,n)=>ask('Delete dataset','Delete “'+name+'” ('+n+' points) from the shared session?'),
  message:(kind,text)=>notify(text,kind==='error'),
- addDataset:async()=>{const name=await ask('New dataset','','','Create');if(name&&name.trim())window.InsertData.addTableDataset('xy',name.trim());},
+ newName:sug=>ask('New dataset','',sug,'Create'),
  commit:({datasets:edited,activeIndex})=>{change(()=>{
   const byId=new Map(edited.map(d=>[d.id,d])),used=new Set(),merged=[];
   for(const d of session.inputs.datasets){
