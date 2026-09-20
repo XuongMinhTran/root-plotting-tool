@@ -1876,18 +1876,33 @@ function loadJSROOT() {
   return jsrootPromise;
 }
 
+/** Apply the current appearance settings to a plot object (a deep copy; the
+ *  original is left untouched). No-op if plot-style.js is unavailable. */
+function styleJson(json) {
+  if (window.PlotStyle && plotStyle) {
+    try { return window.PlotStyle.styledCanvas(json, plotStyle); } catch (_) { /* draw as-is */ }
+  }
+  return json;
+}
+
 function drawableFrom(result) {
-  if (result && result.canvas_json) return { json: result.canvas_json, option: '' };
-  if (result && result.graph_json) return { json: result.graph_json, option: 'AP' };
+  if (result && result.canvas_json) return { json: styleJson(result.canvas_json), option: '' };
+  if (result && result.graph_json) return { json: styleJson(result.graph_json), option: 'AP' };
   return null;
 }
 
 let plotDrawVersion = 0;
-async function drawPlot(result, selection = false) {
+async function drawPlot(result, selection = false, restyle = false) {
   const drawVersion = ++plotDrawVersion;
-  if (!selection) document.dispatchEvent(new CustomEvent('rootfit:draw'));
+  if (!selection && !restyle) document.dispatchEvent(new CustomEvent('rootfit:draw'));
   const plot = $('plot');
   applyPlotHeight(result);
+  // On a fresh draw (not a live restyle), let the Plot-options controls reflect
+  // the axis/grid state the backend actually drew.
+  if (!restyle && result && result.canvas_json && window.PlotStyle && plotStyle) {
+    const ax = window.PlotStyle.readAxes(result.canvas_json);
+    if (ax) { Object.assign(plotStyle, ax); refreshPlotOptionsUI(); }
+  }
   const src = drawableFrom(result);
   setPngEnabled(false);
   lastDrawn = null;
@@ -1937,6 +1952,10 @@ function replotToSize() {
 // --- full-screen mode: the Expand button blows the plot up to fill the window ---
 let plotExpanded = false;
 
+// The plot's appearance settings (axes, grid, boxes, marker/line looks). Loaded
+// from plot-style.js at init; applied client-side, never sent to the backend.
+let plotStyle = null;
+
 /** Enter or leave full-screen. The plot's frame becomes a fixed overlay that
  *  covers the whole window (see .plot-fullscreen in the CSS); JSROOT then
  *  redraws to fill it. */
@@ -1975,6 +1994,90 @@ function syncExpandButton() {
   btn.title = plotExpanded
     ? 'Return the plot to its normal size'
     : 'Blow the plot up to fill the whole window';
+}
+
+// ---- advanced plot options (client-side appearance) --------------------------
+
+/** Redraw the current plot with the latest appearance settings, and remember
+ *  them for next time. Restyle draws skip the axis re-sync and the draw event. */
+function changePlotStyle() {
+  if (window.PlotStyle && plotStyle) window.PlotStyle.save(plotStyle);
+  if (lastResult && (lastResult.canvas_json || lastResult.graph_json)) drawPlot(lastResult, false, true);
+}
+
+/** Set every control in the Plot-options panel from the current plotStyle. */
+function refreshPlotOptionsUI() {
+  const pop = $('plot-options-pop');
+  if (!pop || !plotStyle) return;
+  for (const el of pop.querySelectorAll('[data-po]')) {
+    const key = el.dataset.po;
+    if (el.type === 'checkbox') el.checked = !!plotStyle[key];
+    else el.value = String(plotStyle[key]);
+  }
+}
+
+/** Build the popover once and hang it inside the canvas frame (a sibling of the
+ *  plot, so it survives JSROOT redraws). */
+function buildPlotOptionsPanel() {
+  const btn = $('plot-options-btn');
+  if (!btn || $('plot-options-pop') || !window.PlotStyle) return;
+  const P = window.PlotStyle;
+  const opts = (list) => list.map((o) => `<option value="${o.v}">${o.name}</option>`).join('');
+  const check = (key, label) => `<label class="po-check"><input type="checkbox" data-po="${key}"> ${label}</label>`;
+  const select = (key, label, list) => `<label class="po-field"><span>${label}</span><select data-po="${key}">${opts(list)}</select></label>`;
+  const pop = document.createElement('div');
+  pop.id = 'plot-options-pop';
+  pop.className = 'plot-options-pop';
+  pop.setAttribute('role', 'dialog');
+  pop.setAttribute('aria-label', 'Plot options');
+  pop.hidden = true;
+  pop.innerHTML = `
+    <div class="po-head"><strong>Plot options</strong><button type="button" class="po-reset">Reset</button></div>
+    <fieldset class="po-group"><legend>Axes</legend>
+      ${check('logx', 'Log X')}${check('logy', 'Log Y')}${check('gridx', 'Grid X')}${check('gridy', 'Grid Y')}
+    </fieldset>
+    <fieldset class="po-group"><legend>Show</legend>
+      ${check('stats', 'Stats box')}${check('legend', 'Legend')}${check('title', 'Title')}
+    </fieldset>
+    <fieldset class="po-group"><legend>Data points</legend>
+      ${select('markerColor', 'Color', P.COLORS)}${select('markerStyle', 'Shape', P.MARKERS)}${select('markerSize', 'Size', P.MARKER_SIZES)}
+    </fieldset>
+    <fieldset class="po-group"><legend>Fit line</legend>
+      ${select('lineColor', 'Color', P.COLORS)}${select('lineWidth', 'Width', P.LINE_WIDTHS)}${select('lineStyle', 'Style', P.LINE_STYLES)}
+    </fieldset>`;
+  (btn.closest('.canvas-frame') || btn.parentElement).appendChild(pop);
+
+  pop.addEventListener('click', (ev) => ev.stopPropagation());
+  pop.addEventListener('change', (ev) => {
+    const el = ev.target.closest('[data-po]');
+    if (!el) return;
+    const key = el.dataset.po;
+    plotStyle[key] = el.type === 'checkbox' ? el.checked : Number(el.value);
+    changePlotStyle();
+  });
+  pop.querySelector('.po-reset').addEventListener('click', () => {
+    plotStyle = { ...window.PlotStyle.DEFAULTS };
+    refreshPlotOptionsUI();
+    changePlotStyle();
+  });
+  btn.addEventListener('click', (ev) => { ev.stopPropagation(); togglePlotOptions(); });
+  document.addEventListener('click', closePlotOptions);
+  refreshPlotOptionsUI();
+}
+
+function togglePlotOptions() {
+  const pop = $('plot-options-pop');
+  const btn = $('plot-options-btn');
+  if (!pop) return;
+  const open = pop.hidden;
+  pop.hidden = !open;
+  if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  if (open) refreshPlotOptionsUI();
+}
+
+function closePlotOptions() {
+  const pop = $('plot-options-pop');
+  if (pop && !pop.hidden) { pop.hidden = true; const b = $('plot-options-btn'); if (b) b.setAttribute('aria-expanded', 'false'); }
 }
 
 /** The plot exactly as it is on screen, as SVG text. JSROOT's produceImage
@@ -2554,9 +2657,16 @@ function initMenus() {
 function init() {
   document.addEventListener('click', handleWorkspaceLink);
   initMenus();
+  plotStyle = (window.PlotStyle && window.PlotStyle.load()) || null;
   syncExpandButton();
   initResizers();
-  document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && plotExpanded) toggleExpandPlot(); });
+  buildPlotOptionsPanel();
+  document.addEventListener('keydown', (ev) => {
+    if (ev.key !== 'Escape') return;
+    const pop = $('plot-options-pop');
+    if (pop && !pop.hidden) { closePlotOptions(); return; }
+    if (plotExpanded) toggleExpandPlot();
+  });
   for (const el of document.querySelectorAll('[data-action]')) {
     const fn = ACTIONS[el.dataset.action];
     if (fn) el.addEventListener('click', (ev) => { ev.stopPropagation(); fn(el); });

@@ -272,6 +272,36 @@ button.expand { margin-left: auto; }
 .plot-expand-btn:hover:not(:disabled) { background: #fff; border-color: var(--accent); }
 .plot-expand-btn[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink, #fff); border-color: var(--accent); }
 
+/* Advanced plot options: an overlay button (top-left) and its popover panel. */
+.plot-options-btn {
+  position: absolute; top: 8px; left: 8px; z-index: 6;
+  font: inherit; font-size: 12px; font-weight: 600; line-height: 1;
+  padding: 5px 10px; border-radius: 5px; cursor: pointer;
+  border: 1px solid var(--edge, #9aa2ab);
+  background: rgba(255, 255, 255, 0.92); color: #1a1a1a;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18); text-shadow: none;
+}
+.plot-options-btn:hover:not(:disabled) { background: #fff; border-color: var(--accent); }
+.plot-options-btn[aria-expanded="true"] { background: var(--accent); color: var(--accent-ink, #fff); border-color: var(--accent); }
+.plot-options-pop {
+  position: absolute; top: 44px; left: 8px; z-index: 7;
+  width: 264px; max-width: calc(100% - 16px); max-height: calc(100% - 56px); overflow: auto;
+  background: #fff; color: #1a1a1a; border: 1px solid var(--edge, #9aa2ab);
+  border-radius: 8px; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.22); padding: 10px 12px 12px; font-size: 13px;
+}
+.plot-options-pop .po-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.plot-options-pop .po-reset {
+  font: inherit; font-size: 12px; padding: 3px 9px; border-radius: 4px;
+  border: 1px solid var(--edge, #9aa2ab); background: #f2f2f2; color: #1a1a1a; cursor: pointer; text-shadow: none;
+}
+.plot-options-pop .po-reset:hover { background: #fff; border-color: var(--accent); }
+.plot-options-pop .po-group { border: 1px solid var(--edge, #d8d8d8); border-radius: 6px; padding: 5px 8px 8px; margin: 8px 0 0; }
+.plot-options-pop .po-group legend { font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted, #666); padding: 0 4px; }
+.plot-options-pop .po-check { display: inline-flex; align-items: center; gap: 5px; margin: 3px 12px 3px 0; white-space: nowrap; cursor: pointer; }
+.plot-options-pop .po-field { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 6px 0 0; }
+.plot-options-pop .po-field span { color: var(--muted, #555); }
+.plot-options-pop .po-field select { flex: 0 0 auto; min-width: 132px; font: inherit; font-size: 12px; padding: 2px 4px; }
+
 /* Full-screen: the Expand button makes the plot frame fill the whole window. */
 .canvas-frame.plot-fullscreen {
   position: fixed; inset: 0; z-index: 1000;
@@ -280,6 +310,8 @@ button.expand { margin-left: auto; }
 }
 .canvas-frame.plot-fullscreen .plot { height: 100%; }
 .canvas-frame.plot-fullscreen .plot-expand-btn { top: 12px; right: 12px; z-index: 1001; }
+.canvas-frame.plot-fullscreen .plot-options-btn { top: 12px; left: 12px; z-index: 1001; }
+.canvas-frame.plot-fullscreen .plot-options-pop { z-index: 1002; }
 .plot .placeholder { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); margin: 0; text-align: center; padding: 20px; }
 @media (max-width: 960px) { .plot { height: 460px; } }
 

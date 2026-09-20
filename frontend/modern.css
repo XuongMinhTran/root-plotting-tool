@@ -363,6 +363,19 @@ body.modern .plot-expand-btn {
 body.modern .plot-expand-btn:hover:not(:disabled) { background: var(--blue-soft); border-color: #b9cde2; }
 body.modern .plot-expand-btn[aria-pressed="true"] { background: var(--blue); color: #fff; border-color: var(--blue); }
 
+body.modern .plot-options-btn {
+  position: absolute; top: 14px; left: 14px; z-index: 6;
+  font-size: 12px; font-weight: 600; line-height: 1; min-height: 0;
+  padding: 6px 11px; border-radius: 5px; color: var(--blue);
+  background: rgba(255, 255, 255, 0.94); border: 1px solid var(--sand);
+  box-shadow: 0 1px 3px rgba(52, 98, 149, 0.18);
+}
+body.modern .plot-options-btn:hover:not(:disabled) { background: var(--blue-soft); border-color: #b9cde2; }
+body.modern .plot-options-btn[aria-expanded="true"] { background: var(--blue); color: #fff; border-color: var(--blue); }
+body.modern .plot-options-pop { color: var(--ink); border-color: var(--sand); }
+body.modern .plot-options-pop .po-reset { color: var(--blue); }
+body.modern .canvas-frame.plot-fullscreen .plot-options-btn { top: 12px; left: 12px; }
+
 /* Grab bar under the plot: drag it down to make the plot taller. */
 body.modern .hsplitter { height: 18px; margin: 8px 0 2px; cursor: row-resize; position: relative; touch-action: none; }
 body.modern .hsplitter::after {

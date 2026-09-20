@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Compact workspace · ROOT-A-TRON 3000</title>
-<link rel="stylesheet" href="style.css?v=20260919-plot-expand4">
+<link rel="stylesheet" href="style.css?v=20260919-plot-options">
 <link rel="stylesheet" href="classic.css?v=20260918-button-colors">
 <link rel="stylesheet" href="paste-data.css?v=1">
 <link rel="stylesheet" href="analysis-features.css?v=20260919-export">
@@ -229,7 +229,7 @@
   <div class="results" id="results">
     <div class="result-navigation" data-classic-analysis hidden><a class="analyze-results-button" href="uncertainties.html" data-analyze-results>Analyze Data</a></div>
     <div id="message" class="message" hidden></div>
-    <div class="canvas-frame"><button type="button" id="plot-expand" class="plot-expand-btn" data-action="plot-expand" aria-pressed="false" title="Grow the plot downward for a bigger view">Expand plot</button><div id="plot" class="plot"><p class="placeholder">The plot appears here after a fit.</p></div></div>
+    <div class="canvas-frame"><button type="button" id="plot-options-btn" class="plot-options-btn" aria-haspopup="dialog" aria-expanded="false" title="Advanced appearance options for the plot">Plot options ▾</button><button type="button" id="plot-expand" class="plot-expand-btn" data-action="plot-expand" aria-pressed="false" title="Grow the plot downward for a bigger view">Expand plot</button><div id="plot" class="plot"><p class="placeholder">The plot appears here after a fit.</p></div></div>
     <div class="hsplitter" id="plot-resizer" title="Drag to change the plot height"></div>
     <fieldset class="group report-group">
       <legend>Fit report <button type="button" class="help-btn" data-help="report" aria-label="Help on the fit report">?</button></legend>
@@ -350,7 +350,8 @@
 <script src="equation-parser.js?v=20260919-units" defer></script>
 <script defer src="units.js?v=1"></script><script src="analysis-core.js?v=20260919-units" defer></script>
 <script src="workspace-store.js?v=1" defer></script>
-<script src="app.js?v=20260919-plot-expand4" defer></script>
+<script src="plot-style.js?v=1" defer></script>
+<script src="app.js?v=20260919-plot-options" defer></script>
 <dialog id="dataset-type-dialog" class="tframe">
   <div class="dialog-body">
     <h2>Add dataset</h2>
