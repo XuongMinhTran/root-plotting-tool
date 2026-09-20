@@ -868,7 +868,7 @@ const MIN_ROWS = 12;
 
 function openTable() {
   if (datasets[activeIdx]?.derivedFrom) { showMessage('info', 'This dataset is calculated. Edit its expression or sources in Analyze Data.'); return; }
-  if ($('analysis-type').value !== 'xy') { showMessage('info', 'Enter histogram measurements or bin counts in the Data section. The table editor is for XY datasets.'); return; }
+  if ($('analysis-type').value !== 'xy') { showMessage('info', 'Enter histogram measurements or bin counts in the Data section. Insert data is for XY datasets.'); return; }
   syncActiveFromColumns();
   tableDatasets = datasets.map((d) => ({ ...d, fit:{...d.fit} }));
   tableActive = activeIdx;

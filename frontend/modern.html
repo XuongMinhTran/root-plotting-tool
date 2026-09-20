@@ -7,7 +7,6 @@
 <title>Standard workspace · ROOT-A-TRON 3000</title>
 <link rel="stylesheet" href="style.css?v=20260919-plot-options">
 <link rel="stylesheet" href="modern.css?v=20260919-plot-options">
-<link rel="stylesheet" href="paste-data.css?v=1">
 <link rel="stylesheet" href="site-brand.css?v=1">
 <link rel="stylesheet" href="analysis-features.css?v=20260919-export">
 <link rel="stylesheet" href="multivariate.css?v=1">
@@ -92,8 +91,7 @@
         <button type="button" class="small" data-action="dataset-add" title="Create a dataset">New plot</button>
         <button type="button" class="small" data-action="dataset-duplicate" title="Copy this dataset and its fit settings">Duplicate</button>
         <button type="button" class="small" data-action="dataset-rename" title="Rename this dataset">Rename</button>
-        <button type="button" class="small" data-paste-spreadsheet>Paste data…</button>
-        <button type="button" class="small expand" id="btn-table">Data table</button>
+        <button type="button" class="small expand" id="btn-table" title="Type, paste or edit measurements in a table">Insert data…</button>
         <button type="button" class="small" data-action="dataset-remove" title="Delete this dataset">Delete</button>
       </div>
       <p class="hint dataset-note" id="modern-data-summary" hidden></p>
@@ -138,7 +136,7 @@
         <div class="col"><div class="col-head"><span class="cerr">X uncertainty</span><span class="count" id="count-ex">0</span></div>
           <textarea id="col-ex" aria-label="X uncertainties" spellcheck="false" placeholder="optional"></textarea></div>
       </div>
-      <p class="hint">Separate values with newlines, commas, tabs, or spaces. Uncertainties: one value per axis or one per point. Use Paste data… to load spreadsheet columns with a preview.</p>
+      <p class="hint">Separate values with newlines, commas, tabs, or spaces. Uncertainties: one value per axis or one per point. Use Insert data… to type, paste or edit measurements in a table.</p>
       </div>
       </div>
       <div id="multivariate-data" hidden></div>
@@ -347,7 +345,7 @@
 
 <!-- ============ data table dialog (spreadsheet-style editor) ============ -->
 <dialog id="table-dialog" class="tframe resizable">
-  <div class="titlebar">Data table <span class="titlebar-note">paste from Excel or Sheets — one row per point, columns X · Y · Y err · X err</span></div>
+  <div class="titlebar">Insert data <span class="titlebar-note">type in the grid, or paste from Excel or Sheets — one row per point, columns X · Y · Y err · X err</span></div>
   <div class="dialog-body table-body">
     <div class="tabs" id="dataset-tabs"></div>
     <div class="row table-tools">
@@ -460,10 +458,9 @@
 <script defer src="units.js?v=1"></script><script src="analysis-core.js?v=20260919-units" defer></script>
 <script src="workspace-store.js?v=1" defer></script>
 <script src="plot-style.js?v=1" defer></script>
-<script src="app.js?v=20260920-gof-warning" defer></script>
-<script src="paste-data.js?v=1" defer></script>
+<script src="app.js?v=20260920-insert-data" defer></script>
 <script src="multivariate.js?v=1" defer></script>
 <script src="model-library.js?v=1" defer></script>
-<script defer src="analysis-features.js?v=20260919-export"></script>
+<script defer src="analysis-features.js?v=20260920-insert-data"></script>
 </body>
 </html>
