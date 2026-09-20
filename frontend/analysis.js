@@ -262,7 +262,44 @@ $('edit-exclusions').onclick=()=>{
  if(!x.length||x.length!==y.length||[...x,...y].some(v=>!Number.isFinite(v))){notify('Enter matching numeric X and Y columns before excluding measurements.',true);return;}
  AnalysisFeatures.openExclusions(d,{values:x},{values:y},next=>{change(()=>{d.exclusions=next;});notify('Exclusions saved. Open in plotting and run Fit to update the results. Raw values and calculated columns are unchanged.');});
 };
-$('add-source').onclick=()=>sourceDialog();$('edit-source').onclick=()=>sourceDialog(true);$('source-type').onchange=helpSource;
+// --- shared Insert data grid (insert-data.js) for XY measurement datasets ---
+const DA_COLORS=['#000000','#d62728','#1f5fbf','#2a8f3c','#8e44ad','#e08a00','#17a2b8','#7f4f24'];
+const isGridEditable=d=>d.analysis_type==='xy'&&!d.derivedFrom&&!(d.measurementColumns&&d.measurementColumns.length>2);
+const rawDatasets=()=>session.inputs.datasets.filter(isGridEditable);
+let daActive=0,daSeed=null;
+const insertHost={
+ fitSettings:false,addLabel:'New dataset',
+ datasets:()=>{const list=rawDatasets();return list.length?list:[daSeed];},
+ activeIndex:()=>daActive,
+ color:i=>DA_COLORS[i%DA_COLORS.length],
+ newDataset:name=>({id:S.id(),name,analysis_type:'xy',x:'',y:'',ex:'',ey:'',fit:{formula:'[0]*x+[1]',param_names:'',initial_guesses:'',x_min:'',x_max:''}}),
+ requestName:cur=>ask('Rename dataset','',cur,'Rename'),
+ confirmDelete:(name,n)=>ask('Delete dataset','Delete “'+name+'” ('+n+' points) from the shared session?'),
+ message:(kind,text)=>notify(text,kind==='error'),
+ addDataset:async()=>{const name=await ask('New dataset','','','Create');if(name&&name.trim())window.InsertData.addTableDataset('xy',name.trim());},
+ commit:({datasets:edited,activeIndex})=>{change(()=>{
+  const byId=new Map(edited.map(d=>[d.id,d])),used=new Set(),merged=[];
+  for(const d of session.inputs.datasets){
+   if(isGridEditable(d)){const e=byId.get(d.id);if(e){merged.push(e);used.add(e.id);}}
+   else merged.push(d);
+  }
+  for(const e of edited)if(!used.has(e.id)&&(String(e.x).trim()||String(e.y).trim()))merged.push(e);
+  const next={...session,inputs:{...session.inputs,datasets:merged}},nd=S.projected(next);
+  doc.objects=nd.objects;
+  const active=edited[Math.min(activeIndex,edited.length-1)];
+  doc.selected=(active&&nd.objects.find(o=>o.id===active.id||o.datasetId===active.id)?.id)||nd.selected;
+ });},
+};
+function openInsertData(focusId){
+ const list=rawDatasets();
+ daSeed=list.length?null:insertHost.newDataset('Dataset 1');
+ const i=focusId?list.findIndex(d=>d.id===focusId):0;daActive=i>=0?i:0;
+ window.InsertData.open(insertHost);
+}
+$('add-source').onclick=()=>openInsertData();
+$('add-source-text').onclick=()=>sourceDialog();
+$('edit-source').onclick=()=>{const o=current();if(o&&o.kind==='measurements'&&(o.columns||[]).length<=2){const d=sourceDataset(o);if(d&&d.analysis_type==='xy'&&!d.derivedFrom){openInsertData(d.id);return;}}sourceDialog(true);};
+$('source-type').onchange=helpSource;
 $('source-form').onsubmit=e=>{e.preventDefault();try{const o=parseSource();change(()=>{const i=doc.objects.findIndex(x=>x.id===o.id);if(i<0)doc.objects.push(o);else doc.objects[i]=o;doc.selected=o.id;});$('source-dialog').close();}catch(e){$('source-error').textContent=e.message;}};
 $('calculate').onclick=()=>{if(!window.MathfieldElement){notify('The equation editor could not load. Reload the page and try again.',true);return;}calculationDialog();};$('edit-calculation').onclick=()=>calculationDialog(true);
 $('calculation-expression').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();e.stopPropagation();}});

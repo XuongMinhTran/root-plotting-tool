@@ -21,3 +21,37 @@
 .source-unit-field{margin-left:85px;max-width:360px}.source-unit-field input[readonly]{background:#f5f7fa}@media(max-width:700px){.source-unit-field{margin-left:0;max-width:none}}
 
 .dataset-heading-actions{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:8px}.dataset-heading-actions button{white-space:nowrap}@media(max-width:700px){.dataset-heading-actions{justify-content:flex-start}}
+
+/* Insert data table dialog (shared editor, insert-data.js) */
+.source-actions #add-source-text{margin-top:2px}
+dialog.tframe{width:min(940px,calc(100% - 24px));max-width:none;padding:0;overflow:hidden}
+dialog.tframe .titlebar{background:var(--blue);color:#fff;padding:14px 22px;font-size:17px;font-weight:600}
+dialog.tframe .titlebar-note{display:block;font-size:12px;font-weight:400;color:#dbe6f2;margin-top:3px}
+.table-body{padding:20px 22px;display:flex;flex-direction:column;gap:14px;max-height:78vh;overflow:auto}
+.table-body .tabs{display:flex;flex-wrap:wrap;gap:6px}
+.table-body .tab{display:inline-flex;align-items:center;gap:7px;padding:7px 13px;min-height:0;border:1px solid var(--line);border-radius:4px;background:#fff;font-size:14px}
+.table-body .tab.active{background:var(--soft);border-color:var(--blue);color:var(--blue)}
+.table-body .tab.add{border-style:dashed;color:var(--blue)}
+.table-body .swatch{width:11px;height:11px;border-radius:2px;display:inline-block}
+.table-tools{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.table-tools .small{padding:6px 11px;min-height:0;font-size:13px}
+.table-tools .spacer{flex:1}
+#table-count{font-size:13px;color:#657280}
+.table-body .hint{font-size:13px;color:#526273;margin:0}
+.table-body .hint-inline{color:#8a97a6;font-weight:400}
+.grid-wrap{border:1px solid var(--line);border-radius:4px;overflow:auto;max-height:50vh}
+table.grid{border-collapse:collapse;width:100%;font-size:14px;font-variant-numeric:tabular-nums}
+table.grid th,table.grid td{border:1px solid var(--line);padding:0;text-align:left}
+table.grid thead th{background:#f4f7fa;padding:8px 10px;font-weight:600;position:sticky;top:0;z-index:1;white-space:nowrap}
+table.grid th.rownum,table.grid td.rownum{width:38px;text-align:right;padding:6px 8px;color:#8a97a6;background:#f8fafc}
+table.grid td input{width:100%;border:0;border-radius:0;min-height:0;padding:7px 10px;background:transparent}
+table.grid td input:focus{outline:2px solid var(--blue);outline-offset:-2px;background:#fff}
+table.grid td.rowdel{width:34px;text-align:center}
+.rowdel-btn{border:0;background:transparent;color:#a1a9b4;min-height:0;padding:4px 8px;font-size:16px;line-height:1;cursor:pointer}
+.rowdel-btn:hover{color:#c0392b;background:#fff1ef}
+.import-panel{border:1px dashed var(--line);border-radius:4px;padding:14px;display:flex;flex-direction:column;gap:12px}
+.import-panel .field{margin:0}.import-panel label{margin:0 0 4px}
+#import-mapping{display:flex;flex-wrap:wrap;gap:12px}#import-mapping .field{min-width:150px}#import-mapping select{min-height:38px}
+.table-body .actions{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+.table-body .actions .hint{margin-left:auto}
+@media(max-width:700px){dialog.tframe{width:calc(100% - 12px)}.table-body{padding:16px}}
