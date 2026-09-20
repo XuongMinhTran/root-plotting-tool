@@ -36,3 +36,19 @@
 .primary-tools { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .hero-actions .primary-tools .button { display: flex; align-items: center; justify-content: center; }
 @media(max-width:600px) { .primary-tools { grid-template-columns: 1fr; } }
+
+/* Prototype / cold-start notice: floats in the empty top-right on wide screens,
+   stacks above the content on narrower ones. */
+.hero { position: relative; }
+.prototype-note {
+  box-sizing: border-box; width: min(640px, 100%); margin: 0 auto 22px;
+  border: 2px solid #c0392b; border-left-width: 6px; border-radius: 6px;
+  background: #fff5f4; color: #8a2b22; padding: 12px 16px;
+  text-align: left; font-size: 14px; line-height: 1.55;
+}
+.prototype-note strong { display: block; color: #b02a1e; font-size: 14px; letter-spacing: .02em; margin-bottom: 4px; }
+.prototype-note p { margin: 0 0 6px; }
+.prototype-note p:last-child { margin: 0; }
+@media (min-width: 1600px) {
+  .prototype-note { position: absolute; top: 28px; right: 28px; width: 300px; margin: 0; }
+}
