@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Compact workspace · ROOT-A-TRON 3000</title>
 <link rel="stylesheet" href="style.css?v=20260919-plot-options">
-<link rel="stylesheet" href="classic.css?v=20260920-types">
+<link rel="stylesheet" href="classic.css?v=20260920-eqeditor">
 <link rel="stylesheet" href="analysis-features.css?v=20260919-export">
 <link rel="stylesheet" href="multivariate.css?v=1">
 <script defer src="analysis-export.js?v=20260919-pdf"></script>
@@ -154,15 +154,36 @@
         <div class="field"><label for="hist-method">Histogram fitting method</label><select id="hist-method"><option value="poisson">Poisson likelihood</option><option value="chi2">χ² with √count uncertainties</option></select></div>
         <p class="hint">The function describes counts per unit X. Its integral over each bin predicts that bin’s count. Poisson likelihood includes empty bins and is preferable for sparse counts. χ² excludes empty bins. The fit range selects bins by their centers.</p>
       </div>
+      <div class="equation-editor">
+        <fieldset class="equation-mode-field" id="equation-mode">
+          <legend>Function input</legend>
+          <div class="equation-mode-options">
+            <input type="radio" name="equation-mode" id="mode-equation" value="equation" aria-controls="equation-visual" checked>
+            <label for="mode-equation">Equation editor</label>
+            <input type="radio" name="equation-mode" id="mode-root" value="root" aria-controls="equation-root">
+            <label for="mode-root">ROOT expression</label>
+          </div>
+        </fieldset>
+        <div id="equation-visual">
+          <label id="equation-label" for="fit-equation">Fit function</label>
+          <math-field id="fit-equation" aria-labelledby="equation-label" aria-describedby="equation-rules equation-error" math-virtual-keyboard-policy="manual"></math-field>
+          <p class="hint" id="equation-rules"><code>x</code> is the independent variable. Other symbols become fit parameters; <code>e</code> and π are constants. Type <code>x_0</code> for a subscript or <code>x^2</code> for a power.</p>
+        </div>
+        <div class="formula-field" id="equation-root" hidden>
+          <label for="formula">ROOT fit expression</label>
+          <input id="formula" aria-label="Fit function" type="text" class="mono" value="[0]*x+[1]" spellcheck="false" placeholder="[0]*x+[1]">
+          <details class="equation-help"><summary>Typing reference</summary><p>Use <code>x</code> for the independent variable and <code>[0]</code>, <code>[1]</code>, … for fit parameters. Write multiplication as <code>*</code>, division as <code>/</code>, and powers as <code>pow(x,2)</code>. Functions include <code>exp(x)</code>, <code>log(x)</code>, <code>sin(x)</code>, and <code>sqrt(x)</code>. Use <code>TMath::Pi()</code> for π. Example: <code>[0]*exp(-x/[1])+[2]</code>.</p></details>
+        </div>
+        <p id="equation-error" class="equation-error" role="status" hidden></p>
+        <details id="equation-translation"><summary>ROOT expression</summary><code id="equation-root-preview"></code></details>
+      </div>
       <div class="row">
-        <input id="formula" aria-label="Fit function" type="text" class="grow mono" value="[0]*x+[1]" spellcheck="false" placeholder="[0]*x+[1]">
         <select id="quick-pick" title="Insert a fit function" aria-label="Fit function examples">
           <option value="">Examples…</option>
         </select>
         <button type="button" id="model-library-btn" class="small">Model library…</button>
       </div>
-      <details class="equation-help"><summary>Typing reference</summary><p>Use <code>x</code> for the independent variable and <code>[0]</code>, <code>[1]</code>, … for fit parameters. Write multiplication as <code>*</code>, division as <code>/</code>, and powers as <code>pow(x,2)</code>. Functions include <code>exp(x)</code>, <code>log(x)</code>, <code>sin(x)</code>, and <code>sqrt(x)</code>. Use <code>TMath::Pi()</code> for π. Example: <code>[0]*exp(-x/[1])+[2]</code>.</p></details>
-      <p class="hint"><code>x</code> is the variable, parameters are <code>[0]</code>, <code>[1]</code>, … Named functions
+      <p class="hint" id="root-syntax-links"><code>x</code> is the variable, parameters are <code>[0]</code>, <code>[1]</code>, … Named functions
         <code>gaus</code>, <code>expo</code>, <code>landau</code>, <code>pol2</code> … also work.
         <a href="https://root.cern/doc/master/classTFormula.html" target="_blank" rel="noopener">TFormula</a> ·
         <a href="https://root.cern/doc/master/namespaceTMath.html" target="_blank" rel="noopener">TMath</a></p>
@@ -176,7 +197,7 @@
       <details class="expander" id="param-expander">
         <summary>Parameter table &amp; fit range</summary>
         <table class="param-table" id="param-table">
-          <thead><tr><th>#</th><th>Name</th><th>Start value</th></tr></thead>
+          <thead><tr><th id="equation-parameter-heading">#</th><th id="equation-name-heading">Name</th><th>Start value</th></tr></thead>
           <tbody></tbody>
         </table>
         <p class="hint" id="param-table-note"></p>
@@ -350,6 +371,8 @@
 </dialog>
 
 <script src="equation-parser.js?v=20260919-units" defer></script>
+<script src="vendor/mathlive/mathlive.min.js" defer></script>
+<script src="equation-editor.js?v=20260920-classic" defer></script>
 <script defer src="units.js?v=1"></script><script src="analysis-core.js?v=20260919-units" defer></script>
 <script src="workspace-store.js?v=1" defer></script>
 <script src="plot-style.js?v=1" defer></script>

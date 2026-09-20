@@ -3,10 +3,11 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Analyze Data · ROOT-A-TRON 3000</title>
-<link rel="stylesheet" href="analysis.css?v=20260920-insert-data">
+<link rel="stylesheet" href="analysis.css?v=20260920-parity">
+<link rel="stylesheet" href="multivariate.css?v=1">
 <script defer src="vendor/mathlive/mathlive.min.js"></script>
 <script defer src="equation-parser.js?v=20260919-units"></script>
-<script defer src="units.js?v=1"></script><script defer src="analysis-core.js?v=20260919-units"></script><script defer src="workspace-store.js?v=1"></script><script defer src="insert-data.js?v=20260920-types"></script><script defer src="analysis.js?v=20260920-types"></script>
+<script defer src="units.js?v=1"></script><script defer src="analysis-core.js?v=20260919-units"></script><script defer src="workspace-store.js?v=1"></script><script defer src="multivariate.js?v=1"></script><script defer src="insert-data.js?v=20260920-types"></script><script defer src="analysis.js?v=20260920-parity"></script>
 <link rel="stylesheet" href="site-brand.css?v=1">
 <link rel="stylesheet" href="analysis-features.css?v=20260919-export">
 <script defer src="analysis-export.js?v=20260919-pdf"></script>
@@ -49,12 +50,15 @@
 <p class="form-error" id="source-error" role="alert"></p><div class="dialog-actions"><button type="button" data-close="source-dialog">Cancel</button><button class="primary" type="submit">Add data</button></div></form></dialog>
 <dialog id="prompt-dialog" aria-labelledby="prompt-title"><form id="prompt-form"><h2 id="prompt-title"></h2><p id="prompt-message"></p><label id="prompt-label">Name<input id="prompt-input" maxlength="150"></label><div class="dialog-actions"><button type="button" id="prompt-cancel">Cancel</button><button type="submit" id="prompt-accept" class="primary">Continue</button></div></form></dialog>
 <dialog id="table-dialog" class="tframe">
-  <div class="titlebar">Insert data <span class="titlebar-note">type in the grid, or paste from a spreadsheet or text file - one row per point, columns X · Y · Y err · X err</span></div>
+  <div class="titlebar">Insert data <span class="titlebar-note">choose a data type, then type in the grid or paste from a spreadsheet or text file</span></div>
   <div class="dialog-body table-body">
+    <div class="insert-type-tabs" id="insert-type-tabs" role="tablist" aria-label="Data type" hidden></div>
     <div class="tabs" id="dataset-tabs"></div>
     <div class="row table-tools">
+      <button type="button" class="small" data-taction="duplicate">Duplicate dataset</button>
       <button type="button" class="small" data-taction="add-rows">+ 10 rows</button>
       <button type="button" class="small" data-taction="delete-empty">Delete empty rows</button>
+      <button type="button" class="small" data-taction="delete">Delete dataset</button>
       <button type="button" class="small" data-taction="import">Import from text…</button>
       <span class="spacer"></span>
       <span class="hint" id="table-count"></span>
@@ -65,6 +69,19 @@
         <tbody></tbody>
       </table>
     </div>
+    <div class="insert-histogram" id="insert-histogram" hidden></div>
+    <div class="insert-multivariate" id="insert-multivariate" hidden></div>
+    <fieldset class="table-fit-settings"><legend id="table-fit-label">Fit settings for this dataset</legend>
+      <div class="ins-hist-field"><label for="table-fit-formula">ROOT fit expression</label><input id="table-fit-formula" type="text" spellcheck="false" placeholder="[0]*x+[1]"></div>
+      <div class="ins-hist-row">
+        <div class="ins-hist-field"><label for="table-fit-param_names">Parameter names</label><input id="table-fit-param_names" type="text" placeholder="slope, intercept"></div>
+        <div class="ins-hist-field"><label for="table-fit-initial_guesses">Initial guesses</label><input id="table-fit-initial_guesses" type="text" placeholder="1, 0"></div>
+      </div>
+      <div class="ins-hist-row">
+        <div class="ins-hist-field"><label for="table-fit-x_min">Fit range from</label><input id="table-fit-x_min" type="text" placeholder="All data"></div>
+        <div class="ins-hist-field"><label for="table-fit-x_max">to</label><input id="table-fit-x_max" type="text" placeholder="All data"></div>
+      </div>
+    </fieldset>
     <div class="import-panel" id="import-panel" hidden>
       <p class="hint">Paste a block of text with one point per line. Columns may be separated by tabs, commas, semicolons or spaces. Then say which column is which.</p>
       <textarea id="import-text" rows="6" spellcheck="false" placeholder="1&#9;2.3&#9;0.2&#10;2&#9;4.1&#9;0.2"></textarea>
@@ -81,4 +98,7 @@
     </div>
   </div>
 </dialog>
+<!-- Home for the multivariate editor; Insert data relocates it into its dialog when needed. -->
+<div id="multivariate-data" hidden></div>
+<div id="multivariate-model" hidden></div>
 </body></html>

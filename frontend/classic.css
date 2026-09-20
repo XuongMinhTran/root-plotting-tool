@@ -98,3 +98,21 @@ body.classic .param-help-btn {
 .insert-histogram .ins-hist-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 .insert-histogram .hint-inline { font-weight: normal; color: #6b7684; }
 @media (max-width: 640px) { .insert-histogram .ins-hist-row { grid-template-columns: 1fr; } }
+
+/* Visual equation editor (parity with Standard) */
+.equation-editor { margin: 8px 0 12px; }
+body.classic .equation-mode-field { border: 0; padding: 0; margin: 0 0 12px; min-width: 0; }
+body.classic .equation-mode-field legend { padding: 0; margin-bottom: 6px; font-size: 12px; font-weight: bold; }
+.equation-mode-options { display: inline-flex; flex-wrap: wrap; gap: 6px; position: relative; }
+.equation-mode-options input { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+body.classic .equation-mode-options label { display: inline-flex; align-items: center; padding: 6px 14px; border: 1px solid #9fb0c4; border-radius: 3px; background: #e8edf3; color: #1c3c60; cursor: pointer; font-size: 13px; }
+body.classic .equation-mode-options label:hover { background: #dde6f0; }
+body.classic .equation-mode-options input:checked + label { background: #2f6fb5; border-color: #1e4f86; color: #fff; font-weight: bold; }
+body.classic .equation-mode-options input:focus-visible + label { outline: 2px solid #2f6fb5; outline-offset: 2px; }
+#equation-label { display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px; }
+body.classic math-field { display: block; border: 1px solid #9fb0c4; border-radius: 3px; padding: 8px 10px; font-size: 20px; background: #fff; min-height: 48px; }
+body.classic math-field::part(virtual-keyboard-toggle), body.classic math-field::part(menu-toggle) { display: none; }
+.equation-help, #equation-translation { margin-top: 10px; font-size: 12px; }
+.equation-help summary, #equation-translation summary { cursor: pointer; color: #2f6fb5; }
+#equation-root-preview { display: block; margin-top: 6px; padding: 8px; background: #f0f3f7; font-family: Menlo, Consolas, monospace; overflow-wrap: anywhere; white-space: pre-wrap; }
+.equation-error { border-left: 3px solid #a12e26; padding: 6px 10px; color: #8a251e; background: #fdf0ee; line-height: 1.5; font-size: 13px; margin-top: 8px; }

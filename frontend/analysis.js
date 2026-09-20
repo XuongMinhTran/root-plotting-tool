@@ -262,43 +262,60 @@ $('edit-exclusions').onclick=()=>{
  if(!x.length||x.length!==y.length||[...x,...y].some(v=>!Number.isFinite(v))){notify('Enter matching numeric X and Y columns before excluding measurements.',true);return;}
  AnalysisFeatures.openExclusions(d,{values:x},{values:y},next=>{change(()=>{d.exclusions=next;});notify('Exclusions saved. Open in plotting and run Fit to update the results. Raw values and calculated columns are unchanged.');});
 };
-// --- shared Insert data grid (insert-data.js) for XY measurement datasets ---
+// --- shared Insert data grid (insert-data.js): full parity with Make a Plot ---
 const DA_COLORS=['#000000','#d62728','#1f5fbf','#2a8f3c','#8e44ad','#e08a00','#17a2b8','#7f4f24'];
-const isGridEditable=d=>d.analysis_type==='xy'&&!d.derivedFrom&&!(d.measurementColumns&&d.measurementColumns.length>2);
-const rawDatasets=()=>session.inputs.datasets.filter(isGridEditable);
+// Grid-editable: any typed, non-derived dataset except multi-column measurements (those use the text editor).
+const editable=d=>!!d.analysis_type&&!d.derivedFrom&&!(d.analysis_type==='xy'&&d.measurementColumns&&d.measurementColumns.length>2);
+const editableDatasets=()=>session.inputs.datasets.filter(editable);
+const isEmptyDs=d=>{
+ if(d.analysis_type==='histogram'){const h=d.histogram||{};return !String(h.samples||'').trim()&&!String(h.counts||'').trim();}
+ if(d.analysis_type==='multivariate'){const mv=d.mv;return !mv||!(mv.inVals||[]).some(v=>String(v).trim());}
+ return !String(d.x||'').trim()&&!String(d.y||'').trim();
+};
 let daActive=0,daSeed=null;
+// Write edited datasets straight into the session (preserving histogram/mv/fit) and drop orphaned dependents.
+function commitDatasets(merged,selectId){
+ autoSaved=false;
+ try{
+  const next=S.reconcileDatasets(session,merged);next.title=doc.title;
+  dirty=restoredDirty||snapshot(next)!==saved;
+  session=S.write(localStorage,{...next,unsaved_changes:dirty});doc=S.projected(session);autoSaved=true;
+  if(selectId){const o=doc.objects.find(x=>x.datasetId===selectId||x.id===selectId);if(o)doc.selected=o.id;}
+ }catch(e){dirty=true;notify(e.message+' Use Save to keep all local work in one file.',true);}
+ $('save-state').textContent=dirty?'Unsaved changes':doc.objects.length?'Saved':'No data';
+ render();
+}
 const insertHost={
- fitSettings:false,addLabel:'New dataset',
- datasets:()=>{const list=rawDatasets();return list.length?list:[daSeed];},
+ fitSettings:true,addLabel:'New dataset',types:['xy','histogram','multivariate'],
+ datasets:()=>{const list=editableDatasets();return list.length?list:[daSeed];},
  activeIndex:()=>daActive,
  color:i=>DA_COLORS[i%DA_COLORS.length],
- newDataset:name=>({id:S.id(),name,analysis_type:'xy',x:'',y:'',ex:'',ey:'',fit:{formula:'[0]*x+[1]',param_names:'',initial_guesses:'',x_min:'',x_max:''}}),
+ newDataset:(name,type)=>{const t=type||'xy';const fit={formula:'[0]*x+[1]',param_names:'',initial_guesses:'',x_min:'',x_max:''};if(t==='histogram')Object.assign(fit,{formula:'gausn',param_names:'norm, mean, sigma'});const d={id:S.id(),name,analysis_type:t,x:'',y:'',ex:'',ey:'',fit};if(t==='multivariate'&&window.Multivariate)d.mv=window.Multivariate.defaultMv();return d;},
  requestName:cur=>ask('Rename dataset','',cur,'Rename'),
- confirmDelete:(name,n)=>ask('Delete dataset','Delete “'+name+'” ('+n+' points) from the shared session?'),
+ confirmDelete:(name,n)=>ask('Delete dataset','Delete “'+name+'” from the shared session? Dependent calculations are removed too.'),
  message:(kind,text)=>notify(text,kind==='error'),
  newName:sug=>ask('New dataset','',sug,'Create'),
- commit:({datasets:edited,activeIndex})=>{change(()=>{
+ commit:({datasets:edited,activeIndex})=>{
   const byId=new Map(edited.map(d=>[d.id,d])),used=new Set(),merged=[];
   for(const d of session.inputs.datasets){
-   if(isGridEditable(d)){const e=byId.get(d.id);if(e){merged.push(e);used.add(e.id);}}
+   if(editable(d)){const e=byId.get(d.id);if(e){merged.push(e);used.add(e.id);}}
    else merged.push(d);
   }
-  for(const e of edited)if(!used.has(e.id)&&(String(e.x).trim()||String(e.y).trim()))merged.push(e);
-  const next={...session,inputs:{...session.inputs,datasets:merged}},nd=S.projected(next);
-  doc.objects=nd.objects;
+  for(const e of edited)if(!used.has(e.id)&&!isEmptyDs(e))merged.push(e);
   const active=edited[Math.min(activeIndex,edited.length-1)];
-  doc.selected=(active&&nd.objects.find(o=>o.id===active.id||o.datasetId===active.id)?.id)||nd.selected;
- });},
+  history.push(clone(session));if(history.length>25)history.shift();
+  commitDatasets(merged,active&&active.id);
+ },
 };
 function openInsertData(focusId){
- const list=rawDatasets();
- daSeed=list.length?null:insertHost.newDataset('Dataset 1');
+ const list=editableDatasets();
+ daSeed=list.length?null:insertHost.newDataset('Dataset 1','xy');
  const i=focusId?list.findIndex(d=>d.id===focusId):0;daActive=i>=0?i:0;
  window.InsertData.open(insertHost);
 }
 $('add-source').onclick=()=>openInsertData();
 $('add-source-text').onclick=()=>sourceDialog();
-$('edit-source').onclick=()=>{const o=current();if(o&&o.kind==='measurements'&&(o.columns||[]).length<=2){const d=sourceDataset(o);if(d&&d.analysis_type==='xy'&&!d.derivedFrom){openInsertData(d.id);return;}}sourceDialog(true);};
+$('edit-source').onclick=()=>{const o=current();const d=o&&sourceDataset(o);if(d&&editable(d)){openInsertData(d.id);return;}sourceDialog(true);};
 $('source-type').onchange=helpSource;
 $('source-form').onsubmit=e=>{e.preventDefault();try{const o=parseSource();change(()=>{const i=doc.objects.findIndex(x=>x.id===o.id);if(i<0)doc.objects.push(o);else doc.objects[i]=o;doc.selected=o.id;});$('source-dialog').close();}catch(e){$('source-error').textContent=e.message;}};
 $('calculate').onclick=()=>{if(!window.MathfieldElement){notify('The equation editor could not load. Reload the page and try again.',true);return;}calculationDialog();};$('edit-calculation').onclick=()=>calculationDialog(true);

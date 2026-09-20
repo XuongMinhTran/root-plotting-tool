@@ -55,3 +55,19 @@ table.grid td.rowdel{width:34px;text-align:center}
 .table-body .actions{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
 .table-body .actions .hint{margin-left:auto}
 @media(max-width:700px){dialog.tframe{width:calc(100% - 12px)}.table-body{padding:16px}}
+
+/* Insert data: data-type selector + histogram/fit entry (parity with Make a Plot) */
+.insert-type-tabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.insert-type-tabs .type-tab{min-height:34px;padding:6px 14px;border-radius:6px;font-size:13px;background:#fff;border:1px solid var(--line);color:#526273}
+.insert-type-tabs .type-tab:hover:not(.active){background:var(--soft);border-color:#9fb8d3}
+.insert-type-tabs .type-tab.active{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:600}
+.table-body .ins-hist-field{display:flex;flex-direction:column;gap:4px}
+.table-body .ins-hist-field>label{font-size:13px;font-weight:600}
+.table-body .ins-hist-row{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.table-body .hint-inline{font-weight:400;color:#8a97a6;font-size:12px}
+.insert-histogram{display:flex;flex-direction:column;gap:12px}
+.insert-histogram textarea{min-height:0}
+.table-body .table-fit-settings{border:1px solid var(--line);border-radius:4px;padding:14px 16px;margin:0;display:flex;flex-direction:column;gap:12px}
+.table-body .table-fit-settings legend{font-size:13px;font-weight:600;padding:0 6px}
+.table-body .table-fit-settings .ins-hist-row{grid-template-columns:1fr 1fr}
+@media(max-width:640px){.table-body .ins-hist-row{grid-template-columns:1fr}}
