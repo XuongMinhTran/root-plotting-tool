@@ -227,11 +227,22 @@ body.modern details.fold > .fold-body { padding: 4px 0 18px; }
 
 /* ============================================================ step 1: data */
 
-.dataset-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; }
+.dataset-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 18px; }
 .dataset-row .swatch { width: 10px; height: 10px; border-radius: 2px; border: 1px solid rgba(0,0,0,.25); flex: none; }
-.dataset-row select { flex: 1 1 200px; width: auto; min-height: 38px; padding: 6px 10px; font-size: 14px; }
-.dataset-row button { min-height: 38px; }
-.dataset-row .expand { margin-left: 0; }  /* Data table now sits inline in the data-tools group */
+.dataset-row select { flex: 0 1 240px; width: auto; min-height: 34px; padding: 5px 10px; font-size: 14px; }
+/* One uniform, compact size for every action (incl. the injected Point exclusions button). */
+body.modern .dataset-row button { min-height: 34px; padding: 6px 12px; font-size: 13px; }
+.dataset-row .expand { margin-left: 0; }
+/* Restrained colour: green = create, blue = the primary data action, red = destroy;
+   everything else stays neutral. Delete is set apart on the right. */
+body.modern .dataset-row [data-action="dataset-add"] { background: #eaf4ee; color: #2a6b45; border-color: #cfe4d6; }
+body.modern .dataset-row [data-action="dataset-add"]:hover:not(:disabled) { background: #e0eee6; border-color: #bcdac8; }
+body.modern .dataset-row #btn-table { background: #e7effb; color: #245a97; border-color: #cdddf3; }
+body.modern .dataset-row #btn-table:hover:not(:disabled) { background: #d9e5f8; border-color: #bacdef; }
+body.modern .dataset-row #point-exclusions { background: var(--paper); color: var(--ink-soft); border-color: var(--line); }
+body.modern .dataset-row #point-exclusions:hover:not(:disabled) { background: var(--blue-soft); color: var(--blue-dark); border-color: #c8d5e6; }
+body.modern .dataset-row [data-action="dataset-remove"] { margin-left: auto; background: #fbeceb; color: #a3231b; border-color: #f1d2ce; }
+body.modern .dataset-row [data-action="dataset-remove"]:hover:not(:disabled) { background: #f6dcd9; border-color: #e8bdb8; }
 
 .columns { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
 @media (max-width: 560px) { .columns { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

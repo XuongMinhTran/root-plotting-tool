@@ -59,7 +59,7 @@ function init(){
  const fit=el('formula');if(!fit)return;
  const settings=document.createElement('div');settings.className='feature-settings';settings.innerHTML='<label for="confidence-level">Confidence band</label><select id="confidence-level"><option value="">None</option><option value="0.68">68%</option><option value="0.95">95%</option><option value="0.99">99%</option></select><p class="hint">Pointwise uncertainty in the fitted curve from parameter covariance. Run Fit to update.</p>';
  (el('step-options') || el('opt-grid').closest('fieldset') || fit.parentElement).append(settings);
- const btn=document.createElement('button');btn.type='button';btn.id='point-exclusions';btn.textContent='Point exclusions…';btn.onclick=exclusions;
+ const btn=document.createElement('button');btn.type='button';btn.id='point-exclusions';btn.className='small';btn.textContent='Point exclusions…';btn.onclick=exclusions;
  const row=document.querySelector('.dataset-row'),del=row&&row.querySelector('[data-action="dataset-remove"]');
  if(row){if(del)row.insertBefore(btn,del);else row.append(btn);}
  const host=document.createElement('div');host.id='parameter-correlations';el('report').after(host);
