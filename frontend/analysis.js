@@ -314,6 +314,7 @@ function openInsertData(focusId){
  window.InsertData.open(insertHost);
 }
 $('add-source').onclick=()=>openInsertData();
+$('empty-insert').onclick=()=>openInsertData();
 $('add-source-text').onclick=()=>sourceDialog();
 $('edit-source').onclick=()=>{const o=current();const d=o&&sourceDataset(o);if(d&&editable(d)){openInsertData(d.id);return;}sourceDialog(true);};
 $('source-type').onchange=helpSource;

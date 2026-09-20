@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="multivariate.css?v=1">
 <script defer src="vendor/mathlive/mathlive.min.js"></script>
 <script defer src="equation-parser.js?v=20260919-units"></script>
-<script defer src="units.js?v=1"></script><script defer src="analysis-core.js?v=20260919-units"></script><script defer src="workspace-store.js?v=1"></script><script defer src="multivariate.js?v=1"></script><script defer src="insert-data.js?v=20260920-types"></script><script defer src="analysis.js?v=20260920-empty-cta"></script>
+<script defer src="units.js?v=1"></script><script defer src="analysis-core.js?v=20260919-units"></script><script defer src="workspace-store.js?v=1"></script><script defer src="multivariate.js?v=1"></script><script defer src="insert-data.js?v=20260920-types"></script><script defer src="analysis.js?v=20260920-makeplot"></script>
 <link rel="stylesheet" href="site-brand.css?v=1">
 <link rel="stylesheet" href="analysis-features.css?v=20260919-export">
 <script defer src="analysis-export.js?v=20260919-pdf"></script>
@@ -23,7 +23,7 @@
 <div class="analysis-workspace">
 <aside class="sources" aria-labelledby="sources-title"><h2 id="sources-title">Datasets</h2><div class="source-actions"><button id="add-source" class="primary">Insert data…</button><button id="add-source-text" class="text-button">Paste columns or quantities…</button></div><div id="object-list"></div><button id="example" class="text-button">Load example analysis</button></aside>
 <section class="viewer" aria-labelledby="object-title">
-<div id="empty"><h2>No datasets in this session</h2><p>Open a saved session, paste measurements, or enter data in Make a Plot. Datasets and their fit results appear here automatically.</p><p><button id="empty-insert" class="primary">Insert data</button></p><p>Compact, Standard, and Analyze Data use the same session. Save from any workspace to keep the complete analysis in one JSON file.</p></div>
+<div id="empty"><h2>No datasets in this session</h2><p>Open a saved session, paste measurements, or enter data in Make a Plot. Datasets and their fit results appear here automatically.</p><p>Compact, Standard, and Analyze Data use the same session. Save from any workspace to keep the complete analysis in one JSON file.</p><p><button id="empty-insert" class="primary">Make a Plot</button></p></div>
 <div id="object-content" hidden><div class="object-heading"><div><p id="object-kind" class="eyebrow"></p><h2 id="object-title"></h2></div><div class="dataset-heading-actions"><button id="plot-selected" disabled>Open in plotting</button><button id="rename">Rename</button></div></div>
 <nav id="dataset-views" aria-label="Dataset content" hidden></nav>
 <div class="calculation-navigation"><nav id="dataset-calculations" aria-label="Dataset calculations" hidden></nav><button id="edit-calculation" hidden>Edit calculation</button></div>
