@@ -1,5 +1,5 @@
 /*
- * app.js — shared behavior for classic.html and modern.html.
+ * app.js - shared behavior for classic.html and modern.html.
  *
  * Sections:
  *   1. helpers            element lookup, number formatting, downloads
@@ -226,7 +226,7 @@ const HELP = {
       uncertainties meaningful.</p>
       <p><b>X errors</b> are folded in by ROOT's "effective variance" method: σ²<sub>eff</sub> = σ<sub>y</sub>² + (f′(x)·σ<sub>x</sub>)²,
       i.e. an uncertainty in x is turned into an equivalent uncertainty in y using the slope of the fitted curve.</p>
-      <p><b>Several datasets</b> (x1 y1, x2 y2, …) can live in one document — use +, and switch with the selector.
+      <p><b>Several datasets</b> (x1 y1, x2 y2, …) can live in one document - use +, and switch with the selector.
       The fit runs on the dataset shown in the columns.</p>
       <p><b>Expand</b> opens a table where you can paste a whole block of columns at once, add or delete rows, and
       import a text file with a column mapping.</p>`,
@@ -255,13 +255,13 @@ const HELP = {
       <p>Initial guesses specify the parameter values used to initialize minimization. Enter values in parameter-index order: <code>[0]</code>, <code>[1]</code>, …, using the units defined by the model.</p>
       <p>For <code>[0]*exp(-x/[1])</code>, [0] is the amplitude at x = 0 and [1] is the decay time constant. For <code>gaus</code>, the parameters are peak height, mean, and standard deviation.</p>
       <p>Blank entries retain the model’s default or automatic estimate. Automatic initialization depends on the function and analysis type; custom functions may require explicit guesses. In a comma-separated list, <code>1,,3</code> specifies [0] and [2] while leaving [1] unspecified.</p>
-      <p>For nonlinear models, different initial guesses may converge to different local minima. Check the fit status, parameter uncertainties, and residuals.</p><p><a href="docs-starting-values.html" target="_blank" rel="noopener"><b>Starting parameter guides</b> — a recipe for every model</a></p>`,
+      <p>For nonlinear models, different initial guesses may converge to different local minima. Check the fit status, parameter uncertainties, and residuals.</p><p><a href="docs-starting-values.html" target="_blank" rel="noopener"><b>Starting parameter guides</b> - a recipe for every model</a></p>`,
   },
   range: {
     title: 'Fit range',
     html: `
       <p>By default the function is fitted to every point. Give a range to use only the points with
-      x<sub>min</sub> ≤ x ≤ x<sub>max</sub> — for instance to fit the linear part of a curve, or to exclude a region where
+      x<sub>min</sub> ≤ x ≤ x<sub>max</sub> - for instance to fit the linear part of a curve, or to exclude a region where
       your model does not apply. The curve is still drawn only over the fitted range, so you can see what was used.</p>
       <p>NDF changes accordingly: it is the number of points <em>inside</em> the range minus the number of parameters.</p>`,
   },
@@ -690,7 +690,7 @@ function renderDatasetSelector() {
     const opt = document.createElement('option');
     opt.value = String(i);
     const mv = d.analysis_type === 'multivariate';
-    opt.textContent = mv ? `${d.name} — Multivariate ${window.Multivariate ? window.Multivariate.label(d) : ''}` : `${d.name} — ${histogram ? 'Histogram' : 'XY'} (${n} ${unit})`;
+    opt.textContent = mv ? `${d.name} - Multivariate ${window.Multivariate ? window.Multivariate.label(d) : ''}` : `${d.name} - ${histogram ? 'Histogram' : 'XY'} (${n} ${unit})`;
     sel.appendChild(opt);
   });
   sel.value = String(activeIdx);
@@ -701,7 +701,7 @@ function renderDatasetSelector() {
     if (!d.analysis_type || d.analysis_type !== $('analysis-type').value) return;
     const option = document.createElement('option');
     option.value = String(i);
-    option.textContent = d.name + ' — ' + (d.analysis_type === 'histogram' ? 'Histogram' : d.analysis_type === 'multivariate' ? 'Multivariate' : 'XY');
+    option.textContent = d.name + ' - ' + (d.analysis_type === 'histogram' ? 'Histogram' : d.analysis_type === 'multivariate' ? 'Multivariate' : 'XY');
     fitSelect.appendChild(option);
   });
   fitSelect.value = String(activeIdx);
@@ -709,7 +709,7 @@ function renderDatasetSelector() {
   const summary = $('modern-data-summary');
   if (summary) {
     const d = datasets[activeIdx];
-    summary.textContent = d.analysis_type ? d.name + ' — ' + (d.analysis_type === 'histogram' ? 'Histogram' : d.analysis_type === 'multivariate' ? 'Multivariate' : 'XY') : 'Select an analysis type to get started.';
+    summary.textContent = d.analysis_type ? d.name + ' - ' + (d.analysis_type === 'histogram' ? 'Histogram' : d.analysis_type === 'multivariate' ? 'Multivariate' : 'XY') : 'Select an analysis type to get started.';
   }
   if ($('fit-dataset-label')) $('fit-dataset-label').textContent = 'These settings belong to ' + datasets[activeIdx].name + '. The expanded data table edits the same settings; choose Done there to apply changes.';
   const removeBtns = document.querySelectorAll('[data-action="dataset-remove"]');
@@ -729,7 +729,7 @@ function showDatasetResult() {
   if (lastResult) {
     renderReport(lastResult);
     drawPlot(lastResult, true);
-    setStatus($('fit-status'), 'Stored result — ' + datasets[activeIdx].name);
+    setStatus($('fit-status'), 'Stored result - ' + datasets[activeIdx].name);
   } else {
     plotDrawVersion++;
     clearReport();
@@ -1400,8 +1400,8 @@ function buildPayload(inputs, fitModel = true) {
   if (excluded.length !== (datasets[activeIdx].exclusions || []).length) throw new Error('Some excluded measurements have changed position or value. Review Point exclusions and apply them again before fitting.');
   const omit = new Set(excluded.map(p => p.index));
   for (const c of COLUMNS) cols[c] = cols[c].filter((_, i) => !omit.has(i));
-  if (cols.x.length < 2) throw new Error('Include at least two measurements before fitting. Review Point exclusions.');
-  if (!inputs.formula.trim()) throw new Error('Type a fit function, e.g. [0]*x+[1].');
+  if (cols.x.length < 2) throw new Error('Include at least two measurements before plotting. Review Point exclusions.');
+  // No fit function is allowed: the backend then just plots the data points.
 
   const o = inputs.options || {};
   const xmin = numberOrNull(o.x_min);
@@ -1615,7 +1615,7 @@ async function runFit(fitModel = true) {
       if (gof) showMessage('warn', gof + (plotNote ? '\n' + plotNote : ''));
       else if (plotNote) showMessage('info', plotNote);
     }
-    setStatus($('fit-status'), result.converged ? `${result.fit_performed === false ? 'Histogram plotted' : 'Fit done'} — ${payload.dataset_name}` : 'Fit not converged', result.converged ? 'ok' : 'warn');
+    setStatus($('fit-status'), result.converged ? `${result.fit_performed === false ? 'Plotted' : 'Fit done'} - ${payload.dataset_name}` : 'Fit not converged', result.converged ? 'ok' : 'warn');
   } catch (e) {
     if (requestVersion !== fitRequestVersion) return;
     showMessage('error', e.message + (lastResult ? ' The plot and report below are from the previous fit.' : ''));
@@ -1667,7 +1667,7 @@ async function runMultivariate() {
       if (gof) showMessage('warn', gof + (notes ? '\n' + notes : ''));
       else if (notes) showMessage('info', notes);
     }
-    setStatus($('fit-status'), result.converged ? `Fit done — ${payload.dataset_name}` : 'Fit not converged', result.converged ? 'ok' : 'warn');
+    setStatus($('fit-status'), result.converged ? `Fit done - ${payload.dataset_name}` : 'Fit not converged', result.converged ? 'ok' : 'warn');
   } catch (e) {
     if (requestVersion !== fitRequestVersion) return;
     showMessage('error', e.message + (lastResult ? ' The plot and report below are from the previous fit.' : ''));
@@ -1725,6 +1725,12 @@ function renderHistogramReport(r) {
 function renderReport(r) {
   if (r.analysis_type === 'histogram') { renderHistogramReport(r); return; }
   if (r.analysis_type === 'multivariate') { window.Multivariate.renderReport(r, lastPayload); setResultEnabled(true); return; }
+  if (r.fit_performed === false) {
+    const ds = lastPayload && lastPayload.dataset_name ? `<span class="ds-name">${escapeHtml(lastPayload.dataset_name)}</span>: ` : '';
+    $('report').innerHTML = `<p>${ds}${r.n_points} points plotted. No fit function given. Enter one in Fit settings to fit these data.</p>`;
+    setResultEnabled(true);
+    return;
+  }
   const rows = r.params.map((p) => `
     <tr>
       <td>${escapeHtml(p.name)}</td>
@@ -1749,7 +1755,7 @@ function renderReport(r) {
     <div class="summary">
       <div class="stat"><span class="k">χ²</span><span class="v">${fmtNum(r.chi2)}</span></div>
       <div class="stat"><span class="k">NDF</span><span class="v">${r.ndf}</span></div>
-      <div class="stat ${chi2Class(r)}"><span class="k">χ² / NDF</span><span class="v">${r.chi2_ndf === null ? '—' : fmtNum(r.chi2_ndf, 4)}</span></div>
+      <div class="stat ${chi2Class(r)}"><span class="k">χ² / NDF</span><span class="v">${r.chi2_ndf === null ? ' - ' : fmtNum(r.chi2_ndf, 4)}</span></div>
       <div class="stat"><span class="k">p-value</span><span class="v">${fmtNum(r.prob, 4)}</span></div>
     </div>`;
   setResultEnabled(true);
@@ -1786,7 +1792,7 @@ function clearReport() {
 /** The report as plain text (for the clipboard and .txt export). */
 function reportText(r) {
   const L = [];
-  L.push(`ROOT-A-TRON 3000 report — ${$('doc-title').value || 'untitled'}`);
+  L.push(`ROOT-A-TRON 3000 report - ${$('doc-title').value || 'untitled'}`);
   L.push(`Date:      ${new Date().toISOString()}`);
   if (lastPayload) L.push(`Dataset:   ${lastPayload.dataset_name} (${r.n_points} points)`);
   L.push(`Function:  ${r.formula}`);
@@ -1897,7 +1903,7 @@ function loadJSROOT() {
       return m;
     })().catch((e) => {
       jsrootPromise = null;
-      throw new Error(`Could not load JSROOT from root.cern — are you online? (${e.message})`);
+      throw new Error(`Could not load JSROOT from root.cern - are you online? (${e.message})`);
     });
   }
   return jsrootPromise;
@@ -2421,7 +2427,7 @@ function applyDocument(doc) {
     throw new Error('This is not a ROOT-A-TRON 3000 document (expected a JSON object with "version" and "inputs").');
   }
   if (doc.version !== DOC_VERSION) {
-    throw new Error(`Unsupported document version "${doc.version}" — this page understands version ${DOC_VERSION}.`);
+    throw new Error(`Unsupported document version "${doc.version}" - this page understands version ${DOC_VERSION}.`);
   }
   if (!doc.inputs || typeof doc.inputs !== 'object') {
     throw new Error('The document has no "inputs" section.');
@@ -2471,7 +2477,7 @@ function loadDocumentText(text, sourceName) {
     showMessage('error', e.message);
     return false;
   }
-  showMessage('info', `Loaded ${sourceName}${doc.title ? ` — "${doc.title}"` : ''}.`);
+  showMessage('info', `Loaded ${sourceName}${doc.title ? ` - "${doc.title}"` : ''}.`);
   autosave();
   return true;
 }

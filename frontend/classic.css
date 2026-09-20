@@ -80,7 +80,7 @@ body.classic .data-section-heading > button.expand {
   --button-ink: #44330c;
 }
 
-/* Blue: "Help with parameters" — an info action, made prominent. */
+/* Blue: "Help with parameters" - an info action, made prominent. */
 body.classic .param-help-btn {
   --button-top: #3d7cc0;
   --button-bottom: #2660a3;

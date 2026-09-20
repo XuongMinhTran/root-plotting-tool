@@ -6,7 +6,7 @@ let session=S.empty(), doc=S.projected(session), history=[], view='table', editi
 let saved='', autoSaved=false, restoredDirty=false;
 const uid=()=>crypto.randomUUID();
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const fmt=v=>v===null||v===undefined?'—':Number(v).toPrecision(6).replace(/(\.\d*?[1-9])0+(?=e|$)|\.0+(?=e|$)/g,'$1');
+const fmt=v=>v===null||v===undefined?' - ':Number(v).toPrecision(6).replace(/(\.\d*?[1-9])0+(?=e|$)|\.0+(?=e|$)/g,'$1');
 const current=()=>doc.objects.find(o=>o.id===doc.selected);
 function resultText(r){
  if(r.uncertainty===null)return fmt(r.value)+' (uncertainty unspecified)';
@@ -165,7 +165,7 @@ function sourceOptions(exclude){
  const blocked=exclude?dependants(exclude):new Set();
  return doc.objects.filter(o=>o.id!==exclude&&!blocked.has(o.id)&&sourceDataset(o)?.id===calculationDatasetId).flatMap(o=>C.fields(o).map(f=>{
   const owner=sourceDataset(o),type=o.kind==='fit'?'Fit parameters':o.kind==='measurements'?'Measurement columns':o.kind==='calculation'?'Calculated quantities':'Entered quantities';
-  const group=(owner?.name||o.name)+' — '+type;
+  const group=(owner?.name||o.name)+' - '+type;
   const p=o.kind==='fit'?o.parameters[Number(f.key)]:null;
   const name=p?(/^(?:p)?\d+$/.test(f.name)?'Parameter ['+f.key+']':f.name+' ['+f.key+']'):f.name;
   const detail=p?fmt(p.value)+' ± '+fmt(p.error)+(f.unit?' '+f.unit:''):
@@ -222,7 +222,7 @@ function calculationDialog(edit=false){
  const owner=sourceDataset(current());
  if(!owner){notify('Select a dataset before creating or editing a calculation.',true);return;}
  calculationDatasetId=owner.id;
- $('calculation-heading').textContent=(edit?'Edit calculation':'Calculate quantity or column')+' — '+owner.name;
+ $('calculation-heading').textContent=(edit?'Edit calculation':'Calculate quantity or column')+' - '+owner.name;
  $('calculation-form').querySelector('[type=submit]').textContent=edit?'Save changes':'Save calculation';
  editing=edit?current().id:null;const o=edit?current():null;bindings=clone(o?.bindings||{});
  let mode=o?.resultMode||'quantity';

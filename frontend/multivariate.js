@@ -1,5 +1,5 @@
 /*
- * multivariate.js — the "Multivariate (R^n -> R^m)" analysis type for the
+ * multivariate.js - the "Multivariate (R^n -> R^m)" analysis type for the
  * Classic workspace. It is additive: it owns its own data-entry grid, model
  * editors and result table, and app.js calls into window.Multivariate at a few
  * well-defined moments (load a dataset, build the fit payload, render a result).
@@ -265,7 +265,7 @@
 
   // ------------------------------------------------------------------- report
   function fmtNum(v, sig) {
-    if (v == null || !Number.isFinite(v)) return '—';
+    if (v == null || !Number.isFinite(v)) return ' - ';
     return window.fmtNum ? window.fmtNum(v, sig) : Number(v).toPrecision(sig || 6);
   }
   function fmtPair(v, e) {
@@ -296,7 +296,7 @@
       '<div class="summary">' +
       '<div class="stat"><span class="k">χ²</span><span class="v">' + fmtNum(r.chi2) + '</span></div>' +
       '<div class="stat"><span class="k">NDF</span><span class="v">' + r.ndf + '</span></div>' +
-      '<div class="stat"><span class="k">χ² / NDF</span><span class="v">' + (r.chi2_ndf == null ? '—' : fmtNum(r.chi2_ndf, 4)) + '</span></div>' +
+      '<div class="stat"><span class="k">χ² / NDF</span><span class="v">' + (r.chi2_ndf == null ? ' - ' : fmtNum(r.chi2_ndf, 4)) + '</span></div>' +
       '<div class="stat"><span class="k">p-value</span><span class="v">' + fmtNum(r.prob, 4) + '</span></div></div>' +
       (resid ? '<table class="report-table mv-residuals"><thead><tr><th>Output</th><th>RMS residual</th>' +
         '<th>Mean pull</th><th>Pull spread</th></tr></thead><tbody>' + resid + '</tbody></table>' : '');

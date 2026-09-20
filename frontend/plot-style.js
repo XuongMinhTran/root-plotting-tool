@@ -1,8 +1,8 @@
-/* plot-style.js — client-side appearance for the plot.
+/* plot-style.js - client-side appearance for the plot.
  *
  * The backend hands us a ROOT TCanvas serialized with TBufferJSON. Everything
  * here restyles that object in the browser and lets app.js redraw it with
- * JSROOT — no backend call. It only touches how the plot LOOKS (axis scale,
+ * JSROOT - no backend call. It only touches how the plot LOOKS (axis scale,
  * grid, which boxes show, marker/line appearance); it never changes what ROOT
  * computed. Fields set here (fLogx, fGridx, fMarkerColor, fLineStyle, …) are
  * standard ROOT attributes JSROOT reads when it draws.
@@ -10,7 +10,7 @@
 (function () {
   'use strict';
 
-  // ROOT colour indices — JSROOT ships the full ROOT colour table, so these
+  // ROOT colour indices - JSROOT ships the full ROOT colour table, so these
   // high-level indices render the expected colours.
   const COLORS = [
     { name: 'Default', v: 0 },

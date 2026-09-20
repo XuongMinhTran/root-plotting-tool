@@ -186,9 +186,10 @@ def do_fit():
                 raise BadRequest(f"{label} errors describe a size, so use zero or a positive number.")
 
         formula = str(payload.get("formula") or "").strip()
-        ok, message = check_formula(formula)
-        if not ok:
-            raise BadRequest(f"The fitting service could not read this function: {message}")
+        if formula:                                    # empty formula: plot the data with no fit
+            ok, message = check_formula(formula)
+            if not ok:
+                raise BadRequest(f"The fitting service could not read this function: {message}")
 
         par_names = string_list(payload, "param_names")
         par_guesses = guess_list(payload, "initial_guesses")

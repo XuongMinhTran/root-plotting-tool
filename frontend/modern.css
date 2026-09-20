@@ -1,4 +1,4 @@
-/* modern.css — the Modern workspace.
+/* modern.css - the Modern workspace.
  *
  * The visual language follows the official ROOT website (root.cern): a flat
  * ROOT-blue masthead (#346295), warm sand hairlines (#e9dcbe) instead of
@@ -519,8 +519,8 @@ body.modern .import-panel { background: #f7f9fb; border: 1px solid var(--line); 
 
 /* ============================================================ shared workspace chrome
  * cli.html (the console) loads this file for its page frame. These are the
- * generic pieces it uses — a header bar, a centered column, section headings
- * and a footer — in the same ROOT palette as the worksheet above.
+ * generic pieces it uses - a header bar, a centered column, section headings
+ * and a footer - in the same ROOT palette as the worksheet above.
  */
 
 .workspace-header {

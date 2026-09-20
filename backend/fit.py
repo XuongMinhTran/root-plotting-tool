@@ -115,6 +115,29 @@ def run_fit(x, y, ex=None, ey=None, formula="pol1",
     graph.SetMarkerStyle(20)          # filled circles, like the original tool
     graph.SetMarkerSize(0.9)
 
+    # --- no function given: plot the data only, no fit ---------------------
+    if not str(formula or "").strip():
+        return {
+            "confidence_band": None,
+            "status": 0,
+            "converged": True,
+            "fit_performed": False,
+            "status_message": "Data plotted without a fit.",
+            "formula": "",
+            "range": [xmin, xmax],
+            "n_points": int(n),
+            "params": [],
+            "chi2": None,
+            "ndf": 0,
+            "chi2_ndf": None,
+            "prob": None,
+            "covariance": [],
+            "residuals": None,
+            "diagnostics": [],
+            "plot_notes": [],
+            **render_fit_plot(graph, None, [], plot, x_title, xmin, xmax),
+        }
+
     # --- the model ---------------------------------------------------------
     # The TF1 range is what option "R" (below) will use as the fit range.
     func = ROOT.TF1("fit", formula, xmin, xmax)

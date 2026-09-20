@@ -1,4 +1,4 @@
-/* modern.js — the parts of the Modern workspace that are Modern's own.
+/* modern.js - the parts of the Modern workspace that are Modern's own.
  *
  * All the real work (parsing columns, talking to the backend, drawing, saving)
  * lives in the shared app.js. This file only handles presentation:

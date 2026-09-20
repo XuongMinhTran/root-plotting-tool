@@ -76,7 +76,7 @@ function objects(doc){
   }
   if(d.result?.response){
    const f=d.result.response;
-   out.push({id:d.result.objectId||d.id+':fit',datasetId:d.id,kind:'fit',name:d.name+' — fit',origin:'Fit results',formula:f.formula,converged:f.converged,parameters:(f.params||[]).map((p,i)=>({name:p.name||'p'+i,value:p.value,error:p.error,unit:p.unit||''})),covariance:f.covariance,
+   out.push({id:d.result.objectId||d.id+':fit',datasetId:d.id,kind:'fit',name:d.name+' - fit',origin:'Fit results',formula:f.formula,converged:f.converged,parameters:(f.params||[]).map((p,i)=>({name:p.name||'p'+i,value:p.value,error:p.error,unit:p.unit||''})),covariance:f.covariance,
     incomplete:!f.params?.length,stale:!!d.result.sourceSignature&&d.result.sourceSignature!==signature(d)});
   }
  }

@@ -29,7 +29,7 @@ export async function createPDF(doc,ids,options,files,fontBytes){
   heading(d.name);const stem='dataset-'+(i+1),r=d.result?.response;
   if(d.result?.sourceSignature&&d.result.sourceSignature!==globalThis.WorkspaceStore.signature(d))text('Saved fit: inputs have changed since this result was calculated.');
   const png=files['figures/'+stem+'.png'];if(options.graphs&&png){const info=pdf.getImageProperties(png),h=Math.min(120,width*info.height/info.width),w=h*info.width/info.height;if(y+h>bottom)page();pdf.addImage(png,'PNG',left+(width-w)/2,y,w,h);y+=h+8;}
-  if(options.fit&&r){heading('Fit results');text('Function: '+r.formula);text(r.status_message||'');text((r.statistic_name||'χ²')+': '+(r.statistic??r.chi2??'—')+'   NDF: '+(r.ndf??'—')+'   Probability: '+(r.prob??'—'));if(r.range)text('Fit range: '+r.range.join(' to '));if(r.confidence_band)text(Math.round(r.confidence_band.level*100)+'% pointwise confidence band. '+(r.confidence_band.method||''));
+  if(options.fit&&r){heading('Fit results');text('Function: '+r.formula);text(r.status_message||'');text((r.statistic_name||'χ²')+': '+(r.statistic??r.chi2??' - ')+'   NDF: '+(r.ndf??' - ')+'   Probability: '+(r.prob??' - '));if(r.range)text('Fit range: '+r.range.join(' to '));if(r.confidence_band)text(Math.round(r.confidence_band.level*100)+'% pointwise confidence band. '+(r.confidence_band.method||''));
    for(const [suffix,label] of [['parameters','Parameters'],['correlation','Parameter correlations']])if(files[stem+'-'+suffix+'.csv']){heading(label);table(files[stem+'-'+suffix+'.csv']);}
   }
   if(options.raw&&files[stem+'-data.csv']){heading('Measurements and standard uncertainties');text('Blank uncertainty cells are unspecified.',9);table(files[stem+'-data.csv']);}

@@ -103,7 +103,7 @@
 
     <fieldset class="group data-group">
       <legend><span class="data-section-heading"><span>Data <button type="button" class="help-btn" data-help="data" aria-label="Help on data entry">?</button></span></span></legend>
-      <div class="field analysis-choice"><label for="analysis-type">Analysis type</label><select id="analysis-type"><option value="" disabled selected>Select analysis type…</option><option value="xy">XY data</option><option value="histogram">Histogram</option><option value="multivariate">Multivariate — Rⁿ→Rᵐ</option></select></div>
+      <div class="field analysis-choice"><label for="analysis-type">Analysis type</label><select id="analysis-type"><option value="" disabled selected>Select analysis type…</option><option value="xy">XY data</option><option value="histogram">Histogram</option><option value="multivariate">Multivariate - Rⁿ→Rᵐ</option></select></div>
       <div class="row dataset-row">
         <select id="dataset-select" title="Which dataset the columns below show" class="grow"></select>
         <button type="button" class="small" data-action="dataset-add" title="Create a new plot">New plot</button>
@@ -259,7 +259,7 @@
 
 <!-- ============ data table dialog (spreadsheet-style editor) ============ -->
 <dialog id="table-dialog" class="tframe resizable">
-  <div class="titlebar">Insert data <span class="titlebar-note">type in the grid, or paste from Excel / Sheets / a text file — one row per point, columns X · Y · Y err · X err</span></div>
+  <div class="titlebar">Insert data <span class="titlebar-note">type in the grid, or paste from Excel / Sheets / a text file - one row per point, columns X · Y · Y err · X err</span></div>
   <div class="dialog-body table-body">
     <div class="tabs" id="dataset-tabs"></div>
     <div class="row table-tools">
@@ -335,7 +335,7 @@
     <div class="dialog-body">
       <p>Fits are computed server-side by <a href="https://root.cern" target="_blank" rel="noopener">CERN ROOT</a> (Minuit)
         and drawn by <a href="https://root.cern/js/" target="_blank" rel="noopener">JSROOT</a>. Nothing you enter is stored
-        on the server — use <em>Save</em> to keep your work.</p>
+        on the server - use <em>Save</em> to keep your work.</p>
       <p>Built by <strong>Minh Tran</strong> (2026) as a redesign of Dr. D. Beznosko's
         <a href="https://sos.clayton.edu/physics/chi2/" target="_blank" rel="noopener">chi2 tool</a>
         (Clayton State University), without accounts or server-side storage.</p>
@@ -350,7 +350,7 @@
 <script defer src="units.js?v=1"></script><script src="analysis-core.js?v=20260919-units" defer></script>
 <script src="workspace-store.js?v=1" defer></script>
 <script src="plot-style.js?v=1" defer></script>
-<script src="app.js?v=20260920-insert-data" defer></script>
+<script src="app.js?v=20260920-plot-nofit" defer></script>
 <dialog id="dataset-type-dialog" class="tframe">
   <div class="dialog-body">
     <h2>Add dataset</h2>
