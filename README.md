@@ -9,7 +9,6 @@ computed by ROOT's fitter (Minuit), drawn in the browser by JSROOT.
 backend/    Python + Flask + PyROOT, runs in a Docker container (rootproject/root)
 frontend/   landing page, Classic and Modern interfaces (no build step)
 examples/   sample saved documents (JSON) you can load into the page
-tests/      reference datasets with independently known results
 start       one command: build if needed, run, open the browser
 root-run    helper: run any command inside the ROOT container
 ```
@@ -86,7 +85,7 @@ Modern includes a keyboard-operated equation editor. Type `A exp(-x/tau)+B`, `x_
 
 Equation drafts and symbol mappings are saved per dataset, including incomplete drafts. An incomplete equation cannot submit the previous valid formula. Unchanged equations survive Classic/Modern switching; editing the ROOT formula invalidates its old visual representation. MathLive 0.110.0 and its fonts are bundled locally under `frontend/vendor/mathlive/` (MIT license); equation editing does not require a CDN. The parser uses an explicit arithmetic/function grammar and does not evaluate user JavaScript.
 
-Both interfaces provide **Paste data…** beside the dataset selector. Paste a rectangular block from Excel with optional headers, inspect the first five rows, and assign X/Y/error columns (or a histogram measurement column). Names such as `u(Voltage)` are matched to their measurement column. Loading creates a new dataset by default; replacing the selected dataset requires confirmation and clears its old result. Blank or invalid mapped cells are reported rather than silently dropped. Tests: `node tests/paste_data_test.cjs`.
+Both interfaces provide **Paste data…** beside the dataset selector. Paste a rectangular block from Excel with optional headers, inspect the first five rows, and assign X/Y/error columns (or a histogram measurement column). Names such as `u(Voltage)` are matched to their measurement column. Loading creates a new dataset by default; replacing the selected dataset requires confirmation and clears its old result. Blank or invalid mapped cells are reported rather than silently dropped.
 
 You can also open `frontend/classic.html` or `frontend/modern.html` directly.
 Serving the pages from one address (which `./start` does) keeps autosave shared
@@ -157,9 +156,6 @@ The outer object accepts the usual formula, parameter and plot settings;
 `fit_model: false` creates a histogram without a fit. Limits are 100,000
 measurements and 2–2,000 bins.
 
-Run histogram checks with `node tests/histogram_frontend_test.cjs` and
-`docker run --rm --platform linux/amd64 -v "$PWD":/work -w /work/backend rootfit-backend python3 -m unittest histogram_test`.
-
 ## Talk to the backend directly
 
 ```sh
@@ -188,21 +184,6 @@ Datasets have stable IDs. Analyze Data shows a dataset box with Raw data and Fit
 Fits are linked to the source dataset. Refitting updates calculations that use its parameters. Editing the raw data or model marks an old fit as stale and blocks propagation from it until refitted. Missing sources produce explicit errors. Mathematical propagation retains shared-input covariance; cross-covariance between measured data and an estimated fit parameter is not inferred. Separate input sources are treated as independent. Units remain labels, without automatic conversion or dimensional checking.
 
 Old plotting JSON documents are accepted. Earlier `gauss-analysis` documents can also be opened in any workspace, and the old separate browser autosave is migrated into the shared session. No new data is written to the former DA storage key. Open tabs receive updates; revision checks prevent an older tab from silently overwriting newer work. Use Reload session in Analyze Data, or reload the plotting page, after resolving conflicting unsaved edits.
-
-Run `node tests/workspace_store_test.cjs` for shared-session round trips, fit links, stale-result protection, metadata, old-document migration and revision checks. Run `node tests/analysis_test.cjs` for numerical propagation and covariance.
-
-## Self-test inside the ROOT container
-
-```sh
-./root-run python3 backend/fit_test.py
-```
-
-Run HTTP regression checks with `docker run --rm --platform linux/amd64 -v "$PWD":/work -w /work/backend rootfit-backend python3 app_test.py`, and frontend checks with `node tests/frontend_test.cjs`.
-
-Check the multivariate (Rⁿ→Rᵐ) fit against its numpy/scipy reference with `./root-run python3 backend/multivariate_test.py`, and the multivariate frontend with `node tests/multivariate_frontend_test.cjs`.
-
-The self-test fits `tests/linear_reference.json` and checks ROOT against the closed-form
-weighted least-squares answer.
 
 ## Fit functions
 
