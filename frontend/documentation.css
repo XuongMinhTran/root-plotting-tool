@@ -11,7 +11,7 @@
 .documentation-page h3{font-size:21px;margin:30px 0 12px;color:#26303c}
 .documentation-page h4{font-size:17px;font-weight:600;margin:20px 0 8px;color:#343434}
 .documentation-page sup{font-size:.75em}
-.hint-note{background:#eef3fb;border-left:3px solid #000080;padding:11px 15px;margin:0 0 18px;color:#33414f;font-size:15px}
+.hint-note{background:#eef3fb;border-left:3px solid #346295;padding:11px 15px;margin:0 0 18px;color:#33414f;font-size:15px}
 .doc-glossary{display:grid;grid-template-columns:max-content 1fr;gap:9px 20px;margin:0 0 18px}
 .doc-glossary dt{font-weight:600;color:#26303c}
 .doc-glossary dd{margin:0;color:#3a4553}
@@ -20,8 +20,8 @@
 /* ---- multi-page docs: hub cards, breadcrumb, and guides catalog ------- */
 .doc-hub{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:16px;margin:24px 0 28px}
 .doc-card{display:block;border:1px solid #dfe5ec;border-radius:6px;padding:18px 20px;text-decoration:none;color:inherit;background:#fff;transition:border-color .1s,box-shadow .1s}
-.doc-card:hover{border-color:#000080;box-shadow:0 2px 10px rgba(0,0,0,.07)}
-.doc-card h2{font-size:18px;margin:0 0 6px;color:#000080}
+.doc-card:hover{border-color:#346295;box-shadow:0 2px 10px rgba(0,0,0,.07)}
+.doc-card h2{font-size:18px;margin:0 0 6px;color:#346295}
 .doc-card p{margin:0;font-size:14px;color:#3a4553}
 .doc-tip{color:#526273;font-size:15px}
 .doc-crumb{color:#6a7686;font-size:14px;margin:0 0 6px}
