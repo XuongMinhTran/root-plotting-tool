@@ -23,7 +23,7 @@
     $('equation-root').hidden=visual;
     $('equation-translation').hidden=!visual;
     $('root-syntax-links').hidden=visual;
-    $('equation-root-preview').textContent=state?.formula || 'No valid expression';
+    $('equation-root-preview').textContent=state?.formula || (state?.empty ? 'No fit function - the data will be plotted' : 'No valid expression');
     $('equation-error').textContent=state?.error || '';
     $('equation-error').hidden=!state?.error;
     math.setAttribute('aria-invalid',state?.error?'true':'false');
@@ -32,7 +32,7 @@
   }
   function setMath(value) { if(canEdit) math.setValue(value,{silenceNotifications:true}); }
   function rootState(formula, preferVisual=true) {
-    if (!formula.trim() && preferVisual && canEdit) return {latex:'',parameters:[],formula:'',mode:'equation',error:'Enter a fit equation before fitting.',cache:{}};
+    if (!formula.trim() && preferVisual && canEdit) return {latex:'',parameters:[],formula:'',mode:'equation',error:'',empty:true,cache:{}};
     try {
       const imported=engine.fromRoot(formula,list($('param-names').value));
       return {...imported,formula,mode:preferVisual&&canEdit?'equation':'root',error:'',cache:{}};
@@ -45,9 +45,11 @@
     state.cache=state.cache && typeof state.cache==='object'?state.cache:{};
     if (!canEdit) { state.mode='root'; state.error='The equation editor could not load. You can still enter a ROOT expression below.'; }
     if(state.mode==='equation') {
+      // An empty equation means "no fit function": plot the data without fitting.
+      if(!state.latex.trim()) { state.error=''; state.empty=true; state.formula=''; }
       // Revalidate restored drafts; a saved document cannot bypass translation.
-      try { engine.compile(state.latex,state.parameters); state.error=''; }
-      catch(e) { state.error=e.message; raw.value=''; state.formula=''; }
+      else { try { engine.compile(state.latex,state.parameters); state.error=''; }
+        catch(e) { state.error=e.message; raw.value=''; state.formula=''; } }
     }
     setMath(state.latex); paint();
   }
@@ -70,7 +72,10 @@
     const names=list($('param-names').value), guesses=list($('initial-guesses').value);
     state.parameters.forEach((symbol,i)=> { state.cache[symbol]={name:names[i] || symbol,guess:guesses[i]??''}; });
     state.latex=math.value;
-    try {
+    if(!state.latex.trim()) {
+      // Cleared equation = no fit function; the data is plotted without fitting.
+      state.parameters=[]; state.formula=''; state.error=''; state.empty=true; raw.value='';
+    } else { delete state.empty; try {
       const result=engine.compile(state.latex,state.parameters);
       state.parameters=result.parameters;
       state.formula=result.formula;
@@ -81,7 +86,7 @@
     } catch(e) {
       state.error=e.message;
       state.formula=''; raw.value=''; // Never fit the previous valid expression under an invalid draft.
-    }
+    } }
     updating=true;
     try { changed(); } finally { updating=false; }
     sync();
