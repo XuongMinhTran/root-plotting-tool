@@ -91,9 +91,17 @@
 
   // ---------------------------------------------------------------- wiring
   initSteps();
+  // "Make a Plot" links arrive at #measure and should stay on Measurements, even
+  // when a fitted session is restored (its restore draw would otherwise jump to Results).
+  let suppressAutoResults = location.hash === '#measure';
+  if (suppressAutoResults) {
+    try { history.replaceState(null, '', location.pathname + location.search); } catch (_) {}
+    setTimeout(() => { suppressAutoResults = false; }, 800);
+  }
   document.addEventListener('input', updateResultNotice);
   document.addEventListener('change', updateResultNotice);
   document.addEventListener('rootfit:draw', () => {
+    if (suppressAutoResults) return;
     showStep('results', true);
   });
 

@@ -52,9 +52,3 @@
 @media (min-width: 1600px) {
   .prototype-note { position: absolute; top: 28px; right: 28px; width: 300px; margin: 0; }
 }
-
-/* Interface chooser: highlight the recommended (Standard) card */
-.card-title { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.recommended-badge { font-size: 12px; font-weight: 600; color: #fff; background: var(--blue); border-radius: 999px; padding: 3px 11px; letter-spacing: .01em; }
-.workspace-card.recommended { border: 2px solid var(--blue); background: #f4f9fd; box-shadow: 0 0 0 3px rgba(52,98,149,.10); }
-.workspace-card.recommended:hover { background: #eaf2fb; }
