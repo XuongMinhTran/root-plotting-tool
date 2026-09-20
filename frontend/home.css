@@ -42,9 +42,9 @@
 .hero { position: relative; }
 .prototype-note {
   box-sizing: border-box; width: min(640px, 100%); margin: 0 auto 22px;
-  text-align: left; font-size: 14px; line-height: 1.55;
+  color: #8a2b22; text-align: left; font-size: 14px; line-height: 1.55;
 }
-.prototype-note strong { display: block; font-size: 14px; letter-spacing: .02em; margin-bottom: 4px; }
+.prototype-note strong { display: block; color: #b02a1e; font-size: 14px; letter-spacing: .02em; margin-bottom: 4px; }
 .prototype-note p { margin: 0 0 6px; }
 .prototype-note p:last-child { margin: 0; }
 @media (min-width: 1600px) {
