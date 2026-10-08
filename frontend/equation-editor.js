@@ -28,7 +28,10 @@
     $('equation-error').hidden=!state?.error;
     math.setAttribute('aria-invalid',state?.error?'true':'false');
     $('equation-parameter-heading').textContent=visual?'Symbol / index':'Index';
-    $('equation-name-heading').textContent=visual?'Report name':'Name';
+    $('equation-name-heading').textContent='Report name';
+    const note=$('equation-mode-note');
+    if(note) { note.hidden=visual || !!state?.latex || !state?.formula; note.textContent='This model uses advanced ROOT syntax. You can adjust it here; its formula is preserved.'; }
+    window.FitModelUX?.growFormula();
   }
   function setMath(value) { if(canEdit) math.setValue(value,{silenceNotifications:true}); }
   function rootState(formula, preferVisual=true) {

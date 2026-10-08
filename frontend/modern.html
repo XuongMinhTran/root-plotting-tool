@@ -12,6 +12,7 @@
 <link rel="stylesheet" href="multivariate.css?v=1">
 <link rel="stylesheet" href="parameter-search.css?v=20261008-quick-guess">
 <link rel="stylesheet" href="analysis-setup.css?v=20261008-beginners">
+<link rel="stylesheet" href="fit-model.css?v=20261008-flow5">
 <script defer src="analysis-export.js?v=20260919-pdf"></script>
 <link rel="icon" href="favicon.ico?v=1" sizes="any"><link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png?v=1"><link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png?v=1"><link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=1"><link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?v=1"><link rel="apple-touch-icon" href="apple-touch-icon.png?v=1">
 </head>
@@ -176,92 +177,82 @@
         <p class="hint">The model is a count density; its bin integral gives the expected count. Poisson likelihood includes empty bins; χ² uses √count uncertainties and excludes empty bins. Fit-range limits select bins by their centers.</p>
       </div>
 
-      <div class="equation-editor">
-        <fieldset class="equation-mode-field" id="equation-mode">
-          <legend>Function input</legend>
-          <div class="equation-mode-options">
-            <input type="radio" name="equation-mode" id="mode-equation" value="equation" aria-controls="equation-visual" checked>
-            <label for="mode-equation">Equation editor</label>
-            <input type="radio" name="equation-mode" id="mode-root" value="root" aria-controls="equation-root">
-            <label for="mode-root">ROOT expression</label>
-          </div>
-        </fieldset>
-        <div id="equation-visual">
-          <label id="equation-label" for="fit-equation">Fit function</label>
-          <math-field id="fit-equation" aria-labelledby="equation-label" aria-describedby="equation-rules equation-error" math-virtual-keyboard-policy="manual"></math-field>
-          <p class="hint" id="equation-rules"><code>x</code> is the independent variable. Other symbols become fit parameters; <code>e</code> and π are constants. Type <code>x_0</code> for a subscript or <code>x^2</code> for a power.</p>
+      <div class="fit-flow">
+        <p class="fit-intro">Choose a model, adjust its starting values, then Fit to find the curve that best matches your data.</p>
+        <div class="model-choice field">
+          <h3 class="fit-stage">1. Choose a model</h3>
+          <div class="model-choice-row"><button type="button" id="model-library-btn">Choose a model…</button><span id="model-choice-name" class="hint"></span></div>
+          <select id="quick-pick" aria-label="Legacy function presets" hidden><option value="">Choose a model…</option></select>
         </div>
-        <div class="formula-field" id="equation-root" hidden>
-          <label for="formula">ROOT fit expression</label>
-          <input id="formula" type="text" class="mono" value="[0]*x+[1]" spellcheck="false" autocomplete="off" placeholder="[0]*x+[1]"><details class="equation-help"><summary>Typing reference</summary><p>Use <code>x</code> for the independent variable and <code>[0]</code>, <code>[1]</code>, … for fit parameters. Write multiplication as <code>*</code>, division as <code>/</code>, and powers as <code>pow(x,2)</code>. Functions include <code>exp(x)</code>, <code>log(x)</code>, <code>sin(x)</code>, and <code>sqrt(x)</code>. Use <code>TMath::Pi()</code> for π. Example: <code>[0]*exp(-x/[1])+[2]</code>.</p></details>
-          <p class="hint">Use <code>x</code> for the independent variable and <code>[0]</code>, <code>[1]</code>, … for parameters. ROOT named functions and TMath expressions are supported.</p>
-        </div>
-        <p id="equation-error" class="equation-error" role="status" hidden></p>
-        <details id="equation-translation"><summary>ROOT expression</summary><code id="equation-root-preview"></code></details>
-        <details class="equation-help"><summary>Typing reference</summary>
-          <p>Type <code>alpha</code>, <code>beta</code>, <code>mu</code>, <code>sigma</code>, <code>tau</code>, <code>lambda</code>, or <code>theta</code> for Greek symbols, and <code>pi</code> for π. Other Greek letters can be entered as LaTeX commands, such as <code>\omega</code>, followed by Space. Type <code>sqrt</code> for a square root, <code>/</code> for a fraction, <code>^</code> for a power, and <code>_</code> for a subscript. Use Ctrl/⌘ + Z to undo.</p>
-          <p><code>sinc(z)</code> means sin(z)/z, with a value of 1 at z = 0. Use it for diffraction envelopes.</p>
-          <p>Enter the right-hand side of the model, for example <code>A exp(-x/tau) + B</code>. Use the arrow keys to move out of a fraction, exponent, or subscript. LaTeX expressions can also be pasted into the field.</p>
-          <p>Adjacent symbols multiply: <code>ab</code> means <code>a × b</code>. For a single parameter with a longer name, enter <code>\mathrm{background}</code>. A subscripted symbol such as <code>x_0</code> is a parameter. Report names can differ from equation symbols.</p>
-          <p>Functions require parentheses. Supported functions include exp, ln (natural logarithm), log (natural logarithm), log10, sin, cos, tan, asin, acos, atan, sinh, cosh, tanh, sqrt, abs, erf, erfc, pow, min, max, and atan2. Use ROOT expression mode for other ROOT functions.</p>
-        </details>
-      </div>
-
-      <div class="field">
-        <label for="quick-pick">Function presets</label>
-        <select id="quick-pick"><option value="">Examples…</option></select>
-        <button type="button" id="model-library-btn" class="small">Model library…</button>
-      </div>
-
-      <p class="hint" id="root-syntax-links"><a href="https://root.cern/doc/master/classTFormula.html" target="_blank" rel="noopener">TFormula syntax</a> ·
-        <a href="https://root.cern/doc/master/namespaceTMath.html" target="_blank" rel="noopener">TMath functions</a> - 
-        named functions such as <code>gaus</code>, <code>expo</code> and <code>pol2</code> are supported.</p>
-
-      <div class="param-block">
-        <div class="parameter-heading"><p class="preset-label">Parameters</p><button type="button" class="parameter-guide-button" data-help="guesses" aria-label="Help with parameters">Help with parameters</button></div>
-        <p class="hint"><strong>Initial guesses matter for nonlinear fits.</strong> Estimate slopes, peak heights, positions, and widths from the data, using the model’s units. Poor guesses can prevent convergence or lead to a different minimum. Leave a value blank to use its default or automatic estimate, where available.</p>
-        <details class="fold parameter-paste"><summary>Paste comma-separated parameters</summary><div class="fold-body">
-          <div class="field-row">
-            <div class="field"><label for="param-names">Parameter names (comma-separated)</label>
-              <input id="param-names" type="text" placeholder="slope, intercept" spellcheck="false"></div>
-            <div class="field"><label for="initial-guesses">Initial guesses (comma-separated)</label>
-              <input id="initial-guesses" type="text" class="mono" placeholder="1, 0" spellcheck="false"></div>
+        <div class="equation-editor">
+          <h3 class="fit-stage">2. Adjust the equation</h3>
+          <fieldset class="equation-mode-field" id="equation-mode">
+            <legend class="sr-only">Equation input mode</legend>
+            <div class="equation-mode-options" aria-label="Equation input mode">
+              <input type="radio" name="equation-mode" id="mode-equation" value="equation" aria-controls="equation-visual" checked>
+              <label for="mode-equation">Equation editor</label>
+              <input type="radio" name="equation-mode" id="mode-root" value="root" aria-controls="equation-root">
+              <label for="mode-root">Advanced: ROOT expression</label>
+            </div>
+          </fieldset>
+          <p id="equation-mode-note" class="hint" hidden></p>
+          <div id="equation-visual">
+            <label id="equation-label" for="fit-equation">Fit equation</label>
+            <math-field id="fit-equation" aria-labelledby="equation-label" aria-describedby="equation-rules equation-error" math-virtual-keyboard-policy="manual"></math-field>
+            <p class="hint" id="equation-rules">Use <code>x</code> for your measured variable and letters for the values to fit, such as <code>a x + b</code>.</p>
           </div>
-          <p class="hint">Paste values in parameter order: [0], [1], [2], … Leave an initial guess empty between commas to keep that parameter’s default. Edits update the table below.</p>
+          <div class="formula-field" id="equation-root" hidden>
+            <label for="formula">ROOT expression</label>
+            <div class="root-expression-wrap"><pre id="formula-highlights" aria-hidden="true"></pre><textarea id="formula" class="mono" rows="2" spellcheck="false" autocomplete="off" aria-describedby="root-syntax-links equation-error" placeholder="e.g. [0]*x+[1]">[0]*x+[1]</textarea></div>
+            <p class="hint" id="root-syntax-links">Use <code>x</code> for the variable and <code>[0]</code>, <code>[1]</code>… for parameters. Built-in models include <code>gaus</code>, <code>expo</code>, and <code>pol2</code>. See the typing reference for the full list.</p>
+          </div>
+          <p id="equation-error" class="equation-error" role="status" hidden></p>
+          <details id="equation-translation"><summary>View generated ROOT expression</summary><code id="equation-root-preview"></code></details>
+          <details class="equation-help" id="equation-reference"><summary>Typing reference</summary>
+            <p><b>Equation editor:</b> type <code>sqrt</code> for a square root, <code>/</code> for a fraction, <code>^</code> for a power, and <code>_</code> for a subscript. Use Ctrl/⌘ + Z to undo. Use the arrow keys to move out of a fraction, exponent, or subscript. You can also paste LaTeX.</p>
+            <p>For Greek letters, type <code>alpha</code>, <code>beta</code>, <code>mu</code>, <code>sigma</code>, <code>tau</code>, <code>lambda</code>, or <code>theta</code>. Use <code>pi</code> for π. Other Greek letters can be entered as LaTeX commands such as <code>\omega</code>, followed by Space. <code>e</code> and π are constants.</p>
+            <p>Adjacent symbols multiply: <code>ab</code> means a × b. For a parameter with a longer name, use <code>\mathrm{background}</code>. A subscripted symbol such as <code>x_0</code> is a parameter. Report names can differ from equation symbols.</p>
+            <p>Functions need parentheses: exp, ln, log, log10, sin, cos, tan, asin, acos, atan, sinh, cosh, tanh, sqrt, abs, erf, erfc, pow, min, max, atan2, and sinc. <code>sinc(z)</code> means sin(z)/z, with value 1 at zero. Example: <code>A exp(-x/tau) + B</code>.</p>
+            <p><b>ROOT expression:</b> write multiplication as <code>*</code>, division as <code>/</code>, and powers as <code>pow(x,2)</code> or <code>x^2</code>. Parameters are numbered from zero. Named functions such as <code>gaus</code>, <code>gausn</code>, <code>expo</code>, <code>landau</code>, and <code>pol2</code> are supported. Example: <code>[0]*exp(-x/[1])+[2]</code>.</p>
+            <p><a href="https://root.cern/doc/master/classTFormula.html" target="_blank" rel="noopener">Full TFormula reference</a> · <a href="https://root.cern/doc/master/namespaceTMath.html" target="_blank" rel="noopener">TMath functions</a></p>
+          </details>
+        </div>
+        <div class="param-block">
+          <div class="parameter-heading"><h3 class="fit-stage">3. Set starting values</h3><button type="button" class="parameter-guide-button" data-help="guesses">Help with parameters</button></div>
+          <p class="hint">Use Automatic guess for a starting point, or edit the initial guesses below. Fit will refine these values.</p>
+          <div class="parameter-table-scroll"><table class="param-table" id="param-table">
+            <thead><tr><th id="equation-parameter-heading">Symbol / index</th><th id="equation-name-heading">Report name</th><th>Initial guess — edit here</th></tr></thead><tbody></tbody>
+          </table></div>
+          <p class="hint" id="param-table-note"></p>
+          <details class="parameter-paste"><summary>Paste comma-separated parameters</summary><div class="fold-body field-row">
+            <div class="field"><label for="param-names">Parameter names (comma-separated)</label><input id="param-names" type="text" placeholder="e.g. slope, intercept" spellcheck="false"></div>
+            <div class="field"><label for="initial-guesses">Initial guesses (comma-separated)</label><input id="initial-guesses" type="text" class="mono" placeholder="e.g. 1, 0" spellcheck="false"></div>
+            <p class="hint">Use parameter order: [0], [1], [2]… Leave a value blank to keep its default or automatic estimate, where available.</p>
+          </div></details>
+          <details id="guess-preview-panel" class="guess-preview-panel" open>
+            <summary>Preview starting values</summary>
+            <div class="guess-preview-legend"><span class="preview-line-key">Initial guess</span><span class="preview-point-key">Your data</span></div>
+            <p class="hint">The curve uses your current starting values. It is not a fit result.</p>
+            <div id="guess-preview"></div><p id="guess-preview-note" class="hint"></p>
+          </details>
+        </div>
+        <details class="fold" id="param-expander"><summary id="fit-range-summary">Fit range: full data</summary><div class="fold-body">
+          <div class="field-row"><div class="field"><label for="fit-xmin">X minimum</label><input id="fit-xmin" type="text" class="mono" inputmode="decimal" placeholder="Full data range"></div>
+          <div class="field"><label for="fit-xmax">X maximum</label><input id="fit-xmax" type="text" class="mono" inputmode="decimal" placeholder="Full data range"></div></div>
+          <p class="hint">Blank limits use the corresponding data bounds. These limits affect the fit.</p>
         </div></details>
-        <table class="param-table" id="param-table">
-          <thead><tr><th id="equation-parameter-heading">Symbol / index</th><th id="equation-name-heading">Report name</th><th>Initial guess</th></tr></thead>
-          <tbody></tbody>
-        </table>
-        <p class="hint" id="param-table-note"></p>
       </div>
-
-      <details class="fold" id="param-expander">
-        <summary>Fit range</summary>
-        <div class="fold-body">
-          <div class="field-row">
-            <div class="field"><label for="fit-xmin">X minimum</label>
-              <input id="fit-xmin" type="text" class="mono" inputmode="decimal" placeholder="x min"></div>
-            <div class="field"><label for="fit-xmax">X maximum</label>
-              <input id="fit-xmax" type="text" class="mono" inputmode="decimal" placeholder="x max"></div>
-          </div>
-          <p class="hint">Blank limits use the corresponding data-range bounds.</p>
-
-        </div>
-      </details>
       </div><!-- /single-fit-block -->
     </section>
 
     <!-- ---------- step 3 ---------- -->
-    <section class="card" id="step-options" hidden aria-labelledby="h-options">
-      <header><h2 id="h-options">Plot settings</h2>
-        <button type="button" class="help-btn" data-help="plot" aria-label="Help on plot options">?</button></header>
+<details class="card fit-plot-settings" id="step-options" hidden><summary>Plot settings <span class="hint-inline">(optional)</span></summary><div class="plot-settings-body"><button type="button" class="parameter-guide-button" data-help="plot">Help with plot settings</button>
 
       <div class="field"><label for="graph-title">Plot title</label>
-        <input id="graph-title" type="text" placeholder="Period against length"></div>
+        <input id="graph-title" type="text" placeholder="e.g. Period against length"></div>
       <div class="field-row">
-        <div class="field"><label for="x-title">X-axis label</label><input id="x-title" type="text" placeholder="L (m)"></div>
-        <div class="field"><label for="y-title">Y-axis label</label><input id="y-title" type="text" placeholder="T (s)"></div>
+        <div class="field"><label for="x-title">X-axis label</label><input id="x-title" type="text" placeholder="e.g. L (m)"></div>
+        <div class="field"><label for="y-title">Y-axis label</label><input id="y-title" type="text" placeholder="e.g. T (s)"></div>
       </div>
       <div class="checks">
         <label class="check"><input type="checkbox" id="opt-logx"> Log X axis</label>
@@ -303,7 +294,8 @@
             <textarea id="doc-notes" rows="3" placeholder="Apparatus, acquisition conditions, calibration"></textarea></div>
         </div>
       </details>
-    </section>
+      </div>
+    </details>
 
 
   </div>
@@ -343,6 +335,7 @@
     <button id="modern-next" type="button" class="primary">Continue to fit model</button>
     <button id="btn-fit" type="button" class="primary" hidden>Fit</button>
     <span id="fit-status" role="status" aria-live="polite">Ready</span>
+    <button type="button" class="fit-bar-save" data-action="save">Save</button>
   </div>
 </main>
 
@@ -473,16 +466,17 @@
 
 <script src="vendor/mathlive/mathlive.min.js" defer></script>
 <script src="equation-parser.js?v=20261008-sinc" defer></script>
-<script src="equation-editor.js?v=20261008-sinc" defer></script>
-<script src="modern.js?v=20261008-beginners" defer></script>
+<script src="equation-editor.js?v=20261008-fit-flow" defer></script>
+<script src="modern.js?v=20261008-fit-flow" defer></script>
 <script defer src="units.js?v=1"></script><script src="analysis-core.js?v=20260919-units" defer></script>
 <script src="workspace-store.js?v=1" defer></script>
 <script src="plot-style.js?v=1" defer></script>
 <script src="insert-data.js?v=20260920-types" defer></script>
 <script src="multivariate.js?v=1" defer></script>
-<script src="app.js?v=20261008-try-examples" defer></script>
-<script src="model-library.js?v=4" defer></script>
-<script src="parameter-search.js?v=20261008-quick-guess" defer></script>
-<script defer src="analysis-features.js?v=20261008-beginners"></script>
+<script src="app.js?v=20261008-fit-flow3" defer></script>
+<script src="model-library.js?v=5" defer></script>
+<script src="parameter-search.js?v=20261008-fit-flow" defer></script>
+<script defer src="analysis-features.js?v=20261008-fit-flow"></script>
+<script src="fit-model.js?v=20261008-flow3" defer></script>
 </body>
 </html>

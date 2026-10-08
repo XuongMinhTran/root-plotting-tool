@@ -664,7 +664,7 @@ function buildHistogramPayload(inputs, fitModel = true) {
   if (Number.isNaN(lo) || Number.isNaN(hi) || (lo !== null && hi !== null && lo >= hi)) throw new Error('The fit range needs increasing numeric limits, or can be left blank.');
   return {
     analysis_type:'histogram', histogram, fit_model:fitModel,
-    formula:inputs.formula.trim(), param_names:fitModel ? splitList(inputs.param_names) : [],
+    formula:inputs.formula.trim().replace(/[\r\n]+/g, ' '), param_names:fitModel ? splitList(inputs.param_names) : [],
     initial_guesses:fitModel ? splitList(inputs.initial_guesses).map(g => g === '' ? null : g) : [],
     title:inputs.graph_title, x_title:inputs.x_title, y_title:inputs.y_title,
     x_range:lo === null && hi === null ? null : [lo,hi],
@@ -784,7 +784,7 @@ function showDatasetResult() {
   if (lastResult) {
     renderReport(lastResult);
     drawPlot(lastResult, true);
-    setStatus($('fit-status'), 'Stored result - ' + datasets[activeIdx].name);
+    setStatus($('fit-status'), 'Saved fit available for ' + datasets[activeIdx].name);
   } else {
     plotDrawVersion++;
     clearReport();
@@ -1173,7 +1173,7 @@ function buildPayload(inputs, fitModel = true) {
 
   return {
     x: cols.x, y: cols.y, ex: cols.ex, ey: cols.ey,
-    formula: inputs.formula.trim(),
+    formula: inputs.formula.trim().replace(/[\r\n]+/g, ' '),
     param_names: splitList(inputs.param_names),
     initial_guesses: splitList(inputs.initial_guesses).map((g) => (g === '' ? null : g)),
     title: inputs.graph_title,
@@ -1243,23 +1243,26 @@ function renderParamTable() {
     const tr = document.createElement('tr');
     tr.innerHTML = `<td class="idx">[${i}]</td>` +
       `<td><input type="text" aria-label="Parameter ${i} name" data-pname="${i}" value="${escapeHtml(names[i] || '')}" placeholder="p${i}" spellcheck="false"></td>` +
-      `<td><input type="text" class="mono" inputmode="decimal" aria-label="Parameter ${i} initial guess" data-pguess="${i}" value="${escapeHtml(guesses[i] || '')}" placeholder="Default"></td>`;
+      `<td><input type="text" class="mono" inputmode="decimal" aria-label="Parameter ${i} initial guess" data-pguess="${i}" data-full-guess="${escapeHtml(guesses[i] || '')}" value="${escapeHtml(window.FitModelUX?.formatGuess(guesses[i] || '') ?? guesses[i] ?? '')}" placeholder="Default"></td>`;
     tbody.appendChild(tr);
   }
   const note = $('param-table-note');
   if (n === 0) note.textContent = 'No parameters found in the formula.';
   else {
     const extra = Math.max(names.length, guesses.length) - n;
-    note.textContent = `${n} parameter${n === 1 ? '' : 's'} in the formula.` + (extra > 0 ? ` (${extra} extra value${extra === 1 ? '' : 's'} in the lists are ignored.)` : '');
+    note.textContent = `${n} parameter${n === 1 ? '' : 's'} in the formula.` + (extra > 0 ? ` (${extra} extra value${extra === 1 ? '' : 's'} in the lists are ignored.)` : '') +
+      (document.body.classList.contains('modern') ? ' Guesses are rounded for display; select a field to edit its full value.' : '');
   }
   window.RootEquationEditor?.sync();
+  window.FitModelUX?.refresh();
 }
 
 /** The table -> the comma lists (the lists remain the source of truth). */
-function paramTableToLists() {
+function paramTableToLists(event) {
+  if (event?.target?.matches('[data-pguess]')) event.target.dataset.fullGuess = event.target.value.trim();
   paramTableBusy = true;
   const names = [...$('param-table').querySelectorAll('input[data-pname]')].map((i) => i.value.trim());
-  const guesses = [...$('param-table').querySelectorAll('input[data-pguess]')].map((i) => i.value.trim());
+  const guesses = [...$('param-table').querySelectorAll('input[data-pguess]')].map((i) => i.dataset.fullGuess ?? i.value.trim());
   const trimEnd = (arr) => { let k = arr.length; while (k > 0 && arr[k - 1] === '') k--; return arr.slice(0, k); };
   $('param-names').value = trimEnd(names).join(', ');
   $('initial-guesses').value = trimEnd(guesses).join(', ');
