@@ -1,0 +1,28 @@
+/* Shared beginner setup, following each workspace's colour theme. */
+.analysis-setup { margin-bottom: 16px; }
+.analysis-setup .field { width: 100%; margin-bottom: 12px; }
+.analysis-setup .field select { width: 100%; box-sizing: border-box; }
+.analysis-setup .hint { margin: 6px 0 0; line-height: 1.5; }
+.setup-hint { margin: 0 0 18px; padding: 12px 14px; border-left: 3px solid var(--accent, #245a97); background: var(--panel-alt, #f2f6fc); line-height: 1.5; }
+.setup-step { margin: 20px 0 12px; font-size: 1em; }
+.setup-examples { margin: 4px 0 18px; }
+.setup-examples > summary { cursor: pointer; color: var(--accent, #245a97); }
+.setup-examples[open] > summary { margin-bottom: 12px; }
+.analysis-setup .dataset-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start; margin: 14px 0 18px; }
+.analysis-setup .dataset-row [data-action="dataset-add"] { background: transparent; color: inherit; border-color: var(--border, #ccd3dc); }
+body.modern .analysis-setup .dataset-row [data-action="dataset-add"] { background: #fff; color: var(--ink); border-color: var(--line); }
+body.modern #analysis-description { font-size: 14px; color: var(--ink); }
+body.classic .analysis-setup .dataset-row [data-action="dataset-add"] { background: var(--frame); color: var(--ink); border-color: var(--edge); }
+body.modern .analysis-setup #btn-table { background: #fff; color: inherit; border-color: var(--line, #ccd3dc); min-height: 40px; padding: 8px 18px; font-size: 15px; font-weight: 600; }
+body.modern .analysis-setup #btn-table.primary { background: var(--blue, #245a97); color: #fff; border-color: var(--blue, #245a97); }
+body.modern .analysis-setup #btn-table.primary:hover:not(:disabled) { background: #1e4d82; color: #fff; border-color: #1e4d82; }
+body.classic .analysis-setup #btn-table { background: var(--frame); color: var(--ink); border-color: var(--edge); }
+body.classic .analysis-setup #btn-table.primary { background: var(--accent); color: var(--accent-ink, #fff); border-color: var(--accent); font-weight: 600; }
+.plot-options > summary { cursor: pointer; padding: 8px 10px; font-size: 0.95em; }
+.plot-options-actions { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px; border: 1px solid var(--border, #ccd3dc); border-radius: 4px; }
+.plot-options-actions [data-action="dataset-remove"] { margin-left: 0; }
+.setup-help { font-size: 0.85em; }
+body.classic .setup-help { margin-left: 8px; font-weight: normal; }
+body.classic .analysis-setup .field { margin-bottom: 8px; }
+body.classic .analysis-setup .setup-examples { margin: 8px 0 12px; }
+.analysis-setup summary:focus-visible { outline: 2px solid var(--accent, #245a97); outline-offset: 3px; }

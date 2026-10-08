@@ -216,8 +216,11 @@ const HELP = {
       <p>Optional diagnostics compare counts with integrated predictions, even though the main plot displays counts per unit X. Convergence alone does not establish that the model describes the data.</p>`,
   },
   data: {
-    title: 'Entering data',
+    title: 'How your analysis works',
     html: `
+      <p><b>1. Choose an analysis type.</b> XY compares two measured quantities, a histogram groups one quantity into bins, and multivariate analysis relates several inputs to one or more outputs. A plot is created automatically.</p>
+      <p><b>2. Add your data.</b> Choose Add data… to type or paste measurements into a table, or enter them directly in the columns. Examples are optional; the example list follows your chosen analysis type.</p>
+      <p><b>3. Choose a model and fit.</b> Review the fitted curve and results. For a histogram, you can also plot counts without fitting.</p>
       <p>Each column holds one number per point. Paste straight from a spreadsheet: values separated by new lines,
       commas, tabs, semicolons or spaces are all accepted, and blank lines are ignored.</p>
       <p><b>Errors are optional.</b> Enter one value to apply it to every point on that axis, or one per point. Leave both error columns empty for an <em>unweighted</em> fit: every point counts
@@ -226,9 +229,9 @@ const HELP = {
       uncertainties meaningful.</p>
       <p><b>X errors</b> are folded in by ROOT's "effective variance" method: σ²<sub>eff</sub> = σ<sub>y</sub>² + (f′(x)·σ<sub>x</sub>)²,
       i.e. an uncertainty in x is turned into an equivalent uncertainty in y using the slope of the fitted curve.</p>
-      <p><b>Several datasets</b> (x1 y1, x2 y2, …) can live in one document - use +, and switch with the selector.
+      <p><b>Several datasets</b> (x1 y1, x2 y2, …) can live in one document - use New plot, and switch with the Plot selector. More plot options contains Rename, Duplicate, Delete, and point exclusions.
       The fit runs on the dataset shown in the columns.</p>
-      <p><b>Expand</b> opens a table where you can paste a whole block of columns at once, add or delete rows, and
+      <p><b>Add data… / Edit data…</b> opens a table where you can paste a whole block of columns at once, add or delete rows, and
       import a text file with a column mapping.</p>`,
   },
   formula: {
@@ -560,13 +563,72 @@ function syncAnalysisControls() {
   if (!samples) $('hist-edges-details').open = true;
   const custom = !!$('hist-edges').value.trim();
   for (const id of ['hist-bins', 'hist-min', 'hist-max']) $(id).disabled = custom;
-  for (const button of document.querySelectorAll('[data-action="table"], #btn-table')) button.disabled = type !== 'xy';
+  for (const button of document.querySelectorAll('[data-action="table"], #btn-table')) button.disabled = !type;
+  syncAnalysisSetup();
   const values = parseColumn($(samples ? 'hist-samples' : 'hist-counts').value);
   $('hist-summary').textContent = values.bad.length ? `${values.bad.length} entries need a number.` : samples ? `${values.values.length} measurements entered.` : `${values.values.length} bin counts entered.`;
   // Keep the XY-specific introduction out of histogram mode.
   const intro = document.querySelector('#panel-data .section-description');
   if (intro) intro.textContent = !type ? 'Select an analysis type to get started.' : histogram ? 'Enter individual measurements to group into bins, or provide existing bin edges and counts.' : 'Paste columns from a spreadsheet, or use the table editor to enter several columns at once. Each point needs an X and a Y value.';
   if (intro && multivariate) intro.textContent = 'Enter each input and output as a column, give one model per output with inputs x0, x1, … and shared parameters [0], [1], …, then Fit.';
+}
+
+// The same beginner setup flow is used by the Standard and Compact workspaces.
+let datasetExampleOptions = null;
+let datasetExamplesType = null;
+function syncAnalysisSetup() {
+  const type = $('analysis-type').value;
+  const hasPlot = !!datasets[activeIdx]?.analysis_type;
+  const hasNumbers = value => parseColumn(value || '').values.length > 0;
+  const mv = datasets[activeIdx]?.mv;
+  const hasData = type === 'xy' ? hasNumbers($('col-x').value) && hasNumbers($('col-y').value)
+    : type === 'histogram' ? hasNumbers($($('hist-source').value === 'counts' ? 'hist-counts' : 'hist-samples').value)
+    : type === 'multivariate' ? !!mv?.inVals?.length && !!mv?.outVals?.length && mv.inVals.every(hasNumbers) && mv.outVals.every(hasNumbers)
+    : false;
+  const descriptions = {
+    xy: 'Use XY when each measurement has an X and a Y, such as time and temperature. You can fit a curve to see how Y changes with X.',
+    histogram: 'Use a histogram when you measured one quantity many times, such as particle energies. It groups measurements into bins to show their distribution.',
+    multivariate: 'Use several inputs and outputs when a result depends on more than one quantity, such as beam intensity at different horizontal and vertical positions.'
+  };
+  if ($('analysis-description')) {
+    const compactDescriptions = {
+      xy: 'Two columns: X and Y.',
+      histogram: 'One measured quantity, grouped into bins.',
+      multivariate: 'Multiple input columns and one or more outputs.'
+    };
+    $('analysis-description').textContent = document.body.classList.contains('classic')
+      ? compactDescriptions[type] || 'Choose a type to create a plot.'
+      : descriptions[type] || 'XY: compare two quantities. Histogram: show the distribution of one quantity. Several inputs and outputs: model how multiple quantities affect a result.';
+  }
+  if ($('setup-hint')) $('setup-hint').textContent = hasData
+    ? type === 'histogram'
+      ? 'Your measurements are added. Plot the histogram below, or continue to choose a fit model.'
+      : 'Your measurements are added. Next, choose a fit model. You can edit the data below or switch plots at any time.'
+    : hasPlot
+    ? 'Your plot is ready for data. Add your measurements below, then choose a fit model. You can also load an example to try the workflow.'
+    : 'Start here: choose the kind of data you measured. We will create your first plot for you.';
+  if ($('btn-table')) {
+    $('btn-table').classList.toggle('primary', !hasData);
+    $('btn-table').textContent = hasData ? 'Edit data…' : 'Add data…';
+  }
+  if ($('modern-next')) $('modern-next').disabled = !hasData;
+  if ($('plot-choice-hint')) $('plot-choice-hint').textContent = hasPlot
+    ? 'Data and fit settings belong to the selected plot. Use New plot to add another.'
+    : 'Choose an analysis type above to create a plot. Your data and fit settings belong to the selected plot.';
+  if ($('plot-options')) {
+    $('plot-options').hidden = !hasPlot;
+    if (!hasPlot) $('plot-options').open = false;
+  }
+  for (const button of document.querySelectorAll('.analysis-setup [data-action="dataset-add"]')) button.hidden = !hasPlot;
+  const examples = $('example-dataset');
+  if (examples && datasetExamplesType !== type) {
+    datasetExampleOptions ||= Array.from(examples.options, option => option.cloneNode(true));
+    examples.replaceChildren(...datasetExampleOptions
+      .filter(option => !type || !option.value || option.dataset.analysisType === type)
+      .map(option => option.cloneNode(true)));
+    examples.value = '';
+    datasetExamplesType = type;
+  }
 }
 function buildHistogramPayload(inputs, fitModel = true) {
   const h = inputs.histogram || {}, options = inputs.options || {};
@@ -679,7 +741,14 @@ function renderDatasetSelector() {
     opt.textContent = mv ? `${d.name} - Multivariate ${window.Multivariate ? window.Multivariate.label(d) : ''}` : `${d.name} - ${histogram ? 'Histogram' : 'XY'} (${n} ${unit})`;
     sel.appendChild(opt);
   });
-  sel.value = String(activeIdx);
+  if (!sel.options.length) {
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = 'No plots yet — choose an analysis type';
+    sel.appendChild(placeholder);
+  }
+  sel.value = datasets[activeIdx]?.analysis_type ? String(activeIdx) : '';
+  syncAnalysisSetup();
   const fitSelect = $('fit-dataset-select');
   if (fitSelect) {
   fitSelect.innerHTML = '';
@@ -2386,7 +2455,12 @@ function init() {
   });
   for (const el of document.querySelectorAll('[data-action]')) {
     const fn = ACTIONS[el.dataset.action];
-    if (fn) el.addEventListener('click', (ev) => { ev.stopPropagation(); fn(el); });
+    if (fn) el.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      const options = el.closest('.plot-options');
+      if (options) options.open = false;
+      fn(el);
+    });
   }
   // "?" buttons
   for (const el of document.querySelectorAll('[data-help]')) {
@@ -2398,10 +2472,10 @@ function init() {
   // backend URL persists across visits (a setting, not part of a document)
 
   $('analysis-type').addEventListener('change', ev => {
-    const type = ev.target.value;
-    if (datasets.some(d => d.analysis_type === type)) changeAnalysisType(type);
-    else requestNewDataset(type, false);
+    changeAnalysisType(ev.target.value);
   });
+  $('multivariate-data')?.addEventListener('input', syncAnalysisSetup);
+  $('multivariate-data')?.addEventListener('change', syncAnalysisSetup);
   for (const button of document.querySelectorAll('[data-new-type]')) button.addEventListener('click', () => requestNewDataset(button.dataset.newType));
   $('dataset-type-cancel').addEventListener('click', () => $('dataset-type-dialog').close());
   for (const key of HISTOGRAM_FIELDS) $('hist-' + key).addEventListener('input', () => { syncAnalysisControls(); syncActiveFromColumns(); renderDatasetSelector(); autosave(); });

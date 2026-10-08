@@ -11,6 +11,7 @@
 <link rel="stylesheet" href="analysis-features.css?v=20260919-export">
 <link rel="stylesheet" href="multivariate.css?v=1">
 <link rel="stylesheet" href="parameter-search.css?v=20261008-quick-guess">
+<link rel="stylesheet" href="analysis-setup.css?v=20261008-beginners">
 <script defer src="analysis-export.js?v=20260919-pdf"></script>
 <link rel="icon" href="favicon.ico?v=1" sizes="any"><link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png?v=1"><link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png?v=1"><link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=1"><link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?v=1"><link rel="apple-touch-icon" href="apple-touch-icon.png?v=1">
 </head>
@@ -44,7 +45,7 @@
 
     <nav class="steps" aria-label="Worksheet steps">
       <button type="button" class="step-chip" data-target="step-data" aria-current="step">
-        <span class="label"><b>Measurements</b></span></button>
+        <span class="label"><b>Set up analysis</b></span></button>
       <button type="button" class="step-chip" data-target="step-function">
         <span class="label"><b>Fit model</b></span></button>
       <button type="button" class="step-chip" data-target="step-results">
@@ -59,44 +60,57 @@
 
     <!-- ---------- step 1 ---------- -->
     <section class="card" id="step-data" aria-labelledby="h-data">
-      <header><h2 id="h-data">Measurements</h2>
-        <button type="button" class="help-btn" data-help="data" aria-label="Help on entering data">?</button></header>
-      <!-- app.js rewrites this line to suit the analysis type, so it keeps the
-           id and class it looks for. -->
+      <header><h2 id="h-data">Set up your analysis</h2>
+        <button type="button" class="setup-help" data-help="data">How this works</button></header>
       <div id="panel-data">
 
 
-      <div class="field example-actions">
-        <label for="example-dataset">Example dataset</label>
-        <select id="example-dataset">
-          <option value="">Choose an example…</option>
-          <option value="linear">Straight line</option>
-          <option value="exp">Exponential decay</option>
-          <option value="gaus">Gaussian peak</option>
-          <option value="histogram">Count histogram</option>
-          <option value="multivariate">Beam profile (R²→R)</option>
-        </select>
+      <div class="analysis-setup">
+        <p id="setup-hint" class="setup-hint" role="status">Start here: choose the kind of data you measured. We will create your first plot for you.</p>
+        <div class="field analysis-choice">
+          <label for="analysis-type">1. Choose an analysis type</label>
+          <select id="analysis-type" aria-describedby="analysis-description">
+            <option value="" disabled selected>What kind of data did you measure?</option>
+            <option value="xy">XY — compare two quantities</option>
+            <option value="histogram">Histogram — distribution of one quantity</option>
+            <option value="multivariate">Several inputs and outputs (multivariate)</option>
+          </select>
+          <p id="analysis-description" class="hint">Choose the type that matches your measurements.</p>
+        </div>
+        <details class="setup-examples">
+          <summary>Not sure? Load an example</summary>
+          <div class="field">
+            <label for="example-dataset">Optional example</label>
+            <select id="example-dataset">
+              <option value="">Choose an example…</option>
+              <option value="linear" data-analysis-type="xy">Straight line</option>
+              <option value="exp" data-analysis-type="xy">Exponential decay</option>
+              <option value="gaus" data-analysis-type="xy">Gaussian peak</option>
+              <option value="histogram" data-analysis-type="histogram">Count histogram</option>
+              <option value="multivariate" data-analysis-type="multivariate">Beam profile — two inputs, one output</option>
+            </select>
+            <p class="hint">Examples include data and a model to try. Loading an example replaces the current document after confirmation.</p>
+          </div>
+        </details>
+        <h3 class="setup-step">2. Add your data</h3>
+        <div class="field plot-choice">
+          <label for="dataset-select">Plot</label>
+          <select id="dataset-select" aria-describedby="plot-choice-hint"><option value="">No plots yet — choose an analysis type</option></select>
+          <p id="plot-choice-hint" class="hint">Choose an analysis type above to create a plot. Your data and fit settings belong to the selected plot.</p>
+        </div>
+        <div class="dataset-row">
+          <button type="button" class="primary" id="btn-table" disabled title="Type, paste or edit measurements in a table">Add data…</button>
+          <button type="button" class="small" data-action="dataset-add" hidden title="Create another plot">New plot</button>
+          <details id="plot-options" class="plot-options" hidden>
+            <summary>More plot options</summary>
+            <div id="plot-management-actions" class="plot-options-actions">
+              <button type="button" class="small" data-action="dataset-duplicate" title="Copy this plot and its fit settings">Duplicate</button>
+              <button type="button" class="small" data-action="dataset-rename" title="Rename this plot">Rename</button>
+              <button type="button" class="small" data-action="dataset-remove" title="Delete this plot">Delete</button>
+            </div>
+          </details>
+        </div>
       </div>
-
-      <div class="field analysis-choice">
-        <label for="analysis-type">Analysis type</label>
-        <select id="analysis-type">
-          <option value="" disabled selected>Select analysis type…</option>
-          <option value="xy">XY data</option>
-          <option value="histogram">Histogram</option>
-          <option value="multivariate">Multivariate - Rⁿ→Rᵐ</option>
-        </select>
-      </div>
-
-      <div class="dataset-row">
-        <select id="dataset-select" aria-label="Dataset"></select>
-        <button type="button" class="small" data-action="dataset-add" title="Create a dataset">New plot</button>
-        <button type="button" class="small" data-action="dataset-duplicate" title="Copy this dataset and its fit settings">Duplicate</button>
-        <button type="button" class="small" data-action="dataset-rename" title="Rename this dataset">Rename</button>
-        <button type="button" class="small expand" id="btn-table" title="Type, paste or edit measurements in a table">Insert data…</button>
-        <button type="button" class="small" data-action="dataset-remove" title="Delete this dataset">Delete</button>
-      </div>
-      <p class="hint dataset-note" id="modern-data-summary" hidden></p>
 
       <!-- ---- histogram input ---- -->
       <div id="histogram-data" hidden>
@@ -138,7 +152,7 @@
         <div class="col"><div class="col-head"><span class="cerr">X uncertainty</span><span class="count" id="count-ex">0</span></div>
           <textarea id="col-ex" aria-label="X uncertainties" spellcheck="false" placeholder="optional"></textarea></div>
       </div>
-      <p class="hint">Separate values with newlines, commas, tabs, or spaces. Uncertainties: one value per axis or one per point. Use Insert data… to type, paste or edit measurements in a table.</p>
+      <p class="hint">Separate values with newlines, commas, tabs, or spaces. Uncertainties: one value per axis or one per point. Use Add data… to type, paste or edit measurements in a table.</p>
       </div>
       </div>
       <div id="multivariate-data" hidden></div>
@@ -459,15 +473,15 @@
 <script src="vendor/mathlive/mathlive.min.js" defer></script>
 <script src="equation-parser.js?v=20260919-units" defer></script>
 <script src="equation-editor.js?v=20260920-empty-plot" defer></script>
-<script src="modern.js?v=20260920-measure" defer></script>
+<script src="modern.js?v=20261008-beginners" defer></script>
 <script defer src="units.js?v=1"></script><script src="analysis-core.js?v=20260919-units" defer></script>
 <script src="workspace-store.js?v=1" defer></script>
 <script src="plot-style.js?v=1" defer></script>
 <script src="insert-data.js?v=20260920-types" defer></script>
-<script src="app.js?v=20260920-types" defer></script>
 <script src="multivariate.js?v=1" defer></script>
+<script src="app.js?v=20261008-beginners" defer></script>
 <script src="model-library.js?v=3" defer></script>
 <script src="parameter-search.js?v=20261008-quick-guess" defer></script>
-<script defer src="analysis-features.js?v=20260920-toolbar"></script>
+<script defer src="analysis-features.js?v=20261008-beginners"></script>
 </body>
 </html>

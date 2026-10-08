@@ -48,7 +48,7 @@
     $('results').hidden = step !== 'results';
     $('modern-next').hidden = step !== 'data';
     $('modern-back').hidden = step === 'data';
-    $('modern-back').textContent = step === 'results' ? 'Edit fit model' : 'Back to measurements';
+    $('modern-back').textContent = step === 'results' ? 'Edit fit model' : 'Back to analysis setup';
     $('btn-fit').hidden = step !== 'function';
     highlight(step);
     updateResultNotice();

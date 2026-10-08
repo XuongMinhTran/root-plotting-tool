@@ -9,6 +9,7 @@
 <link rel="stylesheet" href="analysis-features.css?v=20260919-export">
 <link rel="stylesheet" href="multivariate.css?v=1">
 <link rel="stylesheet" href="parameter-search.css?v=20261008-quick-guess">
+<link rel="stylesheet" href="analysis-setup.css?v=20261008-beginners">
 <script defer src="analysis-export.js?v=20260919-pdf"></script>
 <link rel="icon" href="favicon.ico?v=1" sizes="any"><link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png?v=1"><link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png?v=1"><link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=1"><link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?v=1"><link rel="apple-touch-icon" href="apple-touch-icon.png?v=1">
 </head>
@@ -104,17 +105,49 @@
     </fieldset>
 
     <fieldset class="group data-group">
-      <legend><span class="data-section-heading"><span>Data <button type="button" class="help-btn" data-help="data" aria-label="Help on data entry">?</button></span></span></legend>
-      <div class="field analysis-choice"><label for="analysis-type">Analysis type</label><select id="analysis-type"><option value="" disabled selected>Select analysis type…</option><option value="xy">XY data</option><option value="histogram">Histogram</option><option value="multivariate">Multivariate - Rⁿ→Rᵐ</option></select></div>
-      <div class="row dataset-row">
-        <select id="dataset-select" title="Which dataset the columns below show" class="grow"></select>
-        <button type="button" class="small" data-action="dataset-add" title="Create a new plot">New plot</button>
-        <button type="button" class="small" data-action="dataset-duplicate" title="Copy this dataset and its fit settings">Duplicate</button>
-        <button type="button" class="small" data-action="dataset-rename" title="Rename this dataset">Rename</button>
-        <button type="button" class="small expand" data-action="table" title="Type, paste or edit measurements in a table">Insert data…</button>
-        <button type="button" class="small" data-action="dataset-remove" title="Delete this dataset">Delete</button>
+      <legend>Analysis setup <button type="button" class="setup-help" data-help="data">How this works</button></legend>
+      <div class="analysis-setup">
+        <div class="field analysis-choice">
+          <label for="analysis-type">Analysis type</label>
+          <select id="analysis-type" aria-describedby="analysis-description">
+            <option value="" disabled selected>Choose analysis type…</option>
+            <option value="xy">XY data</option>
+            <option value="histogram">Histogram</option>
+            <option value="multivariate">Multivariate</option>
+          </select>
+          <p id="analysis-description" class="hint">Choose the type that matches your measurements.</p>
+        </div>
+        <details class="setup-examples">
+          <summary>Examples (optional)</summary>
+          <div class="field">
+            <label for="example-dataset">Optional example</label>
+            <select id="example-dataset">
+              <option value="">Choose an example…</option>
+              <option value="linear" data-analysis-type="xy">Straight line</option>
+              <option value="exp" data-analysis-type="xy">Exponential decay</option>
+              <option value="gaus" data-analysis-type="xy">Gaussian peak</option>
+              <option value="histogram" data-analysis-type="histogram">Count histogram</option>
+              <option value="multivariate" data-analysis-type="multivariate">Beam profile — two inputs, one output</option>
+            </select>
+          </div>
+        </details>
+        <div class="field plot-choice">
+          <label for="dataset-select">Plot</label>
+          <select id="dataset-select"><option value="">No plots yet — choose an analysis type</option></select>
+        </div>
+        <div class="dataset-row">
+          <button type="button" class="primary" id="btn-table" disabled title="Type, paste or edit measurements in a table">Add data…</button>
+          <button type="button" class="small" data-action="dataset-add" hidden title="Create another plot">New plot</button>
+          <details id="plot-options" class="plot-options" hidden>
+            <summary>More plot options</summary>
+            <div id="plot-management-actions" class="plot-options-actions">
+              <button type="button" class="small" data-action="dataset-duplicate" title="Copy this plot and its fit settings">Duplicate</button>
+              <button type="button" class="small" data-action="dataset-rename" title="Rename this plot">Rename</button>
+              <button type="button" class="small" data-action="dataset-remove" title="Delete this plot">Delete</button>
+            </div>
+          </details>
+        </div>
       </div>
-
 
       <div id="histogram-data" hidden>
         <div class="field"><label for="hist-source">Histogram input</label><select id="hist-source"><option value="samples">Individual measurements</option><option value="counts">Pre-binned counts</option></select></div>
@@ -142,7 +175,7 @@
         <div class="col"><div class="col-head"><span class="cerr">X err</span><span class="count" id="count-ex">0</span></div>
           <textarea id="col-ex" aria-label="X uncertainties" rows="10" spellcheck="false" placeholder="One for all, or one per point"></textarea></div>
       </div>
-      <p class="hint">One value per line; commas, tabs or spaces work too. Errors are optional: enter one value for the whole axis, or one per point. Use <em>Insert data…</em> to type, paste or edit measurements in a table.</p>
+      <p class="hint">One value per line; commas, tabs or spaces work too. Uncertainties are optional: one per axis or one per point.</p>
       </div>
       <div id="multivariate-data" hidden></div>
     </fieldset>
@@ -379,7 +412,8 @@
 <script src="workspace-store.js?v=1" defer></script>
 <script src="plot-style.js?v=1" defer></script>
 <script src="insert-data.js?v=20260920-types" defer></script>
-<script src="app.js?v=20260920-types" defer></script>
+<script src="multivariate.js?v=1" defer></script>
+<script src="app.js?v=20261008-beginners" defer></script>
 <dialog id="dataset-type-dialog" class="tframe">
   <div class="dialog-body">
     <h2>Add dataset</h2>
@@ -387,9 +421,8 @@
     <div class="row"><button type="button" data-new-type="xy">XY data</button><button type="button" data-new-type="histogram">Histogram</button><button type="button" data-new-type="multivariate">Multivariate</button><button type="button" id="dataset-type-cancel">Cancel</button></div>
   </div>
 </dialog>
-<script src="multivariate.js?v=1" defer></script>
 <script src="model-library.js?v=3" defer></script>
 <script src="parameter-search.js?v=20261008-quick-guess" defer></script>
-<script defer src="analysis-features.js?v=20260920-toolbar"></script>
+<script defer src="analysis-features.js?v=20261008-beginners"></script>
 </body>
 </html>
