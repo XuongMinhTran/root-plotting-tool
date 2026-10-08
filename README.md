@@ -103,10 +103,14 @@ JSROOT; the report lists every parameter ± uncertainty, χ², NDF, χ²/NDF and
 the p-value.
 
 **Auto-guess parameters…** is available in both plotting interfaces for XY
-fits, including custom ROOT formulas. Review the suggested parameter ranges,
-choose a 30-second, 2-minute or 5-minute search, and start it. You can cancel
-while it runs. The search compares multiple candidates and refines promising
-ones using the selected data, uncertainties, point exclusions and fit range.
+fits, including custom ROOT formulas. Choose **Quick guess (20 seconds)** to
+use automatic search ranges, or **Set ranges and time** for more control.
+The time choices are 5, 10, 20, and 30 seconds, plus 1, 2, 3, and 5 minutes;
+20 seconds is the default. You can cancel while it runs. Click outside the
+window or use its red Close button to dismiss it and stop a running search.
+The Close button stays visible while you scroll. The search compares multiple
+candidates and refines promising ones using the selected data, uncertainties,
+point exclusions and fit range.
 It supports up to 20 parameters. Suggested ranges are heuristics: narrow or
 expand them using what you know about your experiment.
 

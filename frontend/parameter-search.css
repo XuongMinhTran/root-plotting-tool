@@ -9,10 +9,14 @@
 .parameter-search-dialog{width:min(800px,calc(100vw - 24px));max-height:90vh;box-sizing:border-box;padding:22px;background:var(--frame-2,#f7f8fa);color:var(--ink,#111);border:1px solid var(--shadow,#aeb8c6);border-radius:8px;overflow:auto}
 .parameter-search-dialog::backdrop{background:rgba(0,0,0,.4)}
 .parameter-search-dialog [hidden],.parameter-search-tools [hidden]{display:none!important}
-.parameter-search-heading{display:flex;align-items:center;justify-content:space-between;gap:16px}
+.parameter-search-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;position:sticky;top:-22px;z-index:3;margin:-22px -22px 0;padding:14px 22px;background:var(--frame-2,#f7f8fa);border-bottom:1px solid var(--shadow,#ccd5df)}
 .parameter-search-heading h2{font-size:20px;margin:0}
+#parameter-search-close{flex:none;min-height:38px;padding:8px 14px;font-weight:600;background:#b3261e;border-color:#b3261e;color:#fff;box-shadow:none;text-shadow:none}
+#parameter-search-close:hover:not(:disabled){background:#8a1e18;border-color:#8a1e18}
+#parameter-search-close:active:not(:disabled){background:#701912;border-color:#701912}
 .parameter-search-dialog p{line-height:1.5;margin:12px 0}
 .parameter-search-dialog h3{font-size:16px;margin:20px 0 10px}
+#parameter-search-choice{padding:4px 0 12px}
 .parameter-search-scroll{overflow:auto;margin:12px 0;max-height:35vh}
 .parameter-search-dialog table{width:100%;border-collapse:collapse;font-size:13px}
 .parameter-search-dialog th,.parameter-search-dialog td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--shadow,#ccd5df)}
@@ -37,4 +41,4 @@
 .search-point{fill:#252e3e;opacity:.75}
 .modern .parameter-search-dialog{background:#fff;--frame-2:#fff;--shadow:#d4dbe3;--ink:#172b43}
 .classic .parameter-search-dialog{border-radius:0}
-@media(max-width:540px){.parameter-search-dialog{padding:16px}.parameter-search-heading{align-items:flex-start}.parameter-search-heading h2{font-size:18px}.parameter-search-dialog th,.parameter-search-dialog td{padding:7px}.parameter-search-dialog input{min-width:90px}.parameter-search-footer{bottom:-16px}.parameter-search-footer button{flex:1 1 auto}.parameter-search-dialog .primary{padding:0 12px}}
+@media(max-width:540px){.parameter-search-dialog{padding:16px}.parameter-search-heading{align-items:flex-start;top:-16px;margin:-16px -16px 0;padding:12px 16px}.parameter-search-heading h2{font-size:18px}.parameter-search-dialog th,.parameter-search-dialog td{padding:7px}.parameter-search-dialog input{min-width:90px}.parameter-search-footer{bottom:-16px}.parameter-search-footer button{flex:1 1 auto}.parameter-search-dialog .primary{padding:0 12px}}

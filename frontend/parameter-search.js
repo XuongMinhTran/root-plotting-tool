@@ -59,7 +59,18 @@
 
   function setControls(s) {
     const busy = s?.preparing || s?.running || s?.cancelling;
-    el('parameter-search-start').disabled = !!busy || !s?.parameters || !!s.stale;
+    const unavailable = !!busy || !s?.parameters || !!s?.stale;
+    el('parameter-search-choice').hidden = s?.mode !== 'choice';
+    el('parameter-search-quick').disabled = unavailable;
+    el('parameter-search-advanced').disabled = unavailable;
+    el('parameter-search-setup').hidden = s?.mode !== 'advanced' || !s?.parameters;
+    el('parameter-search-footer').hidden = s?.mode === 'choice';
+    el('parameter-search-start').hidden = s?.mode === 'choice' || !!busy;
+    el('parameter-search-start').textContent = s?.mode === 'quick' ? 'Guess again (20 seconds)' : 'Start search';
+    el('parameter-search-settings').hidden = s?.mode !== 'quick' || !!busy;
+    el('parameter-search-settings').disabled = unavailable;
+    el('parameter-search-start').disabled = unavailable;
+    el('parameter-search-apply').hidden = !s?.result;
     el('parameter-search-apply').disabled = !!busy || !s?.result || !!s.stale;
     el('parameter-search-stop').hidden = !s?.running;
     el('parameter-search-stop').disabled = !!s?.cancelling;
@@ -151,15 +162,16 @@
       if (!p.formula) throw new Error('Enter a fit function before searching for starting values.');
       payload = Object.fromEntries(['x', 'y', 'ex', 'ey', 'formula', 'param_names', 'initial_guesses', 'x_range'].map(key => [key, p[key]]));
     } catch (error) { showMessage('error', error.message); return; }
-    const s = session = { payload, backend: backendUrl(), fingerprint: fingerprint(), preparing: true };
+    const s = session = { payload, backend: backendUrl(), fingerprint: fingerprint(), preparing: true, mode: 'choice' };
     warn(''); status('Preparing search ranges…');
     el('parameter-search-ranges').querySelector('tbody').replaceChildren();
     el('parameter-search-results').hidden = true;
     el('parameter-search-setup').hidden = true;
     addWarnings([], el('parameter-search-warnings'));
     el('parameter-search-description').textContent = 'Search for useful starting values for the current XY data and fit range. Excluded points are omitted. Current guesses stay in place until you choose Apply.';
-    el('parameter-search-effort').value = '120';
+    el('parameter-search-effort').value = '20';
     setControls(s); dialog.showModal();
+    dialog.scrollTop = 0;
     clearInterval(refreshTimer); refreshTimer = setInterval(refresh, 500);
     try {
       const prepared = await request(s, '/parameter-search/prepare', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
@@ -169,10 +181,30 @@
       }
       s.parameters = prepared.parameters;
       rangeTable(s); addWarnings(prepared.warnings, el('parameter-search-warnings'));
-      el('parameter-search-setup').hidden = false;
       status(`Ready to search ${s.parameters.length} parameter${s.parameters.length === 1 ? '' : 's'} using ${prepared.n_points ?? payload.x.length} included points.`);
     } catch (error) { if (session === s) { warn(error.message); status('Search could not be prepared.'); } }
     finally { s.preparing = false; if (session === s) setControls(s); }
+  }
+
+  function advanced() {
+    const s = session;
+    if (!s?.parameters || s.preparing || s.running || s.cancelling) return;
+    refresh();
+    if (s.stale) return;
+    s.mode = 'advanced';
+    setControls(s);
+    dialog.scrollTo({ top: 0, behavior: 'smooth' });
+    el('parameter-search-effort').focus({ preventScroll: true });
+  }
+
+  function quick() {
+    const s = session;
+    if (!s?.parameters || s.preparing || s.running || s.cancelling) return;
+    refresh();
+    if (s.stale) return;
+    s.mode = 'quick';
+    el('parameter-search-effort').value = '20';
+    start();
   }
 
   async function start() {
@@ -319,7 +351,8 @@
     requestAnimationFrame(() => {
       if (session !== s || !dialog.open || s.stale) return;
       const top = el('parameter-search-results').getBoundingClientRect().top
-        - dialog.getBoundingClientRect().top + dialog.scrollTop - 16;
+        - dialog.getBoundingClientRect().top + dialog.scrollTop
+        - dialog.querySelector('.parameter-search-heading').offsetHeight - 16;
       dialog.scrollTo({ top, behavior: 'smooth' });
     });
   }
@@ -372,12 +405,17 @@
     dialog.innerHTML = `<div class="parameter-search-heading"><h2 id="parameter-search-title">Auto-guess parameters</h2><button type="button" id="parameter-search-close">Close</button></div>
       <p id="parameter-search-description"></p>
       <p id="parameter-search-error" role="alert" hidden></p>
+      <section id="parameter-search-choice" aria-labelledby="parameter-search-choice-title">
+        <h3 id="parameter-search-choice-title">Find starting values automatically?</h3>
+        <p>Try a quick 20-second guess using automatic search ranges, or choose the ranges and time limit yourself.</p>
+        <div class="parameter-search-actions"><button type="button" id="parameter-search-quick" class="primary">Quick guess (20 seconds)</button><button type="button" id="parameter-search-advanced">Set ranges and time</button></div>
+      </section>
       <div id="parameter-search-setup" hidden>
         <p>Review the search limits below. Narrow them using what you know about the model, especially for frequencies, widths, and parameter scales.</p>
         <div class="parameter-search-scroll"><table id="parameter-search-ranges"><thead><tr><th>Parameter</th><th>Search start</th><th>Lower limit</th><th>Upper limit</th></tr></thead><tbody></tbody></table></div>
         <p class="hint">These limits apply only to the search; Fit can move beyond them. Equal lower and upper limits hold a value constant during the search only.</p>
         <ul id="parameter-search-warnings" class="parameter-search-warnings" hidden></ul>
-        <label class="parameter-search-effort" for="parameter-search-effort"><span>Time limit</span><select id="parameter-search-effort"><option value="30">30 seconds</option><option value="120" selected>2 minutes</option><option value="300">5 minutes</option></select></label>
+        <label class="parameter-search-effort" for="parameter-search-effort"><span>Time limit</span><select id="parameter-search-effort"><option value="5">5 seconds</option><option value="10">10 seconds</option><option value="20" selected>20 seconds</option><option value="30">30 seconds</option><option value="60">1 minute</option><option value="120">2 minutes</option><option value="180">3 minutes</option><option value="300">5 minutes</option></select></label>
         <p class="hint">The search can finish early. Longer searches may help with difficult models, but cannot guarantee the best solution or identify parameters the data do not determine.</p>
       </div>
       <p id="parameter-search-status" role="status" aria-live="polite"></p>
@@ -389,10 +427,13 @@
         <ul id="parameter-search-result-warnings" class="parameter-search-warnings" hidden></ul>
         <div class="parameter-search-scroll"><table id="parameter-search-values"><thead><tr><th>Parameter</th><th>Current guess</th><th>Suggested guess</th></tr></thead><tbody></tbody></table></div>
       </section>
-      <div class="parameter-search-footer"><button type="button" id="parameter-search-start">Start search</button><button type="button" id="parameter-search-stop" hidden>Stop search</button><button type="button" id="parameter-search-apply" class="primary" disabled>Apply suggested values</button></div>`;
+      <div class="parameter-search-footer" id="parameter-search-footer"><button type="button" id="parameter-search-start">Start search</button><button type="button" id="parameter-search-settings">Set ranges and time</button><button type="button" id="parameter-search-stop" hidden>Stop search</button><button type="button" id="parameter-search-apply" class="primary" disabled>Apply suggested values</button></div>`;
     document.body.append(dialog);
     el('parameter-search-open').onclick = open;
     el('parameter-search-undo').onclick = undoApply;
+    el('parameter-search-quick').onclick = quick;
+    el('parameter-search-advanced').onclick = advanced;
+    el('parameter-search-settings').onclick = advanced;
     el('parameter-search-start').onclick = start;
     el('parameter-search-stop').onclick = () => stop(session, false);
     el('parameter-search-apply').onclick = apply;
@@ -409,6 +450,21 @@
     };
     el('parameter-search-close').onclick = close;
     dialog.addEventListener('cancel', event => { event.preventDefault(); close(); });
+    const isOutside = event => {
+      if (event.target !== dialog) return false;
+      const rect = dialog.getBoundingClientRect();
+      return event.clientX < rect.left || event.clientX > rect.right
+        || event.clientY < rect.top || event.clientY > rect.bottom;
+    };
+    let pressedOutside = false;
+    dialog.addEventListener('pointerdown', event => { pressedOutside = isOutside(event); });
+    dialog.addEventListener('pointercancel', () => { pressedOutside = false; });
+    dialog.addEventListener('click', event => {
+      // Releasing a text selection outside the window should not dismiss it.
+      const dismiss = pressedOutside && isOutside(event);
+      pressedOutside = false;
+      if (dismiss) close();
+    });
     dialog.addEventListener('close', () => {
       const s = session; session = null;
       clearInterval(refreshTimer); clearTimeout(s?.timer);
