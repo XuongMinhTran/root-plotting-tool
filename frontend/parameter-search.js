@@ -13,6 +13,8 @@
     return JSON.stringify({
       dataset: d?.id || activeIdx, type: d?.analysis_type,
       columns: ['x', 'y', 'ex', 'ey'].map(c => el('col-' + c).value),
+      histogram: Array.from(document.querySelectorAll('[id^="hist-"]')).filter(node => 'value' in node).map(node => [node.id, node.value]),
+      multivariate: Array.from(document.querySelectorAll('#multivariate-data input, #multivariate-data textarea, #multivariate-model input')).map(node => [node.id, node.dataset.mv, node.dataset.i, node.value]),
       settings: ['formula', 'param-names', 'initial-guesses', 'fit-xmin', 'fit-xmax'].map(id => el(id).value),
       equation: window.RootEquationEditor?.snapshot(),
       draft: el('fit-equation')?.value,
@@ -90,11 +92,14 @@
 
   function refresh() {
     if (applying || !host) return;
-    const supported = datasets[activeIdx]?.analysis_type === 'xy';
+    const kind = datasets[activeIdx]?.analysis_type;
+    const supported = ['xy', 'histogram', 'multivariate'].includes(kind);
+    const mount = kind === 'multivariate' ? el('multivariate-model') : el('parameter-search-single-mount');
+    if (mount && host.parentElement !== mount) mount.append(host);
     el('parameter-search-open').disabled = !supported || fitBusy;
     el('parameter-search-availability').textContent = supported
       ? 'Find starting values for your model, then review them before applying.'
-      : 'Starting-value search is available for XY fits. Histogram and multivariate searches are not available yet.';
+      : 'Choose an analysis type to find starting values for your model.';
     const current = (session || undo) ? fingerprint() : null;
     if (session && current !== session.fingerprint) stale(session);
     if (undo && current !== undo.fingerprint) undo = null;
@@ -153,14 +158,16 @@
     let payload;
     try {
       // Commit any pending visual-equation edit before validating and capturing.
-      el('fit-equation')?.dispatchEvent(new Event('change', { bubbles: true }));
-      window.RootEquationEditor?.validate();
+      const multivariate = datasets[activeIdx]?.analysis_type === 'multivariate';
+      if (!multivariate) {
+        el('fit-equation')?.dispatchEvent(new Event('change', { bubbles: true }));
+        window.RootEquationEditor?.validate();
+      }
       if (hasPendingTableEdits()) throw new Error('Apply or cancel the pending data-table edits before searching.');
       if (!workspaceIsCurrent()) throw new Error('This workspace was updated in another tab. Reload this page to use the current data before searching. Save any local edits first.');
       if (datasets[activeIdx]?.calculationError) throw new Error(datasets[activeIdx].calculationError);
-      const p = buildPayload(readForm());
-      if (!p.formula) throw new Error('Enter a fit function before searching for starting values.');
-      payload = Object.fromEntries(['x', 'y', 'ex', 'ey', 'formula', 'param_names', 'initial_guesses', 'x_range'].map(key => [key, p[key]]));
+      payload = multivariate ? window.Multivariate.buildPayload(datasets[activeIdx], { search: true }) : buildPayload(readForm());
+      if (!multivariate && !payload.formula) throw new Error('Enter a fit function before searching for starting values.');
     } catch (error) { showMessage('error', error.message); return; }
     const s = session = { payload, backend: backendUrl(), fingerprint: fingerprint(), preparing: true, mode: 'choice' };
     warn(''); status('Preparing search ranges…');
@@ -168,7 +175,11 @@
     el('parameter-search-results').hidden = true;
     el('parameter-search-setup').hidden = true;
     addWarnings([], el('parameter-search-warnings'));
-    el('parameter-search-description').textContent = 'Search for useful starting values for the current XY data and fit range. Excluded points are omitted. Current guesses stay in place until you choose Apply.';
+    el('parameter-search-description').textContent = payload.analysis_type === 'multivariate'
+      ? 'Search all outputs together using every input. Shared parameters stay shared. Your current guesses stay in place until you choose Apply.'
+      : payload.analysis_type === 'histogram'
+      ? 'Search using your histogram bins, selected fit range, and counting method. Your current guesses stay in place until you choose Apply.'
+      : 'Search the current XY data and fit range. Excluded points are omitted. Your current guesses stay in place until you choose Apply.';
     el('parameter-search-effort').value = '20';
     setControls(s); dialog.showModal();
     dialog.scrollTop = 0;
@@ -181,7 +192,7 @@
       }
       s.parameters = prepared.parameters;
       rangeTable(s); addWarnings(prepared.warnings, el('parameter-search-warnings'));
-      status(`Ready to search ${s.parameters.length} parameter${s.parameters.length === 1 ? '' : 's'} using ${prepared.n_points ?? payload.x.length} included points.`);
+      status(`Ready to search ${s.parameters.length} parameter${s.parameters.length === 1 ? '' : 's'} using ${prepared.n_points} included ${payload.analysis_type === 'histogram' ? 'bins' : 'rows'}${payload.analysis_type === 'multivariate' ? ' across ' + payload.n_outputs + ' output(s)' : ''}.`);
     } catch (error) { if (session === s) { warn(error.message); status('Search could not be prepared.'); } }
     finally { s.preparing = false; if (session === s) setControls(s); }
   }
@@ -293,12 +304,17 @@
     }
   }
 
-  function drawPreview(s, curve) {
-    const target = el('parameter-search-preview'); target.replaceChildren(); target.hidden = true;
+  function drawPreview(s, curve, append = false) {
+    const target = el('parameter-search-preview'); if (!append) { target.replaceChildren(); target.hidden = true; }
+    if (Array.isArray(curve?.panels)) {
+      curve.panels.forEach(panel => drawPreview(s, panel, true));
+      const note = document.createElement('p'); note.className = 'hint'; note.textContent = curve.note || ''; target.append(note);
+      target.hidden = false; return;
+    }
     if (!Array.isArray(curve?.x) || !Array.isArray(curve?.y)) return;
-    const inside = x => !s.payload.x_range || x >= s.payload.x_range[0] && x <= s.payload.x_range[1];
-    const data = s.payload.x.map((x, i) => [x, s.payload.y[i]]).filter(([x, y]) => inside(x) && Number.isFinite(x) && Number.isFinite(y));
-    const line = curve.x.map((x, i) => [x, curve.y[i]]).filter(([x, y]) => inside(x) && Number.isFinite(x) && Number.isFinite(y));
+    const inside = x => !s.payload.x_range || x >= (s.payload.x_range[0] ?? -Infinity) && x <= (s.payload.x_range[1] ?? Infinity);
+    const data = (curve.data_x || s.payload.x).map((x, i) => [x, (curve.data_y || s.payload.y)[i]]).filter(([x, y]) => inside(x) && Number.isFinite(x) && Number.isFinite(y));
+    const line = (curve.reference ? [curve.x.concat(curve.y).reduce((a, b) => Math.min(a, b), Infinity), curve.x.concat(curve.y).reduce((a, b) => Math.max(a, b), -Infinity)] : curve.x).map((x, i) => [x, curve.reference ? x : curve.y[i]]).filter(([x, y]) => inside(x) && Number.isFinite(x) && Number.isFinite(y));
     const all = [...data, ...line];
     if (!data.length || !line.length) return;
     let xmin = Infinity, xmax = -Infinity, ymin = Infinity, ymax = -Infinity;
@@ -306,6 +322,7 @@
     if (xmin === xmax) { xmin -= 1; xmax += 1; }
     if (ymin === ymax) { ymin -= 1; ymax += 1; }
     if (![xmax - xmin, ymax - ymin].every(Number.isFinite)) return;
+    if (curve.reference) { xmin = ymin = Math.min(xmin, ymin); xmax = ymax = Math.max(xmax, ymax); }
     const px = x => 72 + (x - xmin) / (xmax - xmin) * 540;
     const py = y => 212 - (y - ymin) / (ymax - ymin) * 180;
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -318,7 +335,14 @@
       + `<polyline class="search-curve" points="${line.map(([x, y]) => `${px(x)},${py(y)}`).join(' ')}" />`
       + data.filter((_, i) => i % Math.max(1, Math.ceil(data.length / 3000)) === 0)
         .map(([x, y]) => `<circle class="search-point" cx="${px(x)}" cy="${py(y)}" r="2.5" />`).join('');
-    target.append(svg); target.hidden = false;
+    const title = document.createElement('p'); title.className = 'hint'; title.textContent = curve.title || 'Suggested starting curve';
+    target.append(title, svg);
+    const texts = svg.querySelectorAll('text');
+    texts[texts.length - 2].textContent = curve.x_label || 'X';
+    texts[texts.length - 1].textContent = curve.y_label || 'Y';
+    svg.setAttribute('aria-label', (curve.title || 'Suggested starting curve') + ': ' + (curve.x_label || 'X') + ' horizontal, ' + (curve.y_label || 'Y') + ' vertical.');
+    if (curve.note) { const note = document.createElement('p'); note.className = 'hint'; note.textContent = curve.note; target.append(note); }
+    target.hidden = false;
     if (data.length > 3000) {
       const note = document.createElement('p'); note.className = 'hint';
       note.textContent = 'The preview displays a sample of the measurements. The search uses all included points.';
@@ -341,7 +365,7 @@
       }); tbody.append(row);
     });
     const score = Number.isFinite(result.score) ? `Search score: ${number(result.score)}${Number.isFinite(result.initial_score) ? ' (initial: ' + number(result.initial_score) + ')' : ''}. Lower is better. ` : '';
-    el('parameter-search-score').textContent = score + 'Run Fit after applying to obtain fit uncertainties and goodness of fit.';
+    el('parameter-search-score').textContent = score + (result.score_description || '') + ' ' + 'Run Fit after applying to obtain fit uncertainties and goodness of fit.';
     addWarnings(result.warnings, el('parameter-search-result-warnings'));
     drawPreview(s, result.curve);
     el('parameter-search-results').hidden = false;
@@ -357,11 +381,13 @@
     });
   }
 
+  function guessesField() { return el(datasets[activeIdx]?.analysis_type === 'multivariate' ? 'mv-par-guesses' : 'initial-guesses'); }
+
   function writeGuesses(value) {
     applying = true;
     try {
-      el('initial-guesses').value = value;
-      el('initial-guesses').dispatchEvent(new Event('input', { bubbles: true }));
+      guessesField().value = value;
+      guessesField().dispatchEvent(new Event('input', { bubbles: true }));
       autosave();
     } finally { applying = false; }
   }
@@ -370,7 +396,7 @@
     const s = session; refresh();
     if (!s?.result || s.stale || s.running) return;
     if (!workspaceIsCurrent()) { stale(s, 'This workspace was updated in another tab. Reload it before applying starting values. Save any local edits first.'); return; }
-    const before = el('initial-guesses').value;
+    const before = guessesField().value;
     // Retain full numerical precision in the actual guesses, regardless of how
     // many digits were shown in the review table.
     writeGuesses(s.result.values.map(String).join(', '));
@@ -395,10 +421,12 @@
     host.innerHTML = '<div class="parameter-search-actions"><button type="button" id="parameter-search-open" class="primary" aria-describedby="parameter-search-availability"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" focusable="false"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg><span>Automatic guess…</span></button><button type="button" id="parameter-search-undo" hidden>Undo suggested values</button></div><p class="hint" id="parameter-search-availability"></p>';
     const parameterHelp = block.querySelector('[data-help="guesses"]');
     if (parameterHelp) {
-      parameterHelp.replaceWith(host);
+      const mount = document.createElement('div'); mount.id = 'parameter-search-single-mount';
+      parameterHelp.replaceWith(mount); mount.append(host);
       host.querySelector('.parameter-search-actions').prepend(parameterHelp);
     } else {
-      block.after(host);
+      const mount = document.createElement('div'); mount.id = 'parameter-search-single-mount';
+      block.append(mount); mount.append(host);
     }
     dialog = document.createElement('dialog'); dialog.className = 'parameter-search-dialog';
     dialog.setAttribute('aria-labelledby', 'parameter-search-title'); dialog.setAttribute('aria-describedby', 'parameter-search-description');
@@ -478,6 +506,8 @@
     document.addEventListener('rootfit:draw', refresh);
     // Programmatic dataset/model selections also rebuild these controls.
     new MutationObserver(refresh).observe(el('param-table'), { childList: true, subtree: true });
+    new MutationObserver(refresh).observe(el('mv-models'), { childList: true, subtree: true });
+    new MutationObserver(refresh).observe(el('single-fit-block'), { attributes: true, attributeFilter: ['hidden'] });
     new MutationObserver(refresh).observe(el('dataset-select'), { childList: true });
     new MutationObserver(refresh).observe(el('btn-fit'), { attributes: true, attributeFilter: ['disabled'] });
     window.addEventListener('storage', event => {

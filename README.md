@@ -108,8 +108,8 @@ and press **Fit** (or Ctrl/Cmd+Enter). A single X or Y error value applies to ev
 JSROOT; the report lists every parameter ± uncertainty, χ², NDF, χ²/NDF and
 the p-value.
 
-**Auto-guess parameters…** is available in both plotting interfaces for XY
-fits, including custom ROOT formulas. Choose **Quick guess (20 seconds)** to
+**Automatic guess…** is available in both plotting interfaces for XY, histogram,
+and multivariate fits, including custom ROOT formulas. Choose **Quick guess (20 seconds)** to
 use automatic search ranges, or **Set ranges and time** for more control.
 The time choices are 5, 10, 20, and 30 seconds, plus 1, 2, 3, and 5 minutes;
 20 seconds is the default. You can cancel while it runs. Click outside the
@@ -125,8 +125,14 @@ normal ROOT report and uncertainties. **Undo** restores the previous starting
 values. Search limits apply only to the search; the subsequent fit can move
 outside them. Suggestions can miss other minima, and weakly determined
 parameters or values at a search limit need particular care. The search does
-not identify a model or guarantee a unique solution. Histogram and multivariate
-searches are not currently supported.
+not identify a model or guarantee a unique solution. Histogram searches integrate
+count-density models over each selected bin, including unequal-width bins.
+Poisson likelihood uses deviance and includes empty bins; chi-square uses
+√count errors and omits empty bins. Multivariate searches use all inputs and
+outputs together, preserve shared parameter indices, and propagate input/output
+uncertainties with the same effective-variance convention as Fit. Their preview
+compares measured and predicted outputs against an agreement diagonal.
+Multivariate searches accept up to 100,000 output measurements in total.
 
 - **Save document** downloads a `.json` file with everything: inputs, the
   last fit result (including the ROOT canvas, so it redraws without a backend),
@@ -203,7 +209,11 @@ Response fields: `params[]` (name, value, error), `chi2`, `ndf`, `chi2_ndf`,
 objects for JSROOT: `canvas_json`, `graph_json`, `func_json`.
 Errors: `{"error": "..."}` with HTTP 400 (your input) or 500 (server).
 
-Parameter search uses the same XY request fields:
+Parameter search accepts `analysis_type: "xy"` (default) with the XY fit fields,
+`"histogram"` with the `/histogram` fields, or `"multivariate"` with the
+`/multivariate-fit` fields. Histogram payloads retain binning, counting method,
+and `x_range`; multivariate payloads retain models, shared parameter indices,
+input/output columns, uncertainties, and optional per-input `input_ranges`:
 
 - `POST /parameter-search/prepare` returns suggested `parameters` with
   `index`, `name`, `initial`, `lower`, `upper`, plus `n_points` and `warnings`.
@@ -211,8 +221,9 @@ Parameter search uses the same XY request fields:
   `time_budget` (1–300 seconds) and optional integer `seed`. Equal limits hold
   a parameter fixed during the search. HTTP 202 returns a `job_id`.
 - `GET /parameter-search/<job_id>` returns `status`, `progress`, and a `result`
-  when complete. Results include `values`, a weighted sum-of-squares `score`,
-  `initial_score`, `evaluations`, warnings and a preview curve. This is an
+  when complete. Results include `values`, a method-specific `score`,
+  `score_description`, `initial_score`, `evaluations`, warnings and a preview
+  curve (per-output measured/predicted panels for multivariate models). This is an
   initialization search, so it does not return parameter uncertainties.
 - `DELETE /parameter-search/<job_id>` cancels a running search and stops its
   worker. Cancellation of an already finished job returns its existing result.

@@ -201,7 +201,8 @@
     renderGrids(mv);
   }
 
-  function buildPayload(d) {
+  function buildPayload(d, options = {}) {
+    readDom();
     const mv = ensure(d);
     const inputs = [], input_errors = [], input_names = [];
     let N = null;
@@ -229,7 +230,7 @@
       if (!f) throw new Error('Enter a model for ' + name + '.');
       models.push(f);
     }
-    if (N * mv.m <= maxParamIndex(models) + 1) throw new Error('Add more data: there are fewer measurements than parameters to fit.');
+    if (!options.search && N * mv.m <= maxParamIndex(models) + 1) throw new Error('Add more data: there are fewer measurements than parameters to fit.');
     return {
       n_inputs: mv.n, n_outputs: mv.m,
       inputs, input_errors, outputs, output_errors,

@@ -229,36 +229,45 @@ def do_fit():
 
 
 def parameter_search_payload(payload):
-    """Keep search requests on the same data and formula rules as an XY fit."""
+    """Keep search requests on the same data and formula rules as the selected fit."""
     if not isinstance(payload, dict):
-        raise BadRequest("Enter XY data and a fit function before searching.")
-    if payload.get("analysis_type", "xy") != "xy":
-        raise BadRequest("Starting-value search currently supports XY data.")
-    formula = str(payload.get("formula") or "").strip()
-    ok, message = check_formula(formula)
-    if not ok:
-        raise BadRequest(message)
-    normalized = {
-        "formula": formula,
-        "x": number_list(payload, "x", True), "y": number_list(payload, "y", True),
-        "ex": number_list(payload, "ex", False), "ey": number_list(payload, "ey", False),
-        "param_names": string_list(payload, "param_names"),
-        "initial_guesses": guess_list(payload, "initial_guesses"),
-    }
-    n = len(normalized["x"])
-    if n < 2 or len(normalized["y"]) != n:
-        raise BadRequest("Enter matching X and Y columns with at least two points.")
-    for key in ("ex", "ey"):
-        if len(normalized[key]) not in (0, 1, n) or any(value < 0 for value in normalized[key]):
-            raise BadRequest("Uncertainties must be nonnegative, with one value or one per measurement.")
-    limits = payload.get("x_range")
-    if limits is not None:
-        if not isinstance(limits, list) or len(limits) != 2:
-            raise BadRequest("The fit range needs a minimum and a maximum.")
-        limits = number_list({"limits": limits}, "limits", True)
-        if not limits[0] < limits[1]:
-            raise BadRequest("The fit-range minimum must be less than its maximum.")
-    normalized["x_range"] = limits
+        raise BadRequest("Enter data and a fit function before searching.")
+    kind = payload.get("analysis_type", "xy")
+    if kind == "xy":
+        formula = str(payload.get("formula") or "").strip()
+        ok, message = check_formula(formula)
+        if not ok:
+            raise BadRequest(message)
+        normalized = {
+            "formula": formula,
+            "x": number_list(payload, "x", True), "y": number_list(payload, "y", True),
+            "ex": number_list(payload, "ex", False), "ey": number_list(payload, "ey", False),
+            "param_names": string_list(payload, "param_names"),
+            "initial_guesses": guess_list(payload, "initial_guesses"),
+        }
+        n = len(normalized["x"])
+        if n < 2 or len(normalized["y"]) != n:
+            raise BadRequest("Enter matching X and Y columns with at least two points.")
+        for key in ("ex", "ey"):
+            if len(normalized[key]) not in (0, 1, n) or any(value < 0 for value in normalized[key]):
+                raise BadRequest("Uncertainties must be nonnegative, with one value or one per measurement.")
+        limits = payload.get("x_range")
+        if limits is not None:
+            if not isinstance(limits, list) or len(limits) != 2:
+                raise BadRequest("The fit range needs a minimum and a maximum.")
+            limits = number_list({"limits": limits}, "limits", True)
+            if not limits[0] < limits[1]:
+                raise BadRequest("The fit-range minimum must be less than its maximum.")
+        normalized["x_range"] = limits
+    elif kind in ("histogram", "multivariate"):
+        keys = ("histogram", "formula", "x_range") if kind == "histogram" else (
+            "n_inputs", "n_outputs", "inputs", "outputs", "input_errors", "output_errors",
+            "models", "input_names", "output_names", "input_ranges")
+        normalized = {key: payload[key] for key in keys if key in payload}
+        normalized.update(analysis_type=kind, param_names=string_list(payload, "param_names"),
+                          initial_guesses=guess_list(payload, "initial_guesses"))
+    else:
+        raise BadRequest("Choose XY, histogram, or multivariate analysis before searching.")
     raw_budget = payload.get("time_budget", 120)
     try:
         budget = float(raw_budget)

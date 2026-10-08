@@ -1,4 +1,4 @@
-"""Bounded, best-effort starting-value search for the accepted XY ROOT formulas.
+"""Bounded, best-effort starting-value search for the accepted ROOT fit models.
 
 The formula is evaluated by ROOT, never translated or evaluated as Python.  A
 search runs in the server's disposable process: its caller owns cancellation
@@ -76,8 +76,13 @@ def _inputs(payload):
         raise ValueError("Search needs at least two distinct x values inside the fit range.")
     if not math.isfinite(high - low):
         raise ValueError("The x range is too large; rescale the x units first.")
+    function, expanded, names, guesses = _model(payload, low, high)
+    return x, y, ex, ey, function, expanded, names, guesses, (float(low), float(high))
+
+
+def _model(payload, low, high, variables=("x",), allow_constant=False):
     formula = payload.get("formula", "")
-    ok, reason = check_formula(formula)
+    ok, reason = check_formula(formula, variables=variables)
     if not ok:
         raise ValueError(reason)
     formula = str(formula).strip()
@@ -98,12 +103,18 @@ def _inputs(payload):
             size = int(re.search(r"\d+$", name).group()) + 1
         if offset + size > MAX_PARAMETERS:
             raise ValueError(f"Search supports at most {MAX_PARAMETERS} parameters, including built-in function offsets.")
-    function = ROOT.TF1("parameter_search_" + uuid.uuid4().hex, formula, low, high)
-    function.AddToGlobalList(False)
-    if not function.IsValid() or function.GetNdim() > 1:
-        raise ValueError("ROOT could not parse this as a single-variable fit function.")
+    if variables != ("x",):
+        formula = re.sub(r"\bx(\d+)\b", r"x[\1]", formula)
+    name = "parameter_search_" + uuid.uuid4().hex
+    if variables == ("x",):
+        function = ROOT.TF1(name, formula, low, high)
+        function.AddToGlobalList(False)
+    else:
+        function = ROOT.TFormula(name, formula, False)
+    if not function.IsValid() or function.GetNdim() > len(variables):
+        raise ValueError("ROOT could not parse this model with the selected inputs.")
     count = int(function.GetNpar())
-    if count == 0:
+    if count == 0 and not allow_constant:
         raise ValueError("This function has no adjustable parameters to search for.")
     if count > MAX_PARAMETERS:
         raise ValueError(f"Search supports at most {MAX_PARAMETERS} parameters.")
@@ -127,7 +138,7 @@ def _inputs(payload):
         expanded = expanded.replace("[" + function.GetParName(i) + "]", f"[{i}]")
     names = [str(names[i]).strip() if i < len(names) and names[i] else
              str(function.GetParName(i)) for i in range(count)]
-    return x, y, ex, ey, function, expanded, names, guesses, (float(low), float(high))
+    return function, expanded, names, guesses
 
 
 def _function_arguments(expression):
@@ -257,8 +268,23 @@ def _hints(x, y, expression, names):
 
 
 def _configuration(payload, require_points=True):
-    x, y, ex, ey, function, expression, names, guesses, limits = _inputs(payload)
-    hints, peaks = _hints(x, y, expression, names)
+    if not isinstance(payload, dict):
+        raise ValueError("Search input must be an object.")
+    kind = payload.get("analysis_type", "xy")
+    extra = {}
+    if kind == "xy":
+        x, y, ex, ey, function, expression, names, guesses, limits = _inputs(payload)
+        hints, peaks = _hints(x, y, expression, names)
+    elif kind in ("histogram", "multivariate"):
+        from search_problems import problem
+        extra = problem(payload)
+        x, y = extra["x"], extra["y"]
+        ex, ey = np.zeros(len(x)), np.zeros(len(y))
+        function, expression, names, guesses, limits = (extra[key] for key in
+            ("function", "expression", "names", "guesses", "limits"))
+        hints, peaks = extra["hints"], extra["peaks"]
+    else:
+        raise ValueError("Choose XY, histogram, or multivariate analysis before searching.")
     raw_bounds = payload.get("bounds")
     if raw_bounds is not None:
         try:
@@ -283,7 +309,7 @@ def _configuration(payload, require_points=True):
     if not np.isfinite(bounds).all() or not np.isfinite(bounds[:, 1] - bounds[:, 0]).all():
         raise ValueError("Parameter scales are too large; rescale the data or give narrower search bounds.")
     free = bounds[:, 0] < bounds[:, 1]
-    insufficient = len(x) <= int(np.sum(free))
+    insufficient = extra.get("n_observations", len(x)) <= int(np.sum(free))
     if require_points and insufficient:
         raise ValueError("Use more points inside the fit range than free parameters, or fix parameters with equal bounds.")
     initial = np.array([h["initial"] if guess is None else guess for h, guess in zip(hints, guesses)])
@@ -293,7 +319,7 @@ def _configuration(payload, require_points=True):
     if np.any((initial < bounds[:, 0]) | (initial > bounds[:, 1])):
         warnings.append("Starting values outside the search ranges were clipped to those ranges.")
     initial = np.clip(initial, bounds[:, 0], bounds[:, 1])
-    return dict(x=x, y=y, ex=ex, ey=ey, function=function, expression=expression, names=names,
+    return dict(extra, x=x, y=y, ex=ex, ey=ey, function=function, expression=expression, names=names,
                 hints=hints, peaks=peaks, bounds=bounds, free=free, initial=initial,
                 limits=limits, warnings=warnings)
 
@@ -308,7 +334,8 @@ def prepare(payload, require_points=False):
     return {"parameters": [dict(index=i, name=name, initial=float(config["initial"][i]),
                                 lower=float(config["bounds"][i, 0]), upper=float(config["bounds"][i, 1]))
                            for i, name in enumerate(config["names"])],
-            "n_points": len(config["x"]), "warnings": config["warnings"]}
+            "n_points": len(config["x"]), "n_observations": config.get("n_observations", len(config["x"])),
+            "analysis_type": payload.get("analysis_type", "xy"), "warnings": config["warnings"] + config.get("notes", [])}
 
 
 class _TimeLimit(Exception):
@@ -359,8 +386,8 @@ def search(payload, progress_callback=None):
     # A change of Y units should not stop local refinement merely because all
     # unweighted residuals are numerically tiny. This common scalar affects only
     # optimizer tolerances; the score sent to the user remains the raw SSE.
-    optimization_scale = 1.0 if np.any(ey > 0) else max(
-        float(np.std(y)), float(np.max(np.abs(y))) * .001, np.finfo(float).tiny ** .25)
+    optimization_scale = config.get("optimization_scale") or (1.0 if np.any(ey > 0) else max(
+        float(np.std(y)), float(np.max(np.abs(y))) * .001, np.finfo(float).tiny ** .25))
     # Linear coordinates preserve centers. asinh coordinates let other scales
     # span orders of magnitude, include zero and negative values, and remain
     # well conditioned for bounded local least squares.
@@ -380,6 +407,8 @@ def search(payload, progress_callback=None):
             values[free] = np.where(linear, warped, np.sinh(warped)) * scales
         return np.clip(values, bounds[:, 0], bounds[:, 1])
     def evaluate(values, points=xgrid):
+        if "evaluate" in config:
+            return config["evaluate"](values)
         # Current ROOT versions evaluate an entire NumPy dataset in C++ here.
         return np.asarray(function.EvalPar(points, np.ascontiguousarray(values)), dtype=float).reshape(-1)
     def report(force=False):
@@ -397,20 +426,24 @@ def search(payload, progress_callback=None):
         evaluations += 1
         with np.errstate(all="ignore"):
             predicted = evaluate(values)
-            variance = ey ** 2
-            if with_x_errors:
-                derivative = np.zeros(len(x))
-                derivative[x_error_points] = (evaluate(values, plus) - evaluate(values, minus)) / (2 * h[x_error_points])
-                variance = variance + (ex * derivative) ** 2
-            errors = np.where(variance > 0, np.sqrt(variance), 1)
-            result = (predicted - y) / errors
+            if "residual" in config:
+                result = config["residual"](values, predicted)
+                variance = np.zeros(len(result))
+            else:
+                variance = ey ** 2
+                if with_x_errors:
+                    derivative = np.zeros(len(x))
+                    derivative[x_error_points] = (evaluate(values, plus) - evaluate(values, minus)) / (2 * h[x_error_points])
+                    variance = variance + (ex * derivative) ** 2
+                errors = np.where(variance > 0, np.sqrt(variance), 1)
+                result = (predicted - y) / errors
             finite = (np.isfinite(predicted).all() and np.isfinite(variance).all()
                       and np.isfinite(result).all() and np.max(np.abs(result)) < 1e45)
             score = float(np.dot(result, result)) if finite else INVALID_SCORE
         if finite and (best_score is None or score < best_score):
             best_score, best_values = score, values.copy()
         report()
-        return result / optimization_scale if finite else np.full(len(y), math.sqrt(INVALID_SCORE / len(y)))
+        return result / optimization_scale if finite else np.full(config.get("n_observations", len(y)), math.sqrt(INVALID_SCORE / config.get("n_observations", len(y))))
     def objective(z):
         result = residual(z)
         return float(np.dot(result, result))
@@ -485,7 +518,7 @@ def search(payload, progress_callback=None):
         timed_out = True
     if best_values is None or best_score is None:
         raise ValueError("No finite curve was found. Adjust the parameter ranges or starting values, then try again.")
-    warnings = list(config["warnings"])
+    warnings = list(config["warnings"]) + config.get("notes", [])
     if timed_out:
         warnings.append("The time limit was reached; these are the best values found so far.")
     if dimensions:
@@ -508,11 +541,15 @@ def search(payload, progress_callback=None):
             normalized = jacobian / np.where(norms > 0, norms, 1)
             if np.linalg.matrix_rank(normalized, tol=1e-5) < dimensions:
                 warnings.append("Some parameters have indistinguishable or very weak effects on these data. Their individual values may not be determined.")
-    preview_x = np.linspace(*config["limits"], 301)
-    with np.errstate(all="ignore"):
-        preview_y = evaluate(best_values, preview_x.reshape(-1, 1))
-    if not np.isfinite(preview_y).all():
-        raise ValueError("The best candidate is undefined between data points. Narrow the fit range or adjust parameter bounds.")
+    if "preview" in config:
+        curve = config["preview"](best_values)
+    else:
+        preview_x = np.linspace(*config["limits"], 301)
+        with np.errstate(all="ignore"):
+            preview_y = evaluate(best_values, preview_x.reshape(-1, 1))
+        if not np.isfinite(preview_y).all():
+            raise ValueError("The best candidate is undefined between data points. Narrow the fit range or adjust parameter bounds.")
+        curve = dict(x=preview_x.tolist(), y=preview_y.tolist())
     if initial_score is not None and best_score >= initial_score * (1 - 1e-8):
         warnings.append("The search did not improve on the starting values.")
     warnings.append("These are starting values, not a validated fit. Apply them and run Fit to evaluate convergence and uncertainties.")
@@ -521,5 +558,5 @@ def search(payload, progress_callback=None):
     return dict(values=best_values.tolist(), score=float(best_score), initial_score=initial_score,
                 evaluations=evaluations, elapsed_seconds=round(time.monotonic() - started, 2),
                 n_points=len(x), free_parameters=dimensions, seed=seed, timed_out=timed_out,
-                warnings=warnings, curve=dict(x=preview_x.tolist(), y=preview_y.tolist()),
-                score_description="Sum of squared residuals, with X/Y uncertainties through effective variance when supplied.")
+                warnings=warnings, curve=curve, analysis_type=payload.get("analysis_type", "xy"),
+                score_description=config.get("score_description", "Sum of squared residuals, with X/Y uncertainties through effective variance when supplied."))

@@ -83,7 +83,10 @@
     if (!notice) return;
     if (typeof lastResult === 'undefined' || !lastResult || !lastPayload) { notice.hidden = true; return; }
     try {
-      notice.hidden = JSON.stringify(buildPayload(readForm(), lastResult.fit_performed !== false)) === JSON.stringify(lastPayload);
+      const payload = datasets[activeIdx]?.analysis_type === 'multivariate'
+        ? window.Multivariate.buildPayload(datasets[activeIdx])
+        : buildPayload(readForm(), lastResult.fit_performed !== false);
+      notice.hidden = JSON.stringify(payload) === JSON.stringify(lastPayload);
     } catch (_) {
       notice.hidden = false;
     }
