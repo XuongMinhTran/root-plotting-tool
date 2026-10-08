@@ -1,5 +1,8 @@
 .parameter-search-tools{margin-top:14px;padding-top:12px;border-top:1px solid var(--shadow,#ccd5df)}
 .parameter-search-actions{display:flex;flex-wrap:wrap;gap:8px}
+#parameter-search-open{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:10px 16px;font-size:14px;font-weight:700;line-height:1.3}
+#parameter-search-open svg{flex:none}
+#parameter-search-open:focus-visible{outline:3px solid var(--accent,#145aa0);outline-offset:3px}
 .parameter-search-dialog{width:min(800px,calc(100vw - 24px));max-height:90vh;box-sizing:border-box;padding:22px;background:var(--frame-2,#f7f8fa);color:var(--ink,#111);border:1px solid var(--shadow,#aeb8c6);border-radius:8px;overflow:auto}
 .parameter-search-dialog::backdrop{background:rgba(0,0,0,.4)}
 .parameter-search-dialog [hidden],.parameter-search-tools [hidden]{display:none!important}

@@ -102,7 +102,7 @@ and press **Fit** (or Ctrl/Cmd+Enter). A single X or Y error value applies to ev
 JSROOT; the report lists every parameter ± uncertainty, χ², NDF, χ²/NDF and
 the p-value.
 
-**Search starting values…** is available in both plotting interfaces for XY
+**Auto-guess parameters…** is available in both plotting interfaces for XY
 fits, including custom ROOT formulas. Review the suggested parameter ranges,
 choose a 30-second, 2-minute or 5-minute search, and start it. You can cancel
 while it runs. The search compares multiple candidates and refines promising

@@ -82,7 +82,7 @@
     const supported = datasets[activeIdx]?.analysis_type === 'xy';
     el('parameter-search-open').disabled = !supported || fitBusy;
     el('parameter-search-availability').textContent = supported
-      ? 'Try several starting points for your model, then review the suggested values.'
+      ? 'Find starting values for your model, then review them before applying.'
       : 'Starting-value search is available for XY fits. Histogram and multivariate searches are not available yet.';
     const current = (session || undo) ? fingerprint() : null;
     if (session && current !== session.fingerprint) stale(session);
@@ -359,11 +359,11 @@
   function init() {
     const block = el('single-fit-block'); if (!block) return;
     host = document.createElement('div'); host.className = 'parameter-search-tools';
-    host.innerHTML = '<div class="parameter-search-actions"><button type="button" id="parameter-search-open" aria-describedby="parameter-search-availability">Search starting values…</button><button type="button" id="parameter-search-undo" hidden>Undo suggested values</button></div><p class="hint" id="parameter-search-availability"></p>';
+    host.innerHTML = '<div class="parameter-search-actions"><button type="button" id="parameter-search-open" class="primary" aria-describedby="parameter-search-availability"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" focusable="false"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg><span>Auto-guess parameters…</span></button><button type="button" id="parameter-search-undo" hidden>Undo suggested values</button></div><p class="hint" id="parameter-search-availability"></p>';
     block.after(host);
     dialog = document.createElement('dialog'); dialog.className = 'parameter-search-dialog';
     dialog.setAttribute('aria-labelledby', 'parameter-search-title'); dialog.setAttribute('aria-describedby', 'parameter-search-description');
-    dialog.innerHTML = `<div class="parameter-search-heading"><h2 id="parameter-search-title">Search starting values</h2><button type="button" id="parameter-search-close">Close</button></div>
+    dialog.innerHTML = `<div class="parameter-search-heading"><h2 id="parameter-search-title">Auto-guess parameters</h2><button type="button" id="parameter-search-close">Close</button></div>
       <p id="parameter-search-description"></p>
       <p id="parameter-search-error" role="alert" hidden></p>
       <div id="parameter-search-setup" hidden>
