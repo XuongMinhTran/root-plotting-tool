@@ -219,7 +219,7 @@ const HELP = {
     title: 'How your analysis works',
     html: `
       <p><b>1. Choose an analysis type.</b> XY compares two measured quantities, a histogram groups one quantity into bins, and multivariate analysis relates several inputs to one or more outputs. A plot is created automatically.</p>
-      <p><b>2. Add your data.</b> Choose Add data… to type or paste measurements into a table, or enter them directly in the columns. Examples are optional; the example list follows your chosen analysis type.</p>
+      <p><b>2. Add your data.</b> Choose Add data… to type or paste measurements into a table, or enter them directly in the columns. To explore the tool with sample data instead, load an example; the example list follows your chosen analysis type.</p>
       <p><b>3. Choose a model and fit.</b> Review the fitted curve and results. For a histogram, you can also plot counts without fitting.</p>
       <p>Each column holds one number per point. Paste straight from a spreadsheet: values separated by new lines,
       commas, tabs, semicolons or spaces are all accepted, and blank lines are ignored.</p>
@@ -605,7 +605,7 @@ function syncAnalysisSetup() {
       ? 'Your measurements are added. Plot the histogram below, or continue to choose a fit model.'
       : 'Your measurements are added. Next, choose a fit model. You can edit the data below or switch plots at any time.'
     : hasPlot
-    ? 'Your plot is ready for data. Add your measurements below, then choose a fit model. You can also load an example to try the workflow.'
+    ? 'Your plot is ready for data. Add your measurements below, then choose a fit model.'
     : 'Start here: choose the kind of data you measured. We will create your first plot for you.';
   if ($('btn-table')) {
     $('btn-table').classList.toggle('primary', !hasData);
