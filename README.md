@@ -117,6 +117,12 @@ window or use its red Close button to dismiss it and stop a running search.
 The Close button stays visible while you scroll. The search compares multiple
 candidates and refines promising ones using the selected data, uncertainties,
 point exclusions and fit range.
+Duplicate guesses are removed before refinement. Short local trials select
+distinct promising candidates for longer refinement, while Latin hypercube
+populations and restarts explore the search ranges. Converged regions are
+revisited only when a new candidate meaningfully improves their score. Fixed
+uncertainty quantities are reused, and part of the time budget is reserved
+for the final refinement, preview and sensitivity check.
 It supports up to 20 parameters. Suggested ranges are heuristics: narrow or
 expand them using what you know about your experiment.
 
@@ -220,6 +226,9 @@ input/output columns, uncertainties, and optional per-input `input_ranges`:
 - `POST /parameter-search` adds `bounds: [[lower, upper], ...]`,
   `time_budget` (1–300 seconds) and optional integer `seed`. Equal limits hold
   a parameter fixed during the search. HTTP 202 returns a `job_id`.
+  Optional `stop_when_stalled: true` returns early after three consecutive
+  diverse search rounds without meaningful improvement. The default is false,
+  so a stalled round restarts exploration within the requested time budget.
 - `GET /parameter-search/<job_id>` returns `status`, `progress`, and a `result`
   when complete. Results include `values`, a method-specific `score`,
   `score_description`, `initial_score`, `evaluations`, warnings and a preview

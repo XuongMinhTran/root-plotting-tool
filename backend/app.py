@@ -280,6 +280,10 @@ def parameter_search_payload(payload):
     if isinstance(seed, bool) or not isinstance(seed, int) or not 0 <= seed < 2 ** 32:
         raise BadRequest("The search seed must be an integer between 0 and 4294967295.")
     normalized["seed"] = seed
+    stop_when_stalled = payload.get("stop_when_stalled", False)
+    if not isinstance(stop_when_stalled, bool):
+        raise BadRequest("stop_when_stalled must be true or false.")
+    normalized["stop_when_stalled"] = stop_when_stalled
     bounds = payload.get("bounds")
     if bounds is not None:
         if not isinstance(bounds, list) or not bounds or len(bounds) > 20:
