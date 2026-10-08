@@ -1,5 +1,8 @@
-.parameter-search-tools{margin-top:14px;padding-top:12px;border-top:1px solid var(--shadow,#ccd5df)}
-.parameter-search-actions{display:flex;flex-wrap:wrap;gap:8px}
+.parameter-search-tools{max-width:100%}
+.parameter-search-actions{display:flex;align-items:center;flex-wrap:wrap;gap:8px}
+.parameter-search-actions [data-help="guesses"]{margin:0;min-height:44px}
+.parameter-search-tools>.hint{margin:6px 0 0}
+.classic .parameter-search-tools{margin-top:8px}
 #parameter-search-open{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:10px 16px;font-size:14px;font-weight:700;line-height:1.3}
 #parameter-search-open svg{flex:none}
 #parameter-search-open:focus-visible{outline:3px solid var(--accent,#145aa0);outline-offset:3px}
