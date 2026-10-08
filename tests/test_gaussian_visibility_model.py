@@ -40,8 +40,10 @@ class GaussianVisibilityModelTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.model = library_model()
-        cls.parameters = [float(value) for value in cls.model["guesses"].split(",")]
-        cls.function = ROOT.TF1("gaussian_visibility_test", cls.model["formula"], 3.8, 7.7)
+        cls.guesses = [float(value) for value in cls.model["guesses"].split(",")]
+        # Independent synthetic experiment; library defaults are only placeholders.
+        cls.parameters = [400, 7, 1.3, 4.1, 0.2, 0.7, 0.8, 1.3, 2.4]
+        cls.function = ROOT.TF1("gaussian_visibility_test", cls.model["formula"], -2, 2)
 
     def test_formula_is_accepted_with_nine_parameters(self):
         ok, message = check_formula(self.model["formula"])
@@ -49,13 +51,13 @@ class GaussianVisibilityModelTests(unittest.TestCase):
         self.assertTrue(self.function.IsValid())
         self.assertEqual(self.function.GetNpar(), 9)
         self.assertEqual(len(self.model["params"].split(",")), 9)
-        self.assertEqual(len(self.parameters), 9)
+        self.assertEqual(len(self.guesses), 9)
 
     def test_equation_and_continuous_envelope_center(self):
-        for parameters in (self.parameters, [400, 7, 1.3, 4.1, 5.2, 5.7, 0.8, 6.3, 2.4]):
+        for parameters in (self.guesses, self.parameters):
             self.function.SetParameters(*parameters)
             center = parameters[4]
-            for x in (3.8, 4.6, center - 1e-10, center, center + 1e-10, 6.2, 7.7):
+            for x in (-2, -1, center - 1e-10, center, center + 1e-10, 1, 2):
                 with self.subTest(parameters=parameters, x=x):
                     actual = self.function.Eval(x)
                     self.assertTrue(math.isfinite(actual))
@@ -66,12 +68,11 @@ class GaussianVisibilityModelTests(unittest.TestCase):
         parameters[2] = 0
         parameters[6] = 0
         self.function.SetParameters(*parameters)
-        for x in (3.8, parameters[4], 7.7):
+        for x in (-2, parameters[4], 2):
             self.assertAlmostEqual(self.function.Eval(x), parameters[1] + parameters[0] / 2)
 
     def test_fit_endpoint_recovers_synthetic_curve_from_perturbed_guesses(self):
-        # 79 points match the reference range and give 70 degrees of freedom.
-        x = [3.8 + 0.05 * i for i in range(79)]
+        x = [-2 + 0.05 * i for i in range(81)]
         y = [reference(value, self.parameters) for value in x]
         guesses = self.parameters.copy()
         for index, factor in ((0, 0.95), (1, 1.1), (2, 1.02), (3, 0.99), (6, 0.9), (8, 1.05)):
@@ -84,12 +85,12 @@ class GaussianVisibilityModelTests(unittest.TestCase):
                 "x": x, "y": y, "ey": [math.sqrt(value) for value in y],
                 "formula": self.model["formula"],
                 "param_names": self.model["params"], "initial_guesses": guesses,
-                "x_range": [3.8, 7.7],
+                "x_range": [-2, 2],
             })
         result = response.get_json()
         self.assertEqual(response.status_code, 200, result.get("error"))
         self.assertTrue(result["converged"], result["status_message"])
-        self.assertEqual(result["ndf"], 70)
+        self.assertEqual(result["ndf"], 72)
         self.assertEqual([p["name"] for p in result["params"]],
                          [name.strip() for name in self.model["params"].split(",")])
         self.assertLess(result["chi2"], 0.001)
