@@ -7,7 +7,15 @@ const equation=require('../frontend/equation-parser.js');
 const library=JSON.parse(fs.readFileSync(path.join(__dirname,'../frontend/model-library.js'),'utf8')
   .match(/const DATA = ([\s\S]*?);\s*const norm/)[1]);
 const model=library.models.find(m=>m.name==='Double-slit (Gaussian fringe visibility)');
-const names=model.params.split(',').map(s=>s.trim());
+const names=model.symbols.split(',').map(s=>s.trim());
+
+test('nine-parameter model separates readable report names from equation symbols',()=>{
+  assert.deepEqual(model.params.split(',').map(s=>s.trim()), [
+    'count_scale','background','envelope_scale','fringe_frequency','envelope_center',
+    'fringe_origin','visibility','visibility_center','visibility_width'
+  ]);
+  assert.equal(model.guesses.split(',').length,names.length);
+});
 
 test('nine-parameter library model imports and retains parameter identities',()=>{
   const imported=equation.fromRoot(model.formula,names);
@@ -52,7 +60,7 @@ test('only equivalent guarded sinc expressions can be imported',()=>{
 
 test('all library models still import and round-trip through the editor',()=>{
   for(const m of library.models) {
-    const imported=equation.fromRoot(m.formula,m.params.split(',').map(s=>s.trim()));
+    const imported=equation.fromRoot(m.formula,(m.symbols || m.params).split(',').map(s=>s.trim()));
     const compiled=equation.compile(imported.latex,imported.parameters);
     assert.deepEqual(compiled.parameters,imported.parameters,m.name);
     assert.deepEqual(equation.fromRoot(compiled.formula,compiled.parameters).parameters,compiled.parameters,m.name);

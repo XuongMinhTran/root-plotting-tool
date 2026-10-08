@@ -32,9 +32,15 @@
   function warn(text) {
     el('parameter-search-error').textContent = text || '';
     el('parameter-search-error').hidden = !text;
+    publishInline();
   }
 
-  function status(text) { el('parameter-search-status').textContent = text; }
+  function status(text) { el('parameter-search-status').textContent = text; publishInline(); }
+  function publishInline() {
+    const s=session; if(!s?.inline) return;
+    const busy=!!(s.preparing || s.running || s.cancelling), error=el('parameter-search-error').textContent;
+    window.FitModelUX?.searchState({busy,cancelling:!!s.cancelling,message:el('parameter-search-status').textContent,error,failed:!!error && !busy && !s.stale},s.datasetId);
+  }
 
   async function request(s, path, options = {}) {
     let response;
@@ -80,6 +86,10 @@
     dialog.querySelectorAll('[data-bound]').forEach(input => { input.disabled = !!busy || !!s?.stale; });
     el('parameter-search-progress').hidden = !s?.running;
     el('parameter-search-ranges').setAttribute('aria-busy', String(!!s?.preparing));
+    publishInline();
+    const inlineBusy=!!session?.inline && !!busy;
+    if(el('starting-values-estimate')) el('starting-values-estimate').disabled=inlineBusy || fitBusy || !['xy','histogram'].includes(datasets[activeIdx]?.analysis_type) || !el('param-table').querySelector('[data-pguess]');
+    el('parameter-search-open').disabled=!!busy || fitBusy;
   }
 
   function stale(s, reason) {
@@ -87,6 +97,7 @@
     s.stale = true;
     warn(reason || 'The data, equation, or starting values changed. Close this window and open a new search for the current inputs.');
     setControls(s);
+    if(s.inline && !s.running) { window.FitModelUX?.searchState(null,s.datasetId); return; }
     if (s.running) stop(s, false);
   }
 
@@ -96,12 +107,14 @@
     const supported = ['xy', 'histogram', 'multivariate'].includes(kind);
     const mount = kind === 'multivariate' ? el('multivariate-model') : el('parameter-search-single-mount');
     if (mount && host.parentElement !== mount) mount.append(host);
-    el('parameter-search-open').disabled = !supported || fitBusy;
+    el('parameter-search-open').disabled = !supported || fitBusy || !!(session?.preparing || session?.running || session?.cancelling);
+    el('parameter-search-open').textContent=kind==='multivariate'?'Computer estimate…':'Search options…';
     el('parameter-search-availability').textContent = supported
       ? 'Let the computer suggest values, then review and apply them.'
       : 'Choose an analysis type to find starting values for your model.';
     const current = (session || undo) ? fingerprint() : null;
     if (session && current !== session.fingerprint) stale(session);
+    if(session?.inline && fitBusy) stale(session,'Fit started. The pending estimate will not change its starting values.');
     if (undo && current !== undo.fingerprint) undo = null;
     el('parameter-search-undo').hidden = !undo;
   }
@@ -152,7 +165,8 @@
     });
   }
 
-  async function open() {
+  async function open(inline=false) {
+    inline=inline===true;
     refresh();
     if (el('parameter-search-open').disabled) return;
     let payload;
@@ -168,8 +182,12 @@
       if (datasets[activeIdx]?.calculationError) throw new Error(datasets[activeIdx].calculationError);
       payload = multivariate ? window.Multivariate.buildPayload(datasets[activeIdx], { search: true }) : buildPayload(readForm());
       if (!multivariate && !payload.formula) throw new Error('Enter a fit function before searching for starting values.');
-    } catch (error) { showMessage('error', error.message); return; }
-    const s = session = { payload, backend: backendUrl(), fingerprint: fingerprint(), preparing: true, mode: 'choice' };
+    } catch (error) {
+      if(inline) window.FitModelUX?.searchState({busy:false,failed:true,message:'Estimation could not start. Current values kept.',error:error.message});
+      else showMessage('error', error.message);
+      return;
+    }
+    const s = session = { payload, backend: backendUrl(), fingerprint: fingerprint(), preparing: true, mode: 'choice',inline,datasetId:datasets[activeIdx]?.id || String(activeIdx) };
     warn(''); status('Preparing search ranges…');
     el('parameter-search-ranges').querySelector('tbody').replaceChildren();
     el('parameter-search-results').hidden = true;
@@ -181,7 +199,7 @@
       ? 'Search using your histogram bins, selected fit range, and counting method. Your current guesses stay in place until you choose Apply.'
       : 'Search the current XY data and fit range. Excluded points are omitted. Your current guesses stay in place until you choose Apply.';
     el('parameter-search-effort').value = '20';
-    setControls(s); dialog.showModal();
+    setControls(s); if(!inline) dialog.showModal();
     dialog.scrollTop = 0;
     clearInterval(refreshTimer); refreshTimer = setInterval(refresh, 500);
     try {
@@ -193,8 +211,14 @@
       s.parameters = prepared.parameters;
       rangeTable(s); addWarnings(prepared.warnings, el('parameter-search-warnings'));
       status(`Ready to search ${s.parameters.length} parameter${s.parameters.length === 1 ? '' : 's'} using ${prepared.n_points} included ${payload.analysis_type === 'histogram' ? 'bins' : 'rows'}${payload.analysis_type === 'multivariate' ? ' across ' + payload.n_outputs + ' output(s)' : ''}.`);
-    } catch (error) { if (session === s) { warn(error.message); status('Search could not be prepared.'); } }
-    finally { s.preparing = false; if (session === s) setControls(s); }
+    } catch (error) { if (session === s) { warn(error.message); status('Estimation could not be prepared. Current values kept.'); } }
+    finally {
+      s.preparing = false;
+      if (session === s) {
+        setControls(s);
+        if(inline && s.parameters && !s.stale) { s.mode='quick'; start(); }
+      }
+    }
   }
 
   function advanced() {
@@ -296,6 +320,7 @@
       if (session === s) {
         status('Search stopped. Your starting values have been kept.');
         setControls(s);
+        if(s.inline) { window.FitModelUX?.searchState(null,s.datasetId); clearInterval(refreshTimer); session=null; refresh(); }
         if (closeAfter || s.closeAfterStop) dialog.close();
       }
     } catch (error) {
@@ -355,6 +380,7 @@
       status('Search finished without usable values.'); warn('Try narrower parameter ranges or different starting values.'); return;
     }
     s.result = result;
+    if(s.inline) { apply(); return; }
     const tbody = el('parameter-search-values').querySelector('tbody'); tbody.replaceChildren();
     s.parameters.forEach((p, i) => {
       const row = document.createElement('tr');
@@ -383,11 +409,11 @@
 
   function guessesField() { return el(datasets[activeIdx]?.analysis_type === 'multivariate' ? 'mv-par-guesses' : 'initial-guesses'); }
 
-  function writeGuesses(value) {
+  function writeGuesses(value, source='edited', result=null) {
     applying = true;
     try {
       guessesField().value = value;
-      guessesField().dispatchEvent(new Event('input', { bubbles: true }));
+      guessesField().dispatchEvent(new CustomEvent('input', { bubbles: true, detail:{startingValuesSource:source,curve:result?.curve,warnings:result?.warnings} }));
       autosave();
     } finally { applying = false; }
   }
@@ -399,9 +425,10 @@
     const before = guessesField().value;
     // Retain full numerical precision in the actual guesses, regardless of how
     // many digits were shown in the review table.
-    writeGuesses(s.result.values.map(String).join(', '));
+    writeGuesses(s.result.values.map(String).join(', '),'automatic',s.result);
     undo = { before, fingerprint: fingerprint() };
     s.fingerprint = undo.fingerprint;
+    if(s.inline) { window.FitModelUX?.searchState(null,s.datasetId); clearInterval(refreshTimer); session=null; refresh(); window.FitModelUX?.refresh(); return; }
     dialog.close(); refresh();
     showMessage('info', 'Suggested starting values applied. Run Fit to calculate the fit report and uncertainties.');
   }
@@ -418,19 +445,11 @@
   function init() {
     const block = el('single-fit-block'); if (!block) return;
     host = document.createElement('div'); host.className = 'parameter-search-tools';
-    host.innerHTML = '<div class="parameter-search-actions"><div class="guess-method"><div class="guess-method-heading"><button type="button" id="parameter-search-open" class="primary" aria-describedby="parameter-search-availability"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" focusable="false"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg><span>Computer guess…</span></button><button type="button" id="parameter-search-undo" hidden>Undo suggested values</button></div><p class="hint" id="parameter-search-availability"></p></div></div>';
-    const parameterHelp = block.querySelector('[data-help="guesses"]');
-    if (parameterHelp) {
+    host.innerHTML = '<div class="parameter-search-actions"><button type="button" id="parameter-search-open" aria-describedby="parameter-search-availability">Search options…</button><button type="button" id="parameter-search-undo" hidden>Undo estimate</button></div><p class="hint" id="parameter-search-availability"></p>';
+    const editor = el('starting-values-editor');
+    if (editor) {
       const mount = document.createElement('div'); mount.id = 'parameter-search-single-mount';
-      parameterHelp.closest('.parameter-heading').after(mount); mount.append(host);
-      const actions=host.querySelector('.parameter-search-actions');
-      const visual=block.querySelector('.visual-match-tools');
-      if(visual) {
-        visual.classList.add('guess-method');
-        const heading=document.createElement('div'); heading.className='guess-method-heading';
-        heading.append(...visual.children); visual.append(heading,el('visual-match-help'));
-        actions.classList.add('guess-methods'); actions.prepend(visual);
-      }
+      editor.append(mount); mount.append(host);
     } else {
       const mount = document.createElement('div'); mount.id = 'parameter-search-single-mount';
       block.append(mount); mount.append(host);
@@ -464,7 +483,9 @@
       </section>
       <div class="parameter-search-footer" id="parameter-search-footer"><button type="button" id="parameter-search-start">Start search</button><button type="button" id="parameter-search-settings">Set ranges and time</button><button type="button" id="parameter-search-stop" hidden>Stop search</button><button type="button" id="parameter-search-apply" class="primary" disabled>Apply suggested values</button></div>`;
     document.body.append(dialog);
-    el('parameter-search-open').onclick = open;
+    el('parameter-search-open').onclick = ()=>open(false);
+    el('starting-values-estimate').onclick = ()=>open(true);
+    el('starting-values-stop').onclick = ()=>stop(session,false);
     el('parameter-search-undo').onclick = undoApply;
     el('parameter-search-quick').onclick = quick;
     el('parameter-search-advanced').onclick = advanced;

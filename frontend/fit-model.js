@@ -13,9 +13,15 @@
   function adjustGuess(value, step, action) {
     if(!Number.isFinite(value)) throw new Error('Enter a finite starting value.');
     if(['plus','minus'].includes(action) && (!Number.isFinite(step) || step<=0)) throw new Error('Step must be a positive, finite number.');
-    const next=action==='plus'?value+step:action==='minus'?value-step:action==='times10'?value*10:action==='divide10'?value/10:action==='sign'?-value:NaN;
-    if(!Number.isFinite(next) || (value!==0 && next===0 && ['times10','divide10'].includes(action))) throw new Error('That adjustment is outside the supported number range.');
+    const next=action==='plus'?value+step:action==='minus'?value-step:action==='sign'?-value:NaN;
+    if(!Number.isFinite(next)) throw new Error('That adjustment is outside the supported number range.');
     if(['plus','minus'].includes(action) && next===value) throw new Error('Step is too small at this magnitude. Increase Step.');
+    return next;
+  }
+  function scaleStep(step, action) {
+    if(!Number.isFinite(step) || step<=0) throw new Error('Step must be a positive, finite number.');
+    const next=action==='times10'?step*10:action==='divide10'?step/10:NaN;
+    if(!Number.isFinite(next) || next<=0) throw new Error('That step is outside the supported number range.');
     return next;
   }
   function defaultAdjustment(value, mode='linear') {
@@ -38,13 +44,30 @@
       (value/2-low/2)/(high/2-low/2);
     return Math.max(0,Math.min(1,position));
   }
+  function valuesKey(text) {
+    const values=String(text ?? '').split(',').map(token=> {
+      const value=token.trim(); return value && Number.isFinite(Number(value))?Number(value):value;
+    });
+    while(values.at(-1)==='') values.pop();
+    return JSON.stringify(values);
+  }
+  function startingStatus(guesses, count, provenance, signature) {
+    const values=String(guesses).split(',').map(value=>value.trim());
+    const ready=count>0 && Array.from({length:count},(_,i)=>values[i]).every(value=>value && Number.isFinite(Number(value)));
+    if(!ready) return {ready:false, text:values.some(Boolean)?'Starting values are incomplete. Estimate or edit them before fitting.':'Using model defaults. Estimate or edit values to see the starting curve.'};
+    const recorded=provenance?.values===valuesKey(guesses);
+    const source=recorded?provenance.source:null;
+    const text=source==='automatic'?'Estimated from your data.':source==='adjusted'?'Adjusted manually.':source==='edited'?'Edited.':'Starting values set.';
+    const changed=recorded && provenance.signature!==signature;
+    return {ready:true, text:(changed?text+' The data or model changed; review the curve or re-estimate.':'✓ '+text+' Review the curve, then run Fit.')};
+  }
   function previewModel(engine, formula, names, guesses, xMin, xMax) {
     const imported=engine.fromRoot(formula,names);
     const expression=engine.expression(imported.latex);
     const values={};
     imported.parameters.forEach((symbol,i)=> {
       const value=String(guesses[i] ?? '').trim();
-      if(!value || !Number.isFinite(Number(value))) throw new Error('Enter starting values, or use Computer guess, to see the model curve.');
+      if(!value || !Number.isFinite(Number(value))) throw new Error('Enter or estimate starting values to see the model curve.');
       values[symbol]=Number(value);
     });
     if(!Number.isFinite(xMin) || !Number.isFinite(xMax) || xMin>=xMax) throw new Error('Choose a fit range with its minimum below its maximum.');
@@ -56,7 +79,7 @@
     if(curve.every(p=>p[1]===null)) throw new Error('The model is undefined at these starting values. Check widths, denominators and function domains.');
     return curve;
   }
-  const helpers={formatGuess,bounds,previewModel,adjustGuess,defaultAdjustment,sliderValue,sliderPosition};
+  const helpers={formatGuess,bounds,previewModel,adjustGuess,scaleStep,defaultAdjustment,sliderValue,sliderPosition,valuesKey,startingStatus};
   if(typeof module==='object' && module.exports) module.exports=helpers;
   if(typeof document==='undefined') return;
   const $=id=>document.getElementById(id), raw=$('formula'), table=$('param-table');
@@ -65,13 +88,52 @@
   const adjustments=new Map();
   let controlKey='';
   const panel=$('guess-preview-panel'), controls=$('visual-parameters'), openButton=$('visual-match-open');
-  const manualHelp='Adjust the curve to follow your data, then run Fit.';
+  const searches=new Map();
+  const currentDataset=()=>typeof datasets==='undefined'?null:datasets[activeIdx];
+  const datasetKey=()=>currentDataset()?.id || String(typeof activeIdx==='undefined'?0:activeIdx);
+  function signature() {
+    const dataset=currentDataset();
+    return JSON.stringify({data:scope.WorkspaceStore?.signature(dataset || {}) || dataset,formula:raw.value,range:[$('fit-xmin').value,$('fit-xmax').value]});
+  }
+  function recordSource(source, curve=null, warnings=[]) {
+    const dataset=currentDataset(); if(!dataset) return;
+    dataset.startingValues={source,values:valuesKey($('initial-guesses').value),signature:signature(),curve,warnings};
+    searches.delete(datasetKey());
+    if(typeof autosave==='function') autosave();
+  }
+  function searchState(state, key=datasetKey()) {
+    if(state) searches.set(key,state); else searches.delete(key);
+    updateStartingStatus();
+  }
+  function updateStartingStatus() {
+    const count=table.querySelectorAll('[data-pguess]').length, provenance=currentDataset()?.startingValues;
+    const state=searches.get(datasetKey()), busy=!!state?.busy;
+    const base=startingStatus($('initial-guesses').value,count,provenance,signature());
+    const message=state?.busy || state?.failed?state.message:(count?base.text:'Choose a model with adjustable parameters to set starting values.');
+    if($('starting-values-status').textContent!==message) $('starting-values-status').textContent=message;
+    $('starting-values-error').textContent=state?.error || ''; $('starting-values-error').hidden=!state?.error;
+    const estimate=$('starting-values-estimate');
+    estimate.textContent=provenance?.source==='automatic'?'Re-estimate':'Estimate starting values';
+    estimate.classList.toggle('primary',provenance?.source!=='automatic');
+    estimate.disabled=busy || !count || !['xy','histogram'].includes($('analysis-type').value) || (typeof fitBusy!=='undefined' && fitBusy);
+    $('starting-values-stop').hidden=!busy; $('starting-values-stop').disabled=!!state?.cancelling;
+    openButton.classList.toggle('primary',!!state?.failed);
+    const warnings=provenance?.values===valuesKey($('initial-guesses').value) && Array.isArray(provenance.warnings)?provenance.warnings:[];
+    const list=$('starting-values-warnings'); list.replaceChildren();
+    warnings.forEach(message=> { const item=document.createElement('li'); item.textContent=String(message); list.append(item); });
+    $('starting-values-notes').hidden=!warnings.length;
+  }
+  function cachedCurve() {
+    const estimate=currentDataset()?.startingValues;
+    const curve=estimate?.curve;
+    return estimate?.signature===signature() && estimate.values===valuesKey($('initial-guesses').value) && Array.isArray(curve?.x) && Array.isArray(curve.y) && curve.x.length===curve.y.length?curve:null;
+  }
   function adjustmentError(message='') { $('visual-match-error').textContent=message; $('visual-match-error').hidden=!message; }
   function setGuess(index, value) {
     const input=table.querySelector(`[data-pguess="${index}"]`);
     if(!input) return;
     input.value=String(value); input.dataset.fullGuess=input.value;
-    input.dispatchEvent(new Event('input',{bubbles:true}));
+    input.dispatchEvent(new CustomEvent('input',{bubbles:true,detail:{startingValuesSource:'adjusted'}}));
   }
   function syncControls() {
     if(!controls) return;
@@ -80,12 +142,12 @@
     try { scope.RootEquation.expression(scope.RootEquation.fromRoot(raw.value,$('param-names').value.split(',')).latex); }
     catch(_) { available=false; }
     openButton.disabled=!available;
-    $('visual-match-recommended').hidden=!available;
-    $('visual-match-help').textContent=available?manualHelp:($('analysis-type').value!=='xy'?'Visual matching is available for XY models. Computer guess is available for this analysis.':'Choose a model that supports live preview to match its curve visually. Computer guess is available for other ROOT models.');
+    $('visual-match-help').textContent=available?"Curve doesn't follow the data? Adjust it before running Fit.":($('analysis-type').value!=='xy'?'Estimate or edit values for this analysis. Interactive curve adjustment is available for XY models.':'Estimate or edit values for this model. Interactive adjustment requires a model supported by the live preview.');
     $('visual-adjust-mode').disabled=!available;
     const dataset=typeof datasets==='undefined'?null:datasets[activeIdx];
     const key=`${dataset?.id || (typeof activeIdx==='undefined'?0:activeIdx)}|${raw.value}`;
     if(key!==controlKey || controls.children.length!==(available?inputs.length:0)) {
+      $('visual-adjustments').hidden=true; openButton.setAttribute('aria-expanded','false'); openButton.textContent='Adjust on the plot'; panel.classList.remove('is-adjusting');
       controls.replaceChildren(); controlKey=key; adjustmentError();
       if(available) inputs.forEach((input,i)=> {
         const card=document.createElement('div'); card.className='visual-parameter'; card.dataset.index=i;
@@ -111,8 +173,8 @@
       for(const [selector,text] of [['[data-visual-value]',valueText],['[data-visual-step]',state.step],['[data-visual-bound="low"]',state.low],['[data-visual-bound="high"]',state.high]]) {
         const field=card.querySelector(selector); if(document.activeElement!==field) field.value=String(text);
       }
-      const descriptions={minus:`Decrease ${label} by Step`,plus:`Increase ${label} by Step`,times10:`Multiply ${label} and Step by 10`,divide10:`Divide ${label} and Step by 10`,sign:`Flip the sign of ${label}`};
-      card.querySelectorAll('[data-adjust]').forEach(button=> { button.disabled=!finite; button.title=descriptions[button.dataset.adjust]; button.setAttribute('aria-label',button.title); });
+      const descriptions={minus:`Decrease ${label} by Step`,plus:`Increase ${label} by Step`,times10:`Multiply ${label} Step by 10`,divide10:`Divide ${label} Step by 10`,sign:`Flip the sign of ${label}`};
+      card.querySelectorAll('[data-adjust]').forEach(button=> { button.disabled=['times10','divide10'].includes(button.dataset.adjust)?false:!finite; button.title=descriptions[button.dataset.adjust]; button.setAttribute('aria-label',button.title); });
       card.querySelector('.visual-slider-controls').hidden=$('visual-adjust-mode').value!=='slider';
       const slider=card.querySelector('[data-visual-slider]'); slider.disabled=!finite || state.mode==='log'&&value===0;
       slider.title=state.mode==='log'&&value===0?'Enter a nonzero guess for a logarithmic slider, or choose Linear.':'';
@@ -131,30 +193,27 @@
     const count=table.querySelectorAll('[data-pguess]').length;
     let changed=false;
     for(let i=0;i<count;i++) if(!String(guesses[i]??'').trim()) { guesses[i]=defaults[i]?.trim() && Number.isFinite(Number(defaults[i]))?defaults[i]:'1'; changed=true; }
-    if(changed) { $('initial-guesses').value=guesses.join(', '); $('initial-guesses').dispatchEvent(new Event('input',{bubbles:true})); }
+    if(changed) { $('initial-guesses').value=guesses.join(', '); $('initial-guesses').dispatchEvent(new CustomEvent('input',{bubbles:true,detail:{startingValuesSource:'adjusted'}})); }
   }
   openButton?.addEventListener('click',()=> {
     fillBlankGuesses();
-    panel.showModal(); syncControls(); renderPreview();
-  });
-  $('visual-guess-close')?.addEventListener('click',()=>panel.close());
-  $('visual-guess-form')?.addEventListener('submit',event=>event.preventDefault());
-  panel?.addEventListener('click',event=> {
-    if(event.target!==panel) return;
-    const rect=panel.getBoundingClientRect();
-    if(event.clientX<rect.left || event.clientX>rect.right || event.clientY<rect.top || event.clientY>rect.bottom) panel.close();
+    const pane=$('visual-adjustments'); pane.hidden=!pane.hidden;
+    openButton.setAttribute('aria-expanded',String(!pane.hidden));
+    openButton.textContent=pane.hidden?'Adjust on the plot':'Hide adjustment controls';
+    panel.classList.toggle('is-adjusting',!pane.hidden); syncControls(); renderPreview();
   });
   controls?.addEventListener('click',event=> {
     const button=event.target.closest('[data-adjust]'); if(!button) return;
     const card=button.closest('.visual-parameter'), index=Number(card.dataset.index), state=adjustments.get(controlKey+'|'+index);
     try {
       const stepText=card.querySelector('[data-visual-step]').value.trim(), step=stepText?Number(stepText):NaN;
+      if(['times10','divide10'].includes(button.dataset.adjust)) {
+        state.step=scaleStep(step,button.dataset.adjust);
+        card.querySelector('[data-visual-step]').value=String(state.step);
+        adjustmentError(); syncControls(); return;
+      }
       const valueText=card.querySelector('[data-visual-value]').value.trim();
       const value=adjustGuess(valueText?Number(valueText):NaN,step,button.dataset.adjust);
-      if(['times10','divide10'].includes(button.dataset.adjust) && Number.isFinite(step) && step>0) {
-        const changed=button.dataset.adjust==='times10'?step*10:step/10;
-        if(Number.isFinite(changed)&&changed>0) state.step=changed;
-      }
       adjustmentError(); setGuess(index,value);
     } catch(error) { adjustmentError(error.message); }
   });
@@ -223,32 +282,46 @@
       (Number.isFinite(low)&&Number.isFinite(high)?` (${formatGuess(low)} – ${formatGuess(high)})`:'');
     const choice=scope.ModelLibrary?.guideFor(raw.value);
     $('model-choice-name').textContent=choice?.name || (raw.value.trim()?'Custom model':'No model — plot data only');
-    if(type!=='xy') { note.textContent='Live starting-value previews are available for XY models. Your fit and plot options still work here.'; return; }
-    if(parsed.bad.length || y.bad.length || parsed.values.length!==y.values.length || parsed.values.length<2) { note.textContent='Add matching X and Y measurements to preview your model.'; return; }
-    if(!raw.value.trim()) { note.textContent='Choose a model to preview its starting values.'; return; }
-    const points=parsed.values.map((x,i)=>[x,y.values[i]]).filter((p,i)=>!excluded.has(i) && p[0]>=low&&p[0]<=high);
-    if(points.length<2) { note.textContent='Include at least two measurements in the fit range to preview the model.'; return; }
-    let curve;
-    try { curve=previewModel(scope.RootEquation,raw.value,$('param-names').value.split(',').map(s=>s.trim()),$('initial-guesses').value.split(','),low,high); }
-    catch(error) {
-      note.textContent=/starting values|undefined|fit range/.test(error.message)?error.message:'Live preview is unavailable for this ROOT function. You can still use Fit; Computer guess is available for supported expressions.';
+    if(type!=='xy') {
+      const cached=cachedCurve();
+      const points=(Array.isArray(cached?.data_x)?cached.data_x:[]).map((x,i)=>[x,cached.data_y?.[i]]).filter(p=>p.every(Number.isFinite));
+      const curve=(cached?.x || []).map((x,i)=>[x,cached.y?.[i]]).filter(p=>p.every(Number.isFinite));
+      const limits=bounds(points.map(p=>p[0]).concat(curve.map(p=>p[0])));
+      if(points.length && curve.length && limits[0]<limits[1]) note.textContent=drawStartingCurve(host,points,curve,...limits);
+      else note.textContent='Estimate starting values to preview this model. Live curve adjustment is available for supported XY models.';
       return;
     }
+    if(parsed.bad.length || y.bad.length || parsed.values.length!==y.values.length || parsed.values.length<2) { note.textContent='Add matching X and Y measurements to preview your model.'; return; }
+    if(!Number.isFinite(low) || !Number.isFinite(high) || low>=high) { note.textContent='Choose an increasing X range to preview the starting curve.'; return; }
+    const points=parsed.values.map((x,i)=>[x,y.values[i]]).filter((p,i)=>!excluded.has(i) && p[0]>=low&&p[0]<=high);
+    if(points.length<2) { note.textContent='Include at least two measurements in the fit range to preview the model.'; return; }
+    let curve=[], warning='';
+    try { curve=previewModel(scope.RootEquation,raw.value,$('param-names').value.split(',').map(s=>s.trim()),$('initial-guesses').value.split(','),low,high); }
+    catch(error) {
+      const cached=cachedCurve();
+      if(Array.isArray(cached?.x) && cached.x.length===cached.y?.length) curve=cached.x.map((x,i)=>[x,cached.y[i]]).filter(p=>p.every(Number.isFinite));
+      if(!curve.length) warning=/starting values|undefined|fit range/.test(error.message)?error.message:'Estimate or edit starting values to see this ROOT model curve. Live adjustment is unavailable for this function.';
+    }
+    note.textContent=warning || drawStartingCurve(host,points,curve,low,high);
+    if(warning) drawStartingCurve(host,points,curve,low,high);
+  }
+  function drawStartingCurve(host,points,curve,low,high) {
     // Keep the measurement scale steady while the user moves the curve.
     const yBounds=bounds(points.map(p=>p[1]));
     const span=yBounds[1]-yBounds[0] || Math.max(1,Math.abs(yBounds[0])*.1), ymin=yBounds[0]-span*.08, ymax=yBounds[1]+span*.08;
-    if(!Number.isFinite(ymax-ymin) || !Number.isFinite(ymin) || !Number.isFinite(ymax)) { note.textContent='These starting values make the curve too large to preview. Try smaller values or Computer guess.'; return; }
+    if(!Number.isFinite(ymax-ymin) || !Number.isFinite(ymin) || !Number.isFinite(ymax)) return 'These measurements are outside the supported preview range.';
     const sx=x=>52+(x-low)/(high-low)*544, sy=y=>Math.max(-1e6,Math.min(1e6,210-(y-ymin)/(ymax-ymin)*184));
     let path='', restart=true;
     for(const [x,y] of curve) { if(y===null) { restart=true; continue; } path+=(restart?'M':'L')+sx(x).toFixed(2)+','+sy(y).toFixed(2)+' '; restart=false; }
     const step=Math.max(1,Math.ceil(points.length/1500));
     const dots=points.filter((_,i)=>i%step===0).map(([x,y])=>`<circle cx="${sx(x).toFixed(2)}" cy="${sy(y).toFixed(2)}" r="2.5" fill="#354759"/>`).join('');
-    host.innerHTML=`<svg viewBox="0 0 624 244" role="img" aria-label="Initial guess model curve over your included measurements; not a fit result"><defs><clipPath id="guess-preview-clip"><rect x="52" y="22" width="544" height="188"/></clipPath></defs><path d="M52 22 V210 H596" stroke="#becbd7" fill="none"/><g clip-path="url(#guess-preview-clip)"><path d="${path}" stroke="#346295" stroke-width="2" stroke-dasharray="6 4" fill="none"/>${dots}</g><g font-size="12" fill="#657487"><text x="52" y="234">${formatGuess(low)}</text><text x="596" y="234" text-anchor="end">${formatGuess(high)}</text><text x="324" y="234" text-anchor="middle">x</text><text x="46" y="30" text-anchor="end">${formatGuess(ymax)}</text><text x="46" y="210" text-anchor="end">${formatGuess(ymin)}</text></g></svg>`;
-    note.textContent=curve.some(p=>p[1]===null)?'Some parts of this model are undefined at these starting values. Check the curve before fitting.':curve.some(p=>p[1]<ymin||p[1]>ymax)?'Part of the curve is outside the data scale. Adjust the values to bring it toward your measurements.':'';
+    host.innerHTML=`<svg viewBox="0 0 624 244" role="img" aria-label="Starting curve over your included measurements; not a fit result"><defs><clipPath id="guess-preview-clip"><rect x="52" y="22" width="544" height="188"/></clipPath></defs><path d="M52 22 V210 H596" stroke="#becbd7" fill="none"/><g clip-path="url(#guess-preview-clip)"><path d="${path}" stroke="#346295" stroke-width="2" stroke-dasharray="6 4" fill="none"/>${dots}</g><g font-size="12" fill="#657487"><text x="52" y="234">${formatGuess(low)}</text><text x="596" y="234" text-anchor="end">${formatGuess(high)}</text><text x="324" y="234" text-anchor="middle">x</text><text x="46" y="30" text-anchor="end">${formatGuess(ymax)}</text><text x="46" y="210" text-anchor="end">${formatGuess(ymin)}</text></g></svg>`;
+    return curve.some(p=>p[1]===null)?'Some parts of this model are undefined at these starting values. Check the curve before fitting.':curve.some(p=>p[1]<ymin||p[1]>ymax)?'Part of the curve is outside the data scale. Adjust the values to bring it toward your measurements.':'';
   }
   function refresh() {
     growFormula();
     syncControls();
+    updateStartingStatus();
     for(const input of table.querySelectorAll('[data-pguess]')) {
       if(document.activeElement!==input) input.value=formatGuess(input.dataset.fullGuess ?? input.value);
     }
@@ -261,11 +334,15 @@
   table.addEventListener('focusout',event=> {
     if(event.target.matches('[data-pguess]')) event.target.value=formatGuess(event.target.dataset.fullGuess ?? event.target.value);
   });
-  document.addEventListener('input',refresh); document.addEventListener('change',refresh);
+  document.addEventListener('input',event=> {
+    if(event.target.matches?.('[data-pguess], #initial-guesses')) recordSource(event.detail?.startingValuesSource || 'edited',event.detail?.curve,event.detail?.warnings);
+    refresh();
+  });
+  document.addEventListener('change',refresh);
   document.addEventListener('rootfit:reset',refresh); document.addEventListener('rootfit:draw',refresh);
   // Switching plots restores data programmatically; observe the selector as well.
   document.addEventListener('click',refresh);
   new ResizeObserver(growFormula).observe(raw.parentElement);
-  scope.FitModelUX={...helpers,refresh,growFormula};
+  scope.FitModelUX={...helpers,refresh,growFormula,recordSource,searchState};
   refresh();
 })(globalThis);

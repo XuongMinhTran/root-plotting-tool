@@ -527,14 +527,15 @@ function syncFunctionExamples(histogram) {
 }
 function applyFunctionExample(value) {
   if (!value) return;
-  const [formula, names, guesses] = value.split('|');
+  delete datasets[activeIdx].startingValues;
+  const [formula, names, guesses, symbols] = value.split('|');
   $('formula').value = formula;
   $('param-names').value = names || '';
   $('initial-guesses').value = $('analysis-type').value !== 'histogram' && formula === '[0]*exp(-x/[1])'
     ? decayStartingGuesses(readForm()) || guesses || '' : guesses || '';
   $('quick-pick').value = '';
   syncDatasetFit();
-  window.RootEquationEditor?.fromRoot();
+  window.RootEquationEditor?.fromRoot(symbols ? symbols.split(',').map(s => s.trim()) : undefined);
   renderParamTable();
   autosave();
 }

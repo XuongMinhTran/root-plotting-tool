@@ -18,7 +18,8 @@
     "cat": "Waves & optics",
     "name": "Double-slit (Gaussian fringe visibility)",
     "formula": "[1]+[0]/2*([2]*(x-[4])==0?1:pow(sin([2]*(x-[4]))/([2]*(x-[4])),2))*(1+[6]*exp(-pow((x-[7])/[8],2))*cos(2*[3]*(x-[5])))",
-    "params": "N0, N_bg, k_a, k_d, x_1, x_0, V, x_c, w",
+    "symbols": "N0, N_bg, k_a, k_d, x_1, x_0, V, x_c, w",
+    "params": "count_scale, background, envelope_scale, fringe_frequency, envelope_center, fringe_origin, visibility, visibility_center, visibility_width",
     "guesses": "1, 0, 1, 5, 0, 0, 0.5, 0, 1",
     "desc": "Nine-parameter interference fit with a sinc² diffraction envelope, Gaussian position-dependent fringe visibility, independent envelope and fringe centers, and constant background: N = N_bg + (N0/2) sinc²(k_a(x−x_1)) [1 + V exp(−((x−x_c)/w)²) cos(2 k_d(x−x_0))]. The starting values are generic placeholders; estimate them from your data before fitting.",
     "x": "screen position",
@@ -113,14 +114,14 @@
   function use(m) {
     last = m;
     if (typeof applyFunctionExample === 'function') {
-      applyFunctionExample([m.formula, m.params, m.guesses].join('|'));
+      applyFunctionExample([m.formula, m.params, m.guesses, m.symbols || ''].join('|'));
     } else {
       if ($('formula')) $('formula').value = m.formula;
       if ($('param-names')) $('param-names').value = m.params;
       if ($('initial-guesses')) $('initial-guesses').value = m.guesses;
     }
     dlg.close();
-    if (typeof showMessage === 'function') showMessage('info', 'Model loaded. Open "Help with parameters" for how to estimate the starting guesses, then press Fit.');
+    if (typeof showMessage === 'function') showMessage('info', 'Model loaded. Review the starting curve, estimate or adjust its values if needed, then press Fit.');
   }
 
   // The model whose formula matches `formula` - preferring the one just inserted

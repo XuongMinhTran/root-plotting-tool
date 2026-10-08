@@ -34,10 +34,10 @@
     window.FitModelUX?.growFormula();
   }
   function setMath(value) { if(canEdit) math.setValue(value,{silenceNotifications:true}); }
-  function rootState(formula, preferVisual=true) {
+  function rootState(formula, preferVisual=true, symbols) {
     if (!formula.trim() && preferVisual && canEdit) return {latex:'',parameters:[],formula:'',mode:'equation',error:'',empty:true,cache:{}};
     try {
-      const imported=engine.fromRoot(formula,list($('param-names').value));
+      const imported=engine.fromRoot(formula,symbols || list(window.ModelLibrary?.guideFor(formula)?.symbols || $('param-names').value));
       return {...imported,formula,mode:preferVisual&&canEdit?'equation':'root',error:'',cache:{}};
     } catch (_) { return {latex:'',parameters:[],formula,mode:'root',error:'',cache:{}}; }
   }
@@ -145,7 +145,7 @@
   window.RootEquationEditor={load,sync,
     snapshot() { return state ? copy(state) : undefined; },
     parameterCount() { return state?.mode==='equation' ? state.parameters.length : null; },
-    fromRoot() { state=rootState(raw.value); setMath(state.latex); paint(); },
+    fromRoot(symbols) { state=rootState(raw.value,true,symbols); setMath(state.latex); paint(); },
     validate() { if(state?.mode==='equation' && state.error) { math.focus(); throw new Error('Fit equation: '+state.error); } }
   };
 })();
