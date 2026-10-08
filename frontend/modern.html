@@ -200,6 +200,7 @@
         <details id="equation-translation"><summary>ROOT expression</summary><code id="equation-root-preview"></code></details>
         <details class="equation-help"><summary>Typing reference</summary>
           <p>Type <code>alpha</code>, <code>beta</code>, <code>mu</code>, <code>sigma</code>, <code>tau</code>, <code>lambda</code>, or <code>theta</code> for Greek symbols, and <code>pi</code> for π. Other Greek letters can be entered as LaTeX commands, such as <code>\omega</code>, followed by Space. Type <code>sqrt</code> for a square root, <code>/</code> for a fraction, <code>^</code> for a power, and <code>_</code> for a subscript. Use Ctrl/⌘ + Z to undo.</p>
+          <p><code>sinc(z)</code> means sin(z)/z, with a value of 1 at z = 0. Use it for diffraction envelopes.</p>
           <p>Enter the right-hand side of the model, for example <code>A exp(-x/tau) + B</code>. Use the arrow keys to move out of a fraction, exponent, or subscript. LaTeX expressions can also be pasted into the field.</p>
           <p>Adjacent symbols multiply: <code>ab</code> means <code>a × b</code>. For a single parameter with a longer name, enter <code>\mathrm{background}</code>. A subscripted symbol such as <code>x_0</code> is a parameter. Report names can differ from equation symbols.</p>
           <p>Functions require parentheses. Supported functions include exp, ln (natural logarithm), log (natural logarithm), log10, sin, cos, tan, asin, acos, atan, sinh, cosh, tanh, sqrt, abs, erf, erfc, pow, min, max, and atan2. Use ROOT expression mode for other ROOT functions.</p>
@@ -471,8 +472,8 @@
 </dialog>
 
 <script src="vendor/mathlive/mathlive.min.js" defer></script>
-<script src="equation-parser.js?v=20260919-units" defer></script>
-<script src="equation-editor.js?v=20260920-empty-plot" defer></script>
+<script src="equation-parser.js?v=20261008-sinc" defer></script>
+<script src="equation-editor.js?v=20261008-sinc" defer></script>
 <script src="modern.js?v=20261008-beginners" defer></script>
 <script defer src="units.js?v=1"></script><script src="analysis-core.js?v=20260919-units" defer></script>
 <script src="workspace-store.js?v=1" defer></script>
@@ -480,7 +481,7 @@
 <script src="insert-data.js?v=20260920-types" defer></script>
 <script src="multivariate.js?v=1" defer></script>
 <script src="app.js?v=20261008-try-examples" defer></script>
-<script src="model-library.js?v=3" defer></script>
+<script src="model-library.js?v=4" defer></script>
 <script src="parameter-search.js?v=20261008-quick-guess" defer></script>
 <script defer src="analysis-features.js?v=20261008-beginners"></script>
 </body>

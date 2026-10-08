@@ -1,4 +1,4 @@
-/* Modern-only adapter. The shared application continues to submit ROOT text. */
+/* Shared equation adapter. The application continues to submit ROOT text. */
 (() => {
   'use strict';
   const $=id=>document.getElementById(id);
@@ -13,7 +13,7 @@
     MathfieldElement.soundsDirectory=null;
     math.mathVirtualKeyboardPolicy='manual';
     math.smartFence=true;
-    math.inlineShortcuts={...math.inlineShortcuts, tau:'\\tau',sigma:'\\sigma',mu:'\\mu',alpha:'\\alpha',beta:'\\beta',lambda:'\\lambda',theta:'\\theta',pi:'\\pi', exp:'\\exp',ln:'\\ln'};
+    math.inlineShortcuts={...math.inlineShortcuts, tau:'\\tau',sigma:'\\sigma',mu:'\\mu',alpha:'\\alpha',beta:'\\beta',lambda:'\\lambda',theta:'\\theta',pi:'\\pi', exp:'\\exp',ln:'\\ln',sinc:'\\operatorname{sinc}'};
   }
   function paint() {
     const visual=state?.mode === 'equation' && canEdit;

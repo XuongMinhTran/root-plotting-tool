@@ -4,7 +4,7 @@
 (function (scope) {
   'use strict';
   const greek = new Set('alpha beta gamma delta epsilon varepsilon zeta eta theta vartheta iota kappa lambda mu nu xi rho varrho sigma varsigma tau upsilon phi varphi chi psi omega Gamma Delta Theta Lambda Xi Sigma Upsilon Phi Psi Omega'.split(' '));
-  const functions = {sin:[1,'sin'],cos:[1,'cos'],tan:[1,'tan'],asin:[1,'asin'],acos:[1,'acos'],atan:[1,'atan'],arcsin:[1,'asin'],arccos:[1,'acos'],arctan:[1,'atan'],sinh:[1,'sinh'],cosh:[1,'cosh'],tanh:[1,'tanh'],exp:[1,'exp'],ln:[1,'log'],log:[1,'log'],log10:[1,'log10'],sqrt:[1,'sqrt'],abs:[1,'abs'],erf:[1,'TMath::Erf'],erfc:[1,'TMath::Erfc'],pow:[2,'pow'],min:[2,'TMath::Min'],max:[2,'TMath::Max'],atan2:[2,'atan2']};
+  const functions = {sinc:[1,'sinc'],sin:[1,'sin'],cos:[1,'cos'],tan:[1,'tan'],asin:[1,'asin'],acos:[1,'acos'],atan:[1,'atan'],arcsin:[1,'asin'],arccos:[1,'acos'],arctan:[1,'atan'],sinh:[1,'sinh'],cosh:[1,'cosh'],tanh:[1,'tanh'],exp:[1,'exp'],ln:[1,'log'],log:[1,'log'],log10:[1,'log10'],sqrt:[1,'sqrt'],abs:[1,'abs'],erf:[1,'TMath::Erf'],erfc:[1,'TMath::Erfc'],pow:[2,'pow'],min:[2,'TMath::Min'],max:[2,'TMath::Max'],atan2:[2,'atan2']};
   const fail = message => { throw new Error(message); };
   function tokens(latex) {
     const source = latex.replace(/\\(?:left|right|bigl|bigr|Bigl|Bigr)\b/g,'').replace(/\\(?:,|;|!| |quad\b|qquad\b)/g,' ');
@@ -32,7 +32,7 @@
         continue;
       }
       if ((m = rest.match(/^(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?/))) { out.push({t:'number',v:m[0]}); i += m[0].length; continue; }
-      if ((m = rest.match(/^(arcsin|arccos|arctan|log10|atan2|sinh|cosh|tanh|sqrt|sin|cos|tan|asin|acos|atan|exp|ln|log|abs|erfc|erf|pow|min|max)(?=[({])/))) { out.push({t:'fn',v:m[1]}); i += m[0].length; continue; }
+      if ((m = rest.match(/^(arcsin|arccos|arctan|log10|atan2|sinh|cosh|tanh|sqrt|sinc|sin|cos|tan|asin|acos|atan|exp|ln|log|abs|erfc|erf|pow|min|max)(?=[({])/))) { out.push({t:'fn',v:m[1]}); i += m[0].length; continue; }
       const c = source[i++];
       if (/[A-Za-z]/.test(c)) out.push({t:c === 'e' ? 'constant':'symbol',v:c});
       else if ('+-*/^_(){}[],|='.includes(c)) out.push({t:c});
@@ -76,8 +76,8 @@
     }
     function subscript() {
       at++; let parts=[];
-      if (peek() === '{') { at++; while (['number','symbol'].includes(peek())) parts.push(ts[at++].v); take('}'); }
-      else if (['number','symbol'].includes(peek())) parts.push(ts[at++].v);
+      if (peek() === '{') { at++; while (['number','symbol','constant'].includes(peek())) parts.push(ts[at++].v); take('}'); }
+      else if (['number','symbol','constant'].includes(peek())) parts.push(ts[at++].v);
       else fail('Complete the parameter subscript.');
       if (!parts.length) fail('Complete the parameter subscript.');
       return parts.join('');
@@ -131,6 +131,10 @@
     if (ast.k === 'symbol') return ast.v === 'x' ? 'x' : `[${parameters.indexOf(ast.v)}]`;
     if (ast.k === 'unary') return `(${ast.op}${emit(ast.a,parameters)})`;
     if (ast.k === 'binary') return `(${emit(ast.a,parameters)}${ast.op}${emit(ast.b,parameters)})`;
+    if (ast.v === 'sinc') {
+      const a=emit(ast.args[0],parameters);
+      return `((${a})==0?1:sin(${a})/(${a}))`;
+    }
     return `${functions[ast.v][1]}(${ast.args.map(a=>emit(a,parameters)).join(',')})`;
   }
   function compile(latex, previous=[]) {
@@ -168,12 +172,58 @@
     const right=precedence(ast.b)<level || (ast.op==='-' && precedence(ast.b)===level) || ast.b.k==='unary' ? wrap(ast.b):toLatex(ast.b);
     return left+(ast.op==='*'?' \\cdot ':' '+ast.op+' ')+right;
   }
+  // Recognize only the continuous sin(z)/z guard (or its square), with the
+  // same z in the condition, numerator, and denominator. Other conditionals
+  // remain ROOT-only; no arbitrary code or general ternary parser is added.
+  function collapseSincGuards(source) {
+    function closing(s, start) {
+      let depth=0;
+      for(let i=start;i<s.length;i++) {
+        if(s[i]==='(') depth++;
+        if(s[i]===')' && --depth===0) return i;
+      }
+      return -1;
+    }
+    function ungroup(s) {
+      while(s[0]==='(' && closing(s,0)===s.length-1) s=s.slice(1,-1);
+      return s;
+    }
+    function recognize(inner) {
+      const s=inner.replace(/\s+/g,''), mark=s.indexOf('==0?1:');
+      if(mark<0) return '('+inner+')';
+      const argument=ungroup(s.slice(0,mark));
+      let quotient=ungroup(s.slice(mark+6)), squared=false;
+      if(quotient.startsWith('pow(') && closing(quotient,3)===quotient.length-1) {
+        const args=quotient.slice(4,-1); let depth=0, comma=-1;
+        for(let i=0;i<args.length;i++) {
+          if(args[i]==='(') depth++;
+          else if(args[i]===')') depth--;
+          else if(args[i]===',' && depth===0) { comma=i; break; }
+        }
+        if(comma>=0 && args.slice(comma+1)==='2') { quotient=ungroup(args.slice(0,comma)); squared=true; }
+      }
+      const end=quotient.startsWith('sin(')?closing(quotient,3):-1;
+      if(end<0 || quotient[end+1]!=='/' || !argument
+        || ungroup(quotient.slice(4,end))!==argument
+        || ungroup(quotient.slice(end+2))!==argument) return '('+inner+')';
+      return squared?'(sinc('+argument+')^2)':'sinc('+argument+')';
+    }
+    const stack=[''];
+    for(const c of source) {
+      if(c==='(') stack.push('');
+      else if(c===')' && stack.length>1) {
+        const inner=stack.pop(); stack[stack.length-1]+=recognize(inner);
+      } else stack[stack.length-1]+=c;
+    }
+    return stack.join('(');
+  }
   // Conservative import: ROOT-only formulas remain editable in ROOT mode.
   // Existing ROOT text stays canonical until the user actually edits the equation.
   function fromRoot(formula, names=[]) {
     let source=formula.trim();
     if (/\bx\s*\[/.test(source)) fail('Use ROOT expression mode for multidimensional variables.');
     source=source.replace(/TMath::(Exp|Log10|Log|Sqrt|Sin|Cos|Tan|ASin|ACos|ATan|SinH|CosH|TanH|Abs|Power)(?=\s*\()/g,(_,name)=>({ASin:'asin',ACos:'acos',ATan:'atan',SinH:'sinh',CosH:'cosh',TanH:'tanh',Power:'pow'}[name] || name.toLowerCase()));
+    source=collapseSincGuards(source);
     const aliases={gaus:'[0]*exp(-0.5*((x-[1])/[2])^2)',gausn:'[0]/(sqrt(2*TMath::Pi())*[2])*exp(-0.5*((x-[1])/[2])^2)',expo:'exp([0]+[1]*x)'};
     source=source.replace(/\b(gausn|gaus|expo|pol\d+)(?:\((\d+)\))?/g, (m,name,offset)=>{
       const off=Number(offset||0);
@@ -227,6 +277,7 @@
           return a.op==='+'?l+r:a.op==='-'?l-r:a.op==='*'?l*r:a.op==='/'?l/r:l**r;
         }
         const name={ln:'log',arcsin:'asin',arccos:'acos',arctan:'atan'}[a.v] || a.v;
+        if(name==='sinc') { const z=walk(a.args[0]); return z===0?1:Math.sin(z)/z; }
         if(typeof Math[name]!=='function') fail('This calculation does not support '+a.v+'.');
         return Math[name](...a.args.map(walk));
       }
