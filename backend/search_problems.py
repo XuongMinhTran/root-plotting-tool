@@ -9,8 +9,6 @@ import numpy as np
 import ROOT
 from parameter_search import _array, _model, _hints, MAX_POINTS
 
-ERROR_COORDINATE_CACHE_BYTES = 64 * 1024 ** 2
-
 
 def problem(payload):
     return histogram(payload) if payload['analysis_type'] == 'histogram' else multivariate(payload)
@@ -78,15 +76,14 @@ def histogram(payload):
             current[i] = function.Integral(float(a[i]), float(b[i]), 1e-8)
         return current
 
-    positive_counts = y > 0
-    chi_errors = np.sqrt(y)
     def residual(values, predicted):
         if (predicted < 0).any() or ((predicted <= 0) & (y > 0)).any():
             return np.full(len(y), np.nan)
         if method == 'chi2':
-            return (predicted - y) / chi_errors
+            return (predicted - y) / np.sqrt(y)
         terms = predicted - y
-        terms[positive_counts] += y[positive_counts] * np.log(y[positive_counts] / predicted[positive_counts])
+        positive = y > 0
+        terms[positive] += y[positive] * np.log(y[positive] / predicted[positive])
         return np.sign(predicted - y) * np.sqrt(np.maximum(2 * terms, 0))
 
     def preview(values):
@@ -211,49 +208,25 @@ def multivariate(payload):
         """)
     coords = np.ascontiguousarray(X)
     h = np.where(np.abs(X) > 0, np.abs(X) * 1e-6, 1e-6)
-    with np.errstate(over='ignore'):
-        base_variance = SY ** 2
-        fixed_errors = np.sqrt(np.where(base_variance > 0, base_variance, 1.))
-    finite_base_variance = bool(np.isfinite(base_variance).all())
-    error_coordinates = []
-    cached_bytes = 0
-    for d in range(n):
-        rows = SX[:, d] > 0
-        if rows.any():
-            coordinate_bytes = 2 * int(rows.sum()) * n * coords.itemsize
-            points = None
-            if cached_bytes + coordinate_bytes <= ERROR_COORDINATE_CACHE_BYTES:
-                plus, minus = coords[rows].copy(), coords[rows].copy()
-                plus[:, d] += h[rows, d]
-                minus[:, d] -= h[rows, d]
-                points = (np.ascontiguousarray(plus), np.ascontiguousarray(minus))
-                cached_bytes += coordinate_bytes
-            error_coordinates.append((rows, d, points, 2 * h[rows, d, None], SX[rows, d, None]))
     def predictions(values, points=coords):
         values = np.ascontiguousarray(values)
         return np.column_stack([np.asarray(ROOT.RootatronSearch.EvaluateFormula(f, np.ascontiguousarray(points), values, len(points), n), dtype=float).reshape(-1) for f in functions])
     def evaluate(values):
         return predictions(values).reshape(-1)
     def residual(values, predicted):
-        if not finite_base_variance:
+        variance = SY ** 2
+        for d in range(n):
+            rows = SX[:, d] > 0
+            if not rows.any():
+                continue
+            plus, minus = coords[rows].copy(), coords[rows].copy()
+            plus[:, d] += h[rows, d]
+            minus[:, d] -= h[rows, d]
+            derivative = (predictions(values, plus) - predictions(values, minus)) / (2 * h[rows, d, None])
+            variance[rows] += (derivative * SX[rows, d, None]) ** 2
+        if not np.isfinite(variance).all():
             return np.full(Y.size, np.nan)
-        errors = fixed_errors
-        if error_coordinates:
-            variance = base_variance.copy()
-            for rows, d, points, denominator, input_error in error_coordinates:
-                if points is None:
-                    # Large, many-input datasets retain the streaming fallback
-                    # instead of caching hundreds of megabytes of coordinates.
-                    plus, minus = coords[rows].copy(), coords[rows].copy()
-                    plus[:, d] += h[rows, d]
-                    minus[:, d] -= h[rows, d]
-                else:
-                    plus, minus = points
-                derivative = (predictions(values, plus) - predictions(values, minus)) / denominator
-                variance[rows] += (derivative * input_error) ** 2
-            if not np.isfinite(variance).all():
-                return np.full(Y.size, np.nan)
-            errors = np.sqrt(np.where(variance > 0, variance, 1.))
+        errors = np.sqrt(np.where(variance > 0, variance, 1.))
         return ((predicted.reshape(Y.shape) - Y) / errors).reshape(-1)
     labels = payload.get('output_names') or []
     def preview(values):

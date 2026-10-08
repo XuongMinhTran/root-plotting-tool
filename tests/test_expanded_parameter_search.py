@@ -3,7 +3,6 @@ from pathlib import Path
 import sys
 import time
 import unittest
-from unittest.mock import patch
 
 import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'backend'))
@@ -91,25 +90,6 @@ class ExpandedSearchTests(unittest.TestCase):
                            + .8**2 / (.4**2 + (3*.1)**2 + (-4*.2)**2))
         self.assertEqual(r['n_points'], rows)
         self.assertAlmostEqual(r['score'], expected, places=7)
-
-    def test_cached_vector_uncertainties_do_not_accumulate_between_candidates(self):
-        from search_problems import problem
-        payload = vector()
-        payload.update(input_errors=[[.1], [.2]], output_errors=[[.3], [.4]])
-        payload['outputs'][0] = (np.asarray(payload['outputs'][0]) + .5).tolist()
-        values = np.array([3., 2., 5., -4., 1.])
-        other = np.array([6., 8., 10., -2., 2.])
-        expected = len(payload['inputs'][0]) * .5**2 / (.3**2 + (3*.1)**2 + (2*.2)**2)
-        # Exercise both cached coordinates and the bounded-memory fallback.
-        for cache_bytes in (64 * 1024**2, 0):
-            with self.subTest(cache_bytes=cache_bytes), \
-                    patch('search_problems.ERROR_COORDINATE_CACHE_BYTES', cache_bytes):
-                config = problem(payload)
-                first = config['residual'](values, config['evaluate'](values))
-                config['residual'](other, config['evaluate'](other))
-                repeated = config['residual'](values, config['evaluate'](values))
-                np.testing.assert_array_equal(first, repeated)
-                self.assertAlmostEqual(float(first @ first), expected, places=7)
 
     def test_constant_input_and_constant_component_with_shared_index(self):
         p = dict(analysis_type='multivariate', n_inputs=2, n_outputs=2,

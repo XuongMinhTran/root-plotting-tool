@@ -4,15 +4,12 @@ from pathlib import Path
 import sys
 import time
 import unittest
-from types import SimpleNamespace
-from unittest.mock import patch
 
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
 from app import app
 from parameter_search import prepare, search
-from parameter_search import _TimeLimit
 from search_jobs import manager
 
 
@@ -70,62 +67,6 @@ class NumericalSearchTests(unittest.TestCase):
                              initial_guesses=[2, 3], bounds=[[.1, 10], [.1, 10]], time_budget=1))
         self.assertTrue(any("indistinguishable" in warning for warning in result["warnings"]))
 
-    def test_invalid_penalty_preserves_ranking_for_tiny_y_units(self):
-        def no_refinement(fun, z, **kwargs):
-            result = fun(z)
-            return SimpleNamespace(x=z, fun=result, success=False)
-
-        def check_ranking(objective, bounds, **kwargs):
-            valid_score = objective(np.array([1.]))
-            invalid_score = objective(np.array([-1.]))
-            self.assertTrue(np.isfinite([valid_score, invalid_score]).all())
-            self.assertGreater(invalid_score, valid_score)
-            raise _TimeLimit()
-
-        with patch('scipy.optimize.least_squares', side_effect=no_refinement), \
-                patch('scipy.optimize.differential_evolution', side_effect=check_ranking):
-            result = search(dict(x=[0, 1, 2], y=[1e-60] * 3, formula='sqrt([0])',
-                                 bounds=[[-1, 1]], initial_guesses=[-1], time_budget=1))
-        self.assertGreaterEqual(result['values'][0], 0)
-        self.assertTrue(np.isfinite(result['curve']['y']).all())
-
-    def test_local_refinements_bound_actual_residual_calls_and_keep_results(self):
-        calls = []
-        def excessive_jacobian_work(fun, z, **kwargs):
-            completed = 0
-            try:
-                for _ in range(1000):
-                    result = fun(z)
-                    completed += 1
-            finally:
-                calls.append(completed)
-            return SimpleNamespace(x=z, fun=result, success=False)
-
-        # Freeze time to exercise the residual-call limit independently of the
-        # clock. An optimizer requesting excess Jacobian work must still stop.
-        with patch('parameter_search.time.monotonic', return_value=0.), \
-                patch('scipy.optimize.least_squares', side_effect=excessive_jacobian_work), \
-                patch('scipy.optimize.differential_evolution', side_effect=_TimeLimit):
-            result = search(dict(x=[0, 1, 2], y=[1, 2, 1], formula='[0]', time_budget=1))
-        self.assertTrue(calls)
-        self.assertTrue(all(0 < count < 300 for count in calls))
-        self.assertTrue(np.isfinite(result['score']))
-        self.assertEqual(result['evaluations'], sum(calls) + 1)
-
-    def test_optional_stalled_stop_retains_noisy_line_solution(self):
-        payload = line_payload()
-        payload.update(time_budget=5, stop_when_stalled=True)
-        result = search(payload)
-        expected = np.polyfit(payload['x'], payload['y'], 1)
-        np.testing.assert_allclose(result['values'], expected, atol=.002)
-        self.assertFalse(result['timed_out'])
-        self.assertTrue(any('without meaningful improvement' in note for note in result['warnings']))
-
-    def test_cached_y_errors_preserve_zero_uncertainty_convention(self):
-        result = search(dict(x=[0, 1, 2], y=[1.1, 2.8, 5.3], ey=[.5, 0, 2],
-                             formula='[0]*x+[1]', bounds=[[2, 2], [1, 1]], time_budget=1))
-        self.assertAlmostEqual(result['score'], .1**2 / .5**2 + .2**2 + .3**2 / 2**2, places=7)
-
     def test_constant_and_named_formulas_can_be_prepared(self):
         for formula in ("[0]", "pol0", "gaus", "gaus(0)+pol1(3)"):
             with self.subTest(formula=formula):
@@ -166,7 +107,6 @@ class SearchEndpointTests(unittest.TestCase):
     def test_invalid_requests_do_not_start_workers(self):
         for change in ({"formula": "system(x)"}, {"x": [0, 1]}, {"ey": [-1]},
                        {"time_budget": 301}, {"time_budget": True}, {"seed": -1},
-                       {"stop_when_stalled": "true"},
                        {"bounds": [[0, 1]]}, {"bounds": [[5, 2], [0, 3]]},
                        {"bounds": [[0, float("inf")], [0, 3]]},
                        {"x_range": [2, 1]}, {"analysis_type": "histogram"}):

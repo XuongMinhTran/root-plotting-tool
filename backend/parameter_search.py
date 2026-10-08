@@ -19,18 +19,6 @@ from formula_check import check_formula
 MAX_PARAMETERS = 20
 MAX_POINTS = 100000
 INVALID_SCORE = 1e100
-BASIN_DISTANCE = .08
-
-
-def _diverse_candidates(candidates, limit=12):
-    """Keep the lowest-scoring representative of each normalized region."""
-    selected = []
-    for z, score in sorted(candidates, key=lambda item: item[1]):
-        if all(np.linalg.norm(z - previous) > BASIN_DISTANCE for previous, _ in selected):
-            selected.append((z.copy(), score))
-        if len(selected) == limit:
-            break
-    return selected
 
 
 def _array(value, name, length=None, errors=False):
@@ -178,31 +166,29 @@ def _hints(x, y, expression, names):
     center = float(np.average(x, weights=weights)) if weights.sum() > 0 else float(np.mean(x))
     width = max(float(np.sqrt(np.average((x - center) ** 2, weights=weights)))
                 if weights.sum() > 0 else span / 4, span / 100)
-    calls = _function_arguments(expression)
+    # A uniform interpolation is only used to suggest frequencies, never to score
+    # the fit. Subsequent fitting always uses the original (possibly uneven) x.
+    order = np.argsort(x)
+    unique, indices = np.unique(x[order], return_index=True)
+    ordered_y = y[order][indices]
+    sample_count = min(2048, max(64, len(unique)))
+    grid = np.linspace(xmin, xmax, sample_count)
+    signal = np.interp(grid, unique, ordered_y)
+    trend = np.linspace(signal[0], signal[-1], sample_count)
+    spectrum = np.abs(np.fft.rfft((signal - trend) * np.hanning(sample_count), n=sample_count * 4))
+    frequencies = np.fft.rfftfreq(sample_count * 4, d=span / (sample_count - 1)) * 2 * np.pi
+    spacing = float(np.median(np.diff(unique)))
+    frequency_limit = min(100 * np.pi / span, np.pi / spacing)
+    valid = np.flatnonzero((frequencies >= np.pi / span) & (frequencies <= frequency_limit))
     peaks = []
-    frequency_limit = 100 * np.pi / span
-    if any(fn in ("sin", "cos") and re.search(r"\[\d+\]", arg) for fn, arg in calls):
-        # Interpolation only suggests frequencies. Scoring uses every original
-        # point. Nontrigonometric models need no FFT or x sorting here.
-        order = np.argsort(x)
-        unique, indices = np.unique(x[order], return_index=True)
-        ordered_y = y[order][indices]
-        sample_count = min(2048, max(64, len(unique)))
-        grid = np.linspace(xmin, xmax, sample_count)
-        signal = np.interp(grid, unique, ordered_y)
-        trend = np.linspace(signal[0], signal[-1], sample_count)
-        spectrum = np.abs(np.fft.rfft((signal - trend) * np.hanning(sample_count), n=sample_count * 4))
-        frequencies = np.fft.rfftfreq(sample_count * 4, d=span / (sample_count - 1)) * 2 * np.pi
-        spacing = float(np.median(np.diff(unique)))
-        frequency_limit = min(frequency_limit, np.pi / spacing)
-        valid = np.flatnonzero((frequencies >= np.pi / span) & (frequencies <= frequency_limit))
-        for i in valid[np.argsort(spectrum[valid])[::-1]]:
-            if all(abs(frequencies[i] - frequency) > 2 * np.pi / span for frequency in peaks):
-                peaks.append(float(frequencies[i]))
-            if len(peaks) == 6:
-                break
-        if not peaks:
-            peaks = [2 * np.pi / span]
+    for i in valid[np.argsort(spectrum[valid])[::-1]]:
+        if all(abs(frequencies[i] - frequency) > 2 * np.pi / span for frequency in peaks):
+            peaks.append(float(frequencies[i]))
+        if len(peaks) == 6:
+            break
+    if not peaks:
+        peaks = [2 * np.pi / span]
+    calls = _function_arguments(expression)
     suggestions = []
     for i, name in enumerate(names):
         token = f"[{i}]"
@@ -356,10 +342,6 @@ class _TimeLimit(Exception):
     pass
 
 
-class _RefinementLimit(Exception):
-    pass
-
-
 def search(payload, progress_callback=None):
     """Return finite starting values from a bounded search, never fit uncertainties.
 
@@ -368,13 +350,9 @@ def search(payload, progress_callback=None):
     different machines. The caller must run this in an isolated worker process.
     """
     from scipy.optimize import differential_evolution, least_squares
-    from scipy.stats import qmc
 
     if not isinstance(payload, dict):
         raise ValueError("Search input must be an object.")
-    stop_when_stalled = payload.get("stop_when_stalled", False)
-    if not isinstance(stop_when_stalled, bool):
-        raise ValueError("stop_when_stalled must be true or false.")
     try:
         budget = float(payload.get("time_budget", 60))
         seed = int(payload.get("seed", 1729))
@@ -392,16 +370,11 @@ def search(payload, progress_callback=None):
     rng = np.random.default_rng(seed)
     started = time.monotonic()
     deadline = started + budget
-    # Reserve part of the budget for a final refinement, preview and diagnostics.
-    finishing_time = min(3., budget * .15)
-    exploration_deadline = deadline - finishing_time
-    active_deadline = exploration_deadline
     evaluations = 0
     best_score, best_values = None, None
     last_progress = 0
     phase = "Trying starting values"
     timed_out = False
-    stopped_stalled = False
     xgrid = np.ascontiguousarray(x.reshape(-1, 1))
     # The finite difference uses each point's coordinate magnitude and the data
     # span, preserving units even for very small or very large x coordinates.
@@ -410,20 +383,11 @@ def search(payload, progress_callback=None):
     plus = np.ascontiguousarray((x[x_error_points] + h[x_error_points]).reshape(-1, 1))
     minus = np.ascontiguousarray((x[x_error_points] - h[x_error_points]).reshape(-1, 1))
     with_x_errors = bool(np.any(x_error_points))
-    with np.errstate(over="ignore"):
-        base_variance = ey ** 2
-        fixed_errors = np.sqrt(np.where(base_variance > 0, base_variance, 1.))
-    finite_base_variance = bool(np.isfinite(base_variance).all())
-    error_x = ex[x_error_points]
-    derivative_denominator = 2 * h[x_error_points]
     # A change of Y units should not stop local refinement merely because all
     # unweighted residuals are numerically tiny. This common scalar affects only
     # optimizer tolerances; the score sent to the user remains the raw SSE.
     optimization_scale = config.get("optimization_scale") or (1.0 if np.any(ey > 0) else max(
         float(np.std(y)), float(np.max(np.abs(y))) * .001, np.finfo(float).tiny ** .25))
-    observations = config.get("n_observations", len(y))
-    invalid_residual = np.full(observations, math.sqrt(INVALID_SCORE / observations)) / optimization_scale
-    invalid_objective = float(np.dot(invalid_residual, invalid_residual))
     # Linear coordinates preserve centers. asinh coordinates let other scales
     # span orders of magnitude, include zero and negative values, and remain
     # well conditioned for bounded local least squares.
@@ -442,18 +406,11 @@ def search(payload, progress_callback=None):
         with np.errstate(over="ignore"):
             values[free] = np.where(linear, warped, np.sinh(warped)) * scales
         return np.clip(values, bounds[:, 0], bounds[:, 1])
-    evaluation_seconds = 0.
     def evaluate(values, points=xgrid):
-        nonlocal evaluation_seconds
-        before = time.monotonic()
         if "evaluate" in config:
-            result = config["evaluate"](values)
-        else:
-            # ROOT evaluates an entire NumPy dataset in C++ here.
-            result = np.asarray(function.EvalPar(points, np.ascontiguousarray(values)), dtype=float).reshape(-1)
-        duration = time.monotonic() - before
-        evaluation_seconds = .8 * evaluation_seconds + .2 * duration
-        return result
+            return config["evaluate"](values)
+        # Current ROOT versions evaluate an entire NumPy dataset in C++ here.
+        return np.asarray(function.EvalPar(points, np.ascontiguousarray(values)), dtype=float).reshape(-1)
     def report(force=False):
         nonlocal last_progress
         now = time.monotonic()
@@ -461,9 +418,9 @@ def search(payload, progress_callback=None):
             progress_callback(dict(phase=phase, evaluations=evaluations, best_score=best_score,
                                    elapsed_seconds=round(now - started, 2)))
             last_progress = now
-    def scored_residual(z):
+    def residual(z):
         nonlocal evaluations, best_score, best_values
-        if time.monotonic() >= active_deadline:
+        if time.monotonic() >= deadline:
             raise _TimeLimit()
         values = decode(z)
         evaluations += 1
@@ -471,82 +428,40 @@ def search(payload, progress_callback=None):
             predicted = evaluate(values)
             if "residual" in config:
                 result = config["residual"](values, predicted)
-                finite_variance = True  # Adapter residuals validate their variance.
+                variance = np.zeros(len(result))
             else:
-                errors = fixed_errors
-                finite_variance = finite_base_variance
+                variance = ey ** 2
                 if with_x_errors:
-                    derivative = (evaluate(values, plus) - evaluate(values, minus)) / derivative_denominator
-                    variance = base_variance.copy()
-                    variance[x_error_points] += (error_x * derivative) ** 2
-                    finite_variance = bool(np.isfinite(variance).all())
-                    errors = np.sqrt(np.where(variance > 0, variance, 1.))
+                    derivative = np.zeros(len(x))
+                    derivative[x_error_points] = (evaluate(values, plus) - evaluate(values, minus)) / (2 * h[x_error_points])
+                    variance = variance + (ex * derivative) ** 2
+                errors = np.where(variance > 0, np.sqrt(variance), 1)
                 result = (predicted - y) / errors
-            finite = (np.isfinite(predicted).all() and finite_variance
+            finite = (np.isfinite(predicted).all() and np.isfinite(variance).all()
                       and np.isfinite(result).all() and np.max(np.abs(result)) < 1e45)
             score = float(np.dot(result, result)) if finite else INVALID_SCORE
         if finite and (best_score is None or score < best_score):
             best_score, best_values = score, values.copy()
         report()
-        if finite:
-            return result / optimization_scale, score / optimization_scale / optimization_scale, True
-        return invalid_residual.copy(), invalid_objective, False
+        return result / optimization_scale if finite else np.full(config.get("n_observations", len(y)), math.sqrt(INVALID_SCORE / config.get("n_observations", len(y))))
     def objective(z):
-        return scored_residual(z)[1]
-    refined_regions = []
-    def already_refined(z, score):
-        return any(np.linalg.norm(z - previous) <= BASIN_DISTANCE
-                   and score >= previous_score * (1 - 1e-4)
-                   for previous, previous_score in refined_regions)
-    def refine(z, max_evaluations=120, remember=False):
-        # Bound actual residual calls as well as SciPy's nfev, which excludes
-        # numerical-Jacobian calls. A local time slice prevents one basin from
-        # consuming the entire remaining global-search budget.
-        local_deadline = min(active_deadline, time.monotonic() + max(
-            .05, min(2., (active_deadline - time.monotonic()) * .15)))
-        calls, local_best = 0, None
-        def local_residual(candidate):
-            nonlocal calls, local_best
-            if time.monotonic() >= active_deadline:
-                raise _TimeLimit()
-            if calls >= max_evaluations * (dimensions + 1) or time.monotonic() >= local_deadline:
-                raise _RefinementLimit()
-            calls += 1
-            result, score, finite = scored_residual(candidate)
-            if finite and (local_best is None or score < local_best[1]):
-                local_best = (candidate.copy(), score)
-            return result
+        result = residual(z)
+        return float(np.dot(result, result))
+    def refine(z, max_evaluations=120):
         try:
-            fitted = least_squares(local_residual, np.clip(z, -1 + 1e-12, 1 - 1e-12),
+            fitted = least_squares(residual, np.clip(z, -1 + 1e-12, 1 - 1e-12),
                                    bounds=(-np.ones(dimensions), np.ones(dimensions)),
                                    max_nfev=max_evaluations, ftol=1e-8, xtol=1e-8, gtol=1e-8)
-            if remember and fitted.success and local_best is not None:
-                refined_regions[:] = _diverse_candidates(refined_regions + [local_best], limit=48)
-        except (_RefinementLimit, ValueError, FloatingPointError, np.linalg.LinAlgError):
-            pass
-        return local_best if local_best is not None else (z.copy(), invalid_objective)
-    def refine_candidates(candidates):
-        trials = []
-        for z, score in candidates:
-            if nearly_exact():
-                break
-            if not already_refined(z, score):
-                trials.append(refine(z, 30))
-        trials = _diverse_candidates(trials)
-        results = list(trials)
-        for z, score in trials[:2]:
-            if nearly_exact():
-                break
-            if not already_refined(z, score):
-                results.append(refine(z, 120, remember=True))
-        return results
+            return fitted.x, float(np.dot(fitted.fun, fitted.fun))
+        except (ValueError, FloatingPointError, np.linalg.LinAlgError):
+            return z, objective(z)
     initial_score = None
     local_candidates = []
     def nearly_exact():
         return best_score is not None and math.sqrt(best_score) / optimization_scale < 1e-8
     try:
         start_z = encode(initial)
-        start_score = objective(start_z)
+        objective(start_z)
         initial_score = best_score
         if dimensions:
             hinted = np.array([hint["initial"] for hint in config["hints"]])
@@ -554,35 +469,25 @@ def search(payload, progress_callback=None):
             seeds = [start_z, encode(hinted)]
             # Give each discovered oscillation a fair local trial. This generic
             # frequency hint works for nested/damped/custom trigonometric models.
-            frequency_parameters = [i for i, hint in enumerate(config["hints"])
-                                    if free[i] and hint["role"] == "frequency"]
-            for frequency in config["peaks"][:5] if frequency_parameters else []:
+            for frequency in config["peaks"][:5]:
                 candidate = hinted.copy()
-                for i in frequency_parameters:
-                    candidate[i] = frequency / config["hints"][i]["multiplier"]
+                for i, hint in enumerate(config["hints"]):
+                    if hint["role"] == "frequency":
+                        candidate[i] = frequency / hint["multiplier"]
                 seeds.append(encode(np.clip(candidate, bounds[:, 0], bounds[:, 1])))
             phase = "Refining data-based estimates"
-            unique_seeds = []
             for z in seeds:
-                if not any(
-                    np.allclose(z, previous, rtol=0, atol=1e-10)
-                    for previous in unique_seeds
-                ):
-                    unique_seeds.append(z)
-            local_candidates = _diverse_candidates(refine_candidates(
-                [(z, start_score if np.allclose(z, start_z, rtol=0, atol=1e-10)
-                  else objective(z)) for z in unique_seeds]))
+                local_candidates.append(refine(z, 100))
+                if nearly_exact():
+                    break
             # Diverse bounded populations plus repeated local refinement can
             # cross the many local minima of oscillations and custom formulas.
             phase = "Searching alternative starting values"
             population_size = max(24, 10 * dimensions)
-            sampler = qmc.LatinHypercube(dimensions, seed=rng)
             rounds = 0
-            stalled_rounds = 0
-            while time.monotonic() < exploration_deadline and not nearly_exact():
-                previous_round_score = best_score
-                population = 2 * sampler.random(population_size) - 1
-                ranked = _diverse_candidates(local_candidates)
+            while time.monotonic() < deadline and not nearly_exact():
+                population = rng.uniform(-1, 1, (population_size, dimensions))
+                ranked = sorted(local_candidates, key=lambda item: item[1])
                 for i, (z, _) in enumerate(ranked[:min(8, population_size // 4)]):
                     population[i] = np.clip(z, -1, 1)
                 if best_values is not None:
@@ -591,64 +496,31 @@ def search(payload, progress_callback=None):
                     count = population_size // 3
                     spread = (.05, .2, .6)[rounds % 3]
                     population[-count:] = np.clip(best_z + rng.normal(0, spread, (count, dimensions)), -1, 1)
-                generation_score, stalled_generations = best_score, 0
-                def generation_callback(z, convergence):
-                    nonlocal generation_score, stalled_generations
-                    if nearly_exact():
-                        return True
-                    improved = best_score is not None and (generation_score is None
-                        or best_score < generation_score * (1 - 1e-4))
-                    if improved:
-                        generation_score, stalled_generations = best_score, 0
-                    else:
-                        stalled_generations += 1
-                    return stalled_generations >= 5
                 evolved = differential_evolution(objective, [(-1, 1)] * dimensions,
-                    init=population, maxiter=20, seed=rng,
-                    polish=False, tol=0, atol=0, mutation=(.5, 1.5), recombination=.85,
-                    callback=generation_callback)
+                    init=population, maxiter=20, popsize=10, seed=rng,
+                    polish=False, tol=0, atol=0, mutation=(.5, 1.5), recombination=.85)
                 phase = "Refining promising candidates"
-                diverse = _diverse_candidates(zip(evolved.population, evolved.population_energies), limit=5)
-                local_candidates = _diverse_candidates(local_candidates + refine_candidates(diverse))
+                ordering = np.argsort(evolved.population_energies)
+                diverse = []
+                for index in ordering:
+                    z = evolved.population[index]
+                    if all(np.linalg.norm(z - previous) > .08 for previous in diverse):
+                        diverse.append(z)
+                    if len(diverse) == 5:
+                        break
+                local_candidates.extend(refine(z, 160) for z in diverse)
+                local_candidates = sorted(local_candidates, key=lambda item: item[1])[:12]
                 rounds += 1
-                improved = best_score is not None and (previous_round_score is None
-                    or best_score < previous_round_score * (1 - 1e-4))
-                stalled_rounds = 0 if improved else stalled_rounds + 1
-                if stop_when_stalled and best_score is not None and stalled_rounds >= 3:
-                    stopped_stalled = True
-                    break
                 phase = "Searching alternative starting values"
         else:
             phase = "Checked fixed parameters"
     except _TimeLimit:
-        timed_out = True
-    if dimensions and not nearly_exact() and best_values is not None:
-        phase = "Refining best starting values"
-        active_deadline = deadline - finishing_time * .5
-        try:
-            refine(encode(best_values), 120)
-        except _TimeLimit:
-            timed_out = True
-    if dimensions and not nearly_exact() and not stopped_stalled and time.monotonic() >= exploration_deadline:
         timed_out = True
     if best_values is None or best_score is None:
         raise ValueError("No finite curve was found. Adjust the parameter ranges or starting values, then try again.")
     warnings = list(config["warnings"]) + config.get("notes", [])
     if timed_out:
         warnings.append("The time limit was reached; these are the best values found so far.")
-    if stopped_stalled:
-        warnings.append("The search stopped after several diverse restarts without meaningful improvement; other minima may remain.")
-    # Produce the required preview before spending the remaining time on an
-    # optional sensitivity diagnostic.
-    if "preview" in config:
-        curve = config["preview"](best_values)
-    else:
-        preview_x = np.linspace(*config["limits"], 301)
-        with np.errstate(all="ignore"):
-            preview_y = evaluate(best_values, preview_x.reshape(-1, 1))
-        if not np.isfinite(preview_y).all():
-            raise ValueError("The best candidate is undefined between data points. Narrow the fit range or adjust parameter bounds.")
-        curve = dict(x=preview_x.tolist(), y=preview_y.tolist())
     if dimensions:
         position = (best_values[free] - lower) / (upper - lower)
         at_edge = np.flatnonzero(free)[(position < 1e-4) | (position > 1 - 1e-4)]
@@ -659,20 +531,25 @@ def search(payload, progress_callback=None):
         z = encode(best_values)
         columns = []
         for i in range(dimensions):
-            if deadline - time.monotonic() <= max(.001, 2 * evaluation_seconds):
-                break
             offset = np.zeros(dimensions)
             offset[i] = 1e-5
             with np.errstate(all="ignore"):
                 columns.append((evaluate(decode(z + offset)) - evaluate(decode(z - offset))) / 2e-5)
         jacobian = np.asarray(columns).T
-        if len(columns) < dimensions:
-            warnings.append("The parameter sensitivity check was skipped to return the best values within the time budget.")
-        elif np.isfinite(jacobian).all():
+        if np.isfinite(jacobian).all():
             norms = np.linalg.norm(jacobian, axis=0)
             normalized = jacobian / np.where(norms > 0, norms, 1)
             if np.linalg.matrix_rank(normalized, tol=1e-5) < dimensions:
                 warnings.append("Some parameters have indistinguishable or very weak effects on these data. Their individual values may not be determined.")
+    if "preview" in config:
+        curve = config["preview"](best_values)
+    else:
+        preview_x = np.linspace(*config["limits"], 301)
+        with np.errstate(all="ignore"):
+            preview_y = evaluate(best_values, preview_x.reshape(-1, 1))
+        if not np.isfinite(preview_y).all():
+            raise ValueError("The best candidate is undefined between data points. Narrow the fit range or adjust parameter bounds.")
+        curve = dict(x=preview_x.tolist(), y=preview_y.tolist())
     if initial_score is not None and best_score >= initial_score * (1 - 1e-8):
         warnings.append("The search did not improve on the starting values.")
     warnings.append("These are starting values, not a validated fit. Apply them and run Fit to evaluate convergence and uncertainties.")
