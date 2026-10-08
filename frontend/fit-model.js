@@ -61,11 +61,11 @@
   if(typeof document==='undefined') return;
   const $=id=>document.getElementById(id), raw=$('formula'), table=$('param-table');
   if(!raw || !table) return;
-  let timer, activeParameter=null;
+  let timer;
   const adjustments=new Map();
   let controlKey='';
   const panel=$('guess-preview-panel'), controls=$('visual-parameters'), openButton=$('visual-match-open');
-  const manualHelp='Adjust the controls until the curve follows your data, then click Fit to calculate the fitted parameters and uncertainties.';
+  const manualHelp='Adjust the curve to follow your data, then run Fit.';
   function adjustmentError(message='') { $('visual-match-error').textContent=message; $('visual-match-error').hidden=!message; }
   function setGuess(index, value) {
     const input=table.querySelector(`[data-pguess="${index}"]`);
@@ -201,23 +201,6 @@
   });
   function growFormula() {
     raw.style.height='auto'; raw.style.height=Math.max(82,raw.scrollHeight+2)+'px';
-    const mirror=$('formula-highlights');
-    mirror.replaceChildren();
-    const text=raw.value, pattern=/\[(\d+)\]/g;
-    let end=0;
-    for(const match of text.matchAll(pattern)) {
-      mirror.append(document.createTextNode(text.slice(end,match.index)));
-      if(Number(match[1])===activeParameter) {
-        const mark=document.createElement('mark'); mark.textContent=match[0]; mirror.append(mark);
-      } else mirror.append(document.createTextNode(match[0]));
-      end=match.index+match[0].length;
-    }
-    mirror.append(document.createTextNode(text.slice(end)+'\n'));
-  }
-  function highlight(row) {
-    activeParameter=row ? [...table.querySelectorAll('tbody tr')].indexOf(row) : null;
-    for(const item of table.querySelectorAll('tbody tr')) item.classList.toggle('is-highlighted',item===row);
-    growFormula();
   }
   function renderPreview() {
     const host=$('guess-preview'), note=$('guess-preview-note');
@@ -274,14 +257,10 @@
   table.addEventListener('focusin',event=> {
     const input=event.target;
     if(input.matches('[data-pguess]')) { input.value=input.dataset.fullGuess ?? input.value; input.select(); }
-    highlight(input.closest('tbody tr'));
   });
   table.addEventListener('focusout',event=> {
     if(event.target.matches('[data-pguess]')) event.target.value=formatGuess(event.target.dataset.fullGuess ?? event.target.value);
-    highlight(null);
   });
-  table.addEventListener('pointerover',event=>highlight(event.target.closest('tbody tr')));
-  table.addEventListener('pointerleave',()=>highlight(document.activeElement.closest?.('tbody tr')));
   document.addEventListener('input',refresh); document.addEventListener('change',refresh);
   document.addEventListener('rootfit:reset',refresh); document.addEventListener('rootfit:draw',refresh);
   // Switching plots restores data programmatically; observe the selector as well.

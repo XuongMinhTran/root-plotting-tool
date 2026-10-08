@@ -10,7 +10,7 @@
 <link rel="stylesheet" href="multivariate.css?v=1">
 <link rel="stylesheet" href="parameter-search.css?v=20261008-quick-guess">
 <link rel="stylesheet" href="analysis-setup.css?v=20261008-beginners">
-<link rel="stylesheet" href="fit-model.css?v=20261008-visual-guess-final">
+<link rel="stylesheet" href="fit-model.css?v=20261008-guess-layout">
 <script defer src="analysis-export.js?v=20260919-pdf"></script>
 <link rel="icon" href="favicon.ico?v=1" sizes="any"><link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png?v=1"><link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png?v=1"><link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=1"><link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?v=1"><link rel="apple-touch-icon" href="apple-touch-icon.png?v=1">
 </head>
@@ -216,7 +216,7 @@
           </div>
           <div class="formula-field" id="equation-root" hidden>
             <label for="formula">ROOT expression</label>
-            <div class="root-expression-wrap"><pre id="formula-highlights" aria-hidden="true"></pre><textarea id="formula" class="mono" rows="2" spellcheck="false" autocomplete="off" aria-describedby="root-syntax-links equation-error" placeholder="e.g. [0]*x+[1]">[0]*x+[1]</textarea></div>
+            <div class="root-expression-wrap"><textarea id="formula" class="mono" rows="2" spellcheck="false" autocomplete="off" aria-describedby="root-syntax-links equation-error" placeholder="e.g. [0]*x+[1]">[0]*x+[1]</textarea></div>
             <p class="hint" id="root-syntax-links">Use <code>x</code> for the variable and <code>[0]</code>, <code>[1]</code>… for parameters. Built-in models include <code>gaus</code>, <code>expo</code>, and <code>pol2</code>. See the typing reference for the full list.</p>
           </div>
           <p id="equation-error" class="equation-error" role="status" hidden></p>
@@ -438,8 +438,8 @@
   </div>
 </dialog>
 <script src="model-library.js?v=20261008-guess-forms-v3" defer></script>
-<script src="parameter-search.js?v=20261008-guess-forms-v3" defer></script>
+<script src="parameter-search.js?v=20261008-guess-layout" defer></script>
 <script defer src="analysis-features.js?v=20261008-fit-flow"></script>
-<script src="fit-model.js?v=20261008-visual-guess-final" defer></script>
+<script src="fit-model.js?v=20261008-guess-layout" defer></script>
 </body>
 </html>

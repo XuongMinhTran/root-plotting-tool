@@ -98,7 +98,7 @@
     if (mount && host.parentElement !== mount) mount.append(host);
     el('parameter-search-open').disabled = !supported || fitBusy;
     el('parameter-search-availability').textContent = supported
-      ? 'Find starting values for your model, then review them before applying.'
+      ? 'Let the computer suggest values, then review and apply them.'
       : 'Choose an analysis type to find starting values for your model.';
     const current = (session || undo) ? fingerprint() : null;
     if (session && current !== session.fingerprint) stale(session);
@@ -418,15 +418,19 @@
   function init() {
     const block = el('single-fit-block'); if (!block) return;
     host = document.createElement('div'); host.className = 'parameter-search-tools';
-    host.innerHTML = '<div class="parameter-search-actions"><button type="button" id="parameter-search-open" class="primary" aria-describedby="parameter-search-availability"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" focusable="false"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg><span>Computer guess…</span></button><button type="button" id="parameter-search-undo" hidden>Undo suggested values</button></div><p class="hint" id="parameter-search-availability"></p>';
+    host.innerHTML = '<div class="parameter-search-actions"><div class="guess-method"><div class="guess-method-heading"><button type="button" id="parameter-search-open" class="primary" aria-describedby="parameter-search-availability"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" focusable="false"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg><span>Computer guess…</span></button><button type="button" id="parameter-search-undo" hidden>Undo suggested values</button></div><p class="hint" id="parameter-search-availability"></p></div></div>';
     const parameterHelp = block.querySelector('[data-help="guesses"]');
     if (parameterHelp) {
       const mount = document.createElement('div'); mount.id = 'parameter-search-single-mount';
-      parameterHelp.replaceWith(mount); mount.append(host);
+      parameterHelp.closest('.parameter-heading').after(mount); mount.append(host);
       const actions=host.querySelector('.parameter-search-actions');
       const visual=block.querySelector('.visual-match-tools');
-      if(visual) actions.prepend(visual);
-      actions.append(parameterHelp);
+      if(visual) {
+        visual.classList.add('guess-method');
+        const heading=document.createElement('div'); heading.className='guess-method-heading';
+        heading.append(...visual.children); visual.append(heading,el('visual-match-help'));
+        actions.classList.add('guess-methods'); actions.prepend(visual);
+      }
     } else {
       const mount = document.createElement('div'); mount.id = 'parameter-search-single-mount';
       block.append(mount); mount.append(host);
