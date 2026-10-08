@@ -13,9 +13,10 @@ start       one command: build if needed, run, open the browser
 root-run    helper: run any command inside the ROOT container
 ```
 
-The form backend stores no analysis data: `POST /fit` returns a result, and
-the page saves your work in a JSON file you download ("Save") and re-open
-("Load").
+The backend does not save analyses to disk. Fits return their results directly;
+starting-value searches keep temporary jobs and results in memory. Completed
+results expire after 15 minutes. The page saves your work in a JSON file you
+download ("Save") and re-open ("Load").
 
 ## Start it
 
@@ -101,6 +102,22 @@ and press **Fit** (or Ctrl/Cmd+Enter). A single X or Y error value applies to ev
 JSROOT; the report lists every parameter ± uncertainty, χ², NDF, χ²/NDF and
 the p-value.
 
+**Search starting values…** is available in both plotting interfaces for XY
+fits, including custom ROOT formulas. Review the suggested parameter ranges,
+choose a 30-second, 2-minute or 5-minute search, and start it. You can cancel
+while it runs. The search compares multiple candidates and refines promising
+ones using the selected data, uncertainties, point exclusions and fit range.
+It supports up to 20 parameters. Suggested ranges are heuristics: narrow or
+expand them using what you know about your experiment.
+
+Review the suggested values before **Apply**, then press **Fit** to obtain the
+normal ROOT report and uncertainties. **Undo** restores the previous starting
+values. Search limits apply only to the search; the subsequent fit can move
+outside them. Suggestions can miss other minima, and weakly determined
+parameters or values at a search limit need particular care. The search does
+not identify a model or guarantee a unique solution. Histogram and multivariate
+searches are not currently supported.
+
 - **Save document** downloads a `.json` file with everything: inputs, the
   last fit result (including the ROOT canvas, so it redraws without a backend),
   title, notes and timestamps. `examples/` contains a few.
@@ -115,7 +132,8 @@ the p-value.
 - **Optional plots** include residuals, pulls, data/fit ratio, percentage difference, and a residual histogram. Select any combination under **Labels & plot → Plot options** (Classic) or **Fit settings → Labels and plot options** (Modern), then fit again. All are off by default. **Advanced optional plot settings** lets you rename each selected plot, set axis labels and Y limits, panel height, point scope, grids, reference lines, uncertainty bars, and histogram bins. Settings are saved with the document; older single-panel selections migrate automatically. Ratio and percentage uncertainty bars hold the fitted model fixed and are not model confidence bands. Undefined points are omitted with an explanatory message.
 - **Export PNG** renders the current plot to an image.
 - The form is autosaved in your browser (localStorage) so a reload does not
-  lose your work; nothing leaves your machine except the fit request.
+  lose your work; fitting and parameter-search requests send the selected data
+  and model to your configured backend.
 
 ### Histograms
 
@@ -174,6 +192,33 @@ Response fields: `params[]` (name, value, error), `chi2`, `ndf`, `chi2_ndf`,
 `prob`, `status` / `status_message` / `converged`, `covariance`, and the ROOT
 objects for JSROOT: `canvas_json`, `graph_json`, `func_json`.
 Errors: `{"error": "..."}` with HTTP 400 (your input) or 500 (server).
+
+Parameter search uses the same XY request fields:
+
+- `POST /parameter-search/prepare` returns suggested `parameters` with
+  `index`, `name`, `initial`, `lower`, `upper`, plus `n_points` and `warnings`.
+- `POST /parameter-search` adds `bounds: [[lower, upper], ...]`,
+  `time_budget` (1–300 seconds) and optional integer `seed`. Equal limits hold
+  a parameter fixed during the search. HTTP 202 returns a `job_id`.
+- `GET /parameter-search/<job_id>` returns `status`, `progress`, and a `result`
+  when complete. Results include `values`, a weighted sum-of-squares `score`,
+  `initial_score`, `evaluations`, warnings and a preview curve. This is an
+  initialization search, so it does not return parameter uncertainties.
+- `DELETE /parameter-search/<job_id>` cancels a running search and stops its
+  worker. Cancellation of an already finished job returns its existing result.
+
+One search runs at a time per backend process; another start returns HTTP 409.
+Jobs and results are held in memory, expire after 15 minutes, and disappear on
+restart. Search workers have a hard deadline in addition to the optimizer's
+time budget. Use the supplied single-process server setup: independent web
+workers would need shared job routing/storage. SciPy is included in the backend
+dependencies; run `./start --rebuild` when updating an existing local image.
+
+Run regression tests in the rebuilt backend image:
+
+```sh
+docker run --rm --platform linux/amd64 -v "$PWD:/work:ro" -w /work rootfit-backend python3 -m unittest discover -s tests -v
+```
 
 ## Shared analysis session
 

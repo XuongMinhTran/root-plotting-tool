@@ -1,3 +1,4 @@
 flask>=2.2
 numpy
+scipy>=1.10
 # ROOT itself is not on PyPI; it comes from the rootproject/root Docker image.

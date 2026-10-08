@@ -1,9 +1,12 @@
 """
-app.py — the web server. Two endpoints, no state, no storage.
+app.py — the fitting web server. Searches keep temporary jobs in memory.
 
     GET  /health   -> {"status": "ok", "root_version": "...", ...}
     POST /fit      -> runs one fit and returns the result as JSON
     POST /histogram-> builds (and optionally fits) a histogram
+    POST /parameter-search/prepare -> suggests editable search ranges
+    POST /parameter-search -> starts a cancellable parameter search
+    GET/DELETE /parameter-search/<id> -> reads or stops a search
     GET  /         -> the frontend, when FRONTEND_DIR holds a copy of it
 
 The frontend is optional. `./start` bind-mounts frontend/ into the container so
@@ -64,7 +67,7 @@ def add_cors_headers(response):
     GitHub Pages site, ...). There are no cookies or accounts, so a wide-open
     CORS policy gives away nothing."""
     response.headers["Access-Control-Allow-Origin"] = "*"
-    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, DELETE, OPTIONS"
     response.headers["Access-Control-Allow-Headers"] = "Content-Type"
     return response
 
@@ -89,7 +92,7 @@ def number_list(payload, key, required):
     for i, v in enumerate(raw):
         try:
             f = float(v)
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):
             raise BadRequest(f"Column '{key}', entry {i + 1} ({v!r}) is not a number.")
         if f != f or f in (float("inf"), float("-inf")):
             raise BadRequest(f"Column '{key}', entry {i + 1} is not a finite number.")
@@ -124,7 +127,7 @@ def guess_list(payload, key):
             if not math.isfinite(value):
                 raise ValueError()
             out.append(value)
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):
             raise BadRequest(f"Initial guess {i + 1} ({v!r}) needs a finite number, or can be left blank.")
     return out
 
@@ -154,6 +157,7 @@ def health():
         "service": "rootfit-backend",
         "version": APP_VERSION,
         "root_version": str(ROOT.gROOT.GetVersion()),
+        "features": {"parameter_search": True},
     })
 
 
@@ -222,6 +226,111 @@ def do_fit():
     except Exception as e:                         # anything else is our problem
         traceback.print_exc()
         return jsonify({"error": "The fitting service ran into a problem. Your inputs are still here; please try Fit again. If this continues, restart the backend."}), 500
+
+
+def parameter_search_payload(payload):
+    """Keep search requests on the same data and formula rules as an XY fit."""
+    if not isinstance(payload, dict):
+        raise BadRequest("Enter XY data and a fit function before searching.")
+    if payload.get("analysis_type", "xy") != "xy":
+        raise BadRequest("Starting-value search currently supports XY data.")
+    formula = str(payload.get("formula") or "").strip()
+    ok, message = check_formula(formula)
+    if not ok:
+        raise BadRequest(message)
+    normalized = {
+        "formula": formula,
+        "x": number_list(payload, "x", True), "y": number_list(payload, "y", True),
+        "ex": number_list(payload, "ex", False), "ey": number_list(payload, "ey", False),
+        "param_names": string_list(payload, "param_names"),
+        "initial_guesses": guess_list(payload, "initial_guesses"),
+    }
+    n = len(normalized["x"])
+    if n < 2 or len(normalized["y"]) != n:
+        raise BadRequest("Enter matching X and Y columns with at least two points.")
+    for key in ("ex", "ey"):
+        if len(normalized[key]) not in (0, 1, n) or any(value < 0 for value in normalized[key]):
+            raise BadRequest("Uncertainties must be nonnegative, with one value or one per measurement.")
+    limits = payload.get("x_range")
+    if limits is not None:
+        if not isinstance(limits, list) or len(limits) != 2:
+            raise BadRequest("The fit range needs a minimum and a maximum.")
+        limits = number_list({"limits": limits}, "limits", True)
+        if not limits[0] < limits[1]:
+            raise BadRequest("The fit-range minimum must be less than its maximum.")
+    normalized["x_range"] = limits
+    raw_budget = payload.get("time_budget", 120)
+    try:
+        budget = float(raw_budget)
+        if isinstance(raw_budget, bool) or not math.isfinite(budget) or not 1 <= budget <= 300:
+            raise ValueError()
+    except (TypeError, ValueError, OverflowError):
+        raise BadRequest("Choose a search duration between 1 and 300 seconds.")
+    normalized["time_budget"] = budget
+    seed = payload.get("seed", 1729)
+    if isinstance(seed, bool) or not isinstance(seed, int) or not 0 <= seed < 2 ** 32:
+        raise BadRequest("The search seed must be an integer between 0 and 4294967295.")
+    normalized["seed"] = seed
+    bounds = payload.get("bounds")
+    if bounds is not None:
+        if not isinstance(bounds, list) or not bounds or len(bounds) > 20:
+            raise BadRequest("Supply a search range for each parameter (up to 20 parameters).")
+        normalized["bounds"] = []
+        for pair in bounds:
+            if not isinstance(pair, list) or len(pair) != 2:
+                raise BadRequest("Each parameter range needs a lower and an upper value.")
+            pair = number_list({"bounds": pair}, "bounds", True)
+            if pair[0] > pair[1]:
+                raise BadRequest("Each lower parameter limit must be less than or equal to its upper limit.")
+            normalized["bounds"].append(pair)
+    return normalized
+
+
+@app.post("/parameter-search/prepare")
+def prepare_parameter_search():
+    try:
+        from parameter_search import prepare
+        payload = parameter_search_payload(request.get_json(silent=True))
+        with root_lock:
+            result = prepare(payload)
+        require_finite_result(result)
+        return jsonify(result)
+    except ValueError as error:
+        return jsonify(error=str(error)), 400
+    except Exception:
+        traceback.print_exc()
+        return jsonify(error="The parameter search could not be prepared. Check the function and restart the backend if needed."), 500
+
+
+@app.post("/parameter-search")
+def start_parameter_search():
+    from search_jobs import SearchBusy, manager
+    try:
+        from parameter_search import prepare
+        payload = parameter_search_payload(request.get_json(silent=True))
+        with root_lock:
+            prepared = prepare(payload, require_points=True)
+        if "bounds" not in payload:
+            payload["bounds"] = [[p["lower"], p["upper"]] for p in prepared["parameters"]]
+        if len(payload["bounds"]) != len(prepared["parameters"]):
+            raise BadRequest("Supply one search range for every parameter in the formula.")
+        return jsonify(manager.start(payload)), 202
+    except SearchBusy as error:
+        return jsonify(error=str(error)), 409
+    except ValueError as error:
+        return jsonify(error=str(error)), 400
+    except Exception:
+        traceback.print_exc()
+        return jsonify(error="The parameter search could not start. Please try again."), 500
+
+
+@app.route("/parameter-search/<job_id>", methods=["GET", "DELETE"])
+def parameter_search_status(job_id):
+    from search_jobs import manager
+    result = manager.cancel(job_id) if request.method == "DELETE" else manager.get(job_id)
+    if result is None:
+        return jsonify(error="This search has expired or the backend restarted. Start a new search."), 404
+    return jsonify(result)
 
 
 @app.post('/histogram')

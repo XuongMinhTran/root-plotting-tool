@@ -13,7 +13,7 @@ FROM rootproject/root:latest
 # manager instead. numpy is listed too in case a future image drops it.
 # The rm at the end just keeps the image small.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends python3-flask python3-numpy \
+    && apt-get install -y --no-install-recommends python3-flask python3-numpy python3-scipy \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
