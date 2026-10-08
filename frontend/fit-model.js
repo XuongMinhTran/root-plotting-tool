@@ -31,6 +31,26 @@
     return {step,mode,low:mode==='log'?Math.max(Number.MIN_VALUE,magnitude/1000):Math.max(-Number.MAX_VALUE,value-radius),
       high:mode==='log'?Math.min(Number.MAX_VALUE,magnitude*1000):Math.min(Number.MAX_VALUE,value+radius)};
   }
+  function centeredAdjustment(value, step, mode='linear') {
+    if(!Number.isFinite(value)) throw new Error('Enter a finite starting value.');
+    if(!Number.isFinite(step) || step<=0) throw new Error('Step must be a positive, finite number.');
+    let low, high;
+    if(mode==='log') {
+      if(value===0) return {...defaultAdjustment(value,mode),step};
+      const magnitude=Math.abs(value), center=Math.log10(magnitude);
+      const span=Math.min(500*Math.log1p(step/magnitude)/Math.LN10,
+        center-Math.log10(Number.MIN_VALUE),Math.log10(Number.MAX_VALUE)-center);
+      low=10**(center-span); high=10**(center+span);
+    } else {
+      const radius=Math.min(step*500,Number.MAX_VALUE/4,Number.MAX_VALUE-Math.abs(value));
+      low=value-radius; high=value+radius;
+    }
+    if(!Number.isFinite(low) || !Number.isFinite(high) || low>=high ||
+      (mode==='log'?!(low<Math.abs(value) && Math.abs(value)<high):!(low<value && value<high))) {
+      throw new Error('This Step cannot center a slider at this value. Choose a larger Step or edit the value.');
+    }
+    return {step,mode,low,high};
+  }
   function sliderValue(position, low, high, mode='linear', sign=1) {
     if(!Number.isFinite(position) || !Number.isFinite(low) || !Number.isFinite(high) || low>=high || (mode==='log' && low<=0)) throw new Error('Enter an increasing, finite range. Logarithmic magnitude limits must be positive.');
     const t=Math.max(0,Math.min(1,position));
@@ -79,7 +99,7 @@
     if(curve.every(p=>p[1]===null)) throw new Error('The model is undefined at these starting values. Check widths, denominators and function domains.');
     return curve;
   }
-  const helpers={formatGuess,bounds,previewModel,adjustGuess,scaleStep,defaultAdjustment,sliderValue,sliderPosition,valuesKey,startingStatus};
+  const helpers={formatGuess,bounds,previewModel,adjustGuess,scaleStep,defaultAdjustment,centeredAdjustment,sliderValue,sliderPosition,valuesKey,startingStatus};
   if(typeof module==='object' && module.exports) module.exports=helpers;
   if(typeof document==='undefined') return;
   const $=id=>document.getElementById(id), raw=$('formula'), table=$('param-table');
@@ -208,7 +228,10 @@
     try {
       const stepText=card.querySelector('[data-visual-step]').value.trim(), step=stepText?Number(stepText):NaN;
       if(['times10','divide10'].includes(button.dataset.adjust)) {
-        state.step=scaleStep(step,button.dataset.adjust);
+        const nextStep=scaleStep(step,button.dataset.adjust);
+        const valueText=card.querySelector('[data-visual-value]').value.trim();
+        if(valueText && Number.isFinite(Number(valueText))) Object.assign(state,centeredAdjustment(Number(valueText),nextStep,state.mode));
+        else state.step=nextStep;
         card.querySelector('[data-visual-step]').value=String(state.step);
         adjustmentError(); syncControls(); return;
       }
@@ -226,11 +249,22 @@
       if(text && Number.isFinite(Number(text))) adjustmentError();
       setGuess(index,text);
     } else if(target.matches('[data-visual-step]')) {
-      const step=Number(target.value.trim()); if(Number.isFinite(step)&&step>0) state.step=step;
+      const step=Number(target.value.trim());
+      if(Number.isFinite(step)&&step>0) {
+        const valueText=card.querySelector('[data-visual-value]').value.trim();
+        try {
+          if(valueText && Number.isFinite(Number(valueText))) Object.assign(state,centeredAdjustment(Number(valueText),step,state.mode));
+          else state.step=step;
+          adjustmentError();
+        } catch(error) { adjustmentError(error.message); }
+      }
     } else if(target.matches('[data-visual-scale]')) {
       // A select emits input before change; update its state before the global refresh.
       const text=card.querySelector('[data-visual-value]').value.trim(), value=Number(text);
-      if(text && Number.isFinite(value)) Object.assign(state,defaultAdjustment(value,target.value),{step:state.step});
+      if(text && Number.isFinite(value)) {
+        try { Object.assign(state,centeredAdjustment(value,state.step,target.value)); adjustmentError(); }
+        catch(error) { adjustmentError(error.message); }
+      }
     } else if(target.matches('[data-visual-slider]')) {
       try {
         const valueText=card.querySelector('[data-visual-value]').value.trim();
@@ -245,7 +279,7 @@
     const index=Number(card.dataset.index), state=adjustments.get(controlKey+'|'+index), valueText=card.querySelector('[data-visual-value]').value.trim(), value=Number(valueText);
     try {
       if(target.matches('[data-visual-scale], [data-visual-bound]') && (!valueText || !Number.isFinite(value))) throw new Error('Enter a finite starting value before changing the slider range.');
-      if(target.matches('[data-visual-scale]')) Object.assign(state,defaultAdjustment(value,target.value),{step:state.step});
+      if(target.matches('[data-visual-scale]')) Object.assign(state,centeredAdjustment(value,state.step,target.value));
       else if(target.matches('[data-visual-bound]')) {
         const lower=card.querySelector('[data-visual-bound="low"]').value.trim(), upper=card.querySelector('[data-visual-bound="high"]').value.trim();
         if(!lower || !upper) throw new Error('Enter both adjustment range limits.');
@@ -254,7 +288,12 @@
         if(current<low || current>high) throw new Error('Include the current guess in the adjustment range, or change the guess first.');
         state.low=low; state.high=high;
       } else if(target.matches('[data-visual-value]') && (!target.value.trim() || !Number.isFinite(Number(target.value)))) throw new Error('Enter a finite starting value.');
-      else if(target.matches('[data-visual-step]') && (!target.value.trim() || !Number.isFinite(Number(target.value)) || Number(target.value)<=0)) throw new Error('Step must be a positive, finite number.');
+      else if(target.matches('[data-visual-step]')) {
+        const step=Number(target.value.trim());
+        if(!target.value.trim() || !Number.isFinite(step) || step<=0) throw new Error('Step must be a positive, finite number.');
+        if(valueText && Number.isFinite(value)) Object.assign(state,centeredAdjustment(value,step,state.mode));
+        else state.step=step;
+      }
       adjustmentError(); syncControls();
     } catch(error) { adjustmentError(error.message); }
   });

@@ -87,3 +87,18 @@ test('starting-value status distinguishes manual sources and incomplete values',
   }
   assert.match(ux.startingStatus('',2,null,'same').text,/model defaults/);
 });
+
+test('step changes center slider ranges on the unchanged value',()=>{
+  for(const [value,step] of [[0,1e-12],[1.1,.01],[-2.718,1e-6],[4e-15,1e-18]]) {
+    const range=ux.centeredAdjustment(value,step);
+    assert.ok(Math.abs(ux.sliderPosition(value,range.low,range.high)-.5)<1e-8);
+    const next=ux.sliderValue(.501,range.low,range.high);
+    assert.ok(Math.abs(next-(value+step))<=Math.max(Math.abs(value)*1e-15,step*1e-8));
+  }
+  for(const value of [1.1,-1e-12]) {
+    const range=ux.centeredAdjustment(value,Math.abs(value)/100,'log');
+    assert.ok(Math.abs(ux.sliderPosition(value,range.low,range.high,'log')-.5)<1e-12);
+  }
+  assert.throws(()=>ux.centeredAdjustment(1,1e-300),/center/);
+  assert.throws(()=>ux.centeredAdjustment(Number.MAX_VALUE,1),/center/);
+});
