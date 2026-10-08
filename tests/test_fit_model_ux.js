@@ -22,3 +22,43 @@ test('domain failures produce gaps without fitting a different function',()=>{
   assert.throws(()=>ux.previewModel(equation,'landau',[],[],0,10));
   assert.throws(()=>ux.previewModel(equation,'[0]/0',['a'],['1'],0,10),/undefined/);
 });
+test('button adjustments support scientific scales, zero crossings and sign changes',()=>{
+  assert.equal(ux.adjustGuess(0,1e-12,'plus'),1e-12);
+  assert.equal(ux.adjustGuess(1,2,'minus'),-1);
+  assert.equal(ux.adjustGuess(-3,1,'times10'),-30);
+  assert.equal(ux.adjustGuess(-30,1,'divide10'),-3);
+  assert.equal(ux.adjustGuess(-3,1,'sign'),3);
+  assert.equal(ux.adjustGuess(1.234567890123,1e-12,'plus'),1.234567890123+1e-12);
+});
+test('unrepresentable adjustments and invalid steps cannot silently replace guesses',()=>{
+  for(const step of [0,-1,NaN,Infinity]) assert.throws(()=>ux.adjustGuess(1,step,'plus'),/Step/);
+  assert.throws(()=>ux.adjustGuess(NaN,1,'plus'),/finite/);
+  assert.throws(()=>ux.adjustGuess(1e30,1,'plus'),/too small/);
+  assert.throws(()=>ux.adjustGuess(Number.MAX_VALUE,1,'times10'),/number range/);
+  assert.throws(()=>ux.adjustGuess(Number.MIN_VALUE,1,'divide10'),/number range/);
+});
+test('default adjustment scales contain the current guess across orders of magnitude',()=>{
+  for(const value of [0,1e-200,-1e-12,1,-500,1e200,Number.MIN_VALUE,-Number.MAX_VALUE,Number.MAX_VALUE]) {
+    const linear=ux.defaultAdjustment(value);
+    assert.ok(linear.step>0 && Number.isFinite(linear.step));
+    assert.ok(Number.isFinite(linear.low) && Number.isFinite(linear.high));
+    assert.ok(linear.low<linear.high && linear.low<=value && linear.high>=value);
+    const log=ux.defaultAdjustment(value,'log'), magnitude=Math.abs(value)||1;
+    assert.ok(log.low>0 && log.low<log.high && log.low<=magnitude && log.high>=magnitude);
+  }
+});
+test('linear sliders span signed ranges and retain finite extreme endpoints',()=>{
+  assert.equal(ux.sliderValue(.5,-5,5),0);
+  assert.equal(ux.sliderPosition(0,-5,5),.5);
+  assert.equal(ux.sliderValue(.5,-Number.MAX_VALUE,Number.MAX_VALUE),0);
+  assert.equal(ux.sliderPosition(0,-Number.MAX_VALUE,Number.MAX_VALUE),.5);
+  assert.equal(ux.sliderValue(1,0,Number.MAX_VALUE),Number.MAX_VALUE);
+  assert.throws(()=>ux.sliderValue(.5,5,1),/range/);
+});
+test('logarithmic sliders move by magnitude while preserving negative signs',()=>{
+  assert.equal(ux.sliderValue(.5,1e-12,1e-6,'log',-1),-1e-9);
+  assert.equal(ux.sliderPosition(-1e-9,1e-12,1e-6,'log'),.5);
+  assert.equal(ux.sliderValue(0,Number.MIN_VALUE,Number.MAX_VALUE,'log'),Number.MIN_VALUE);
+  assert.equal(ux.sliderValue(1,Number.MIN_VALUE,Number.MAX_VALUE,'log',-1),-Number.MAX_VALUE);
+  assert.throws(()=>ux.sliderValue(.5,0,1,'log'),/positive/);
+});

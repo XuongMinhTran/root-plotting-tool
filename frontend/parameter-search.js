@@ -418,23 +418,26 @@
   function init() {
     const block = el('single-fit-block'); if (!block) return;
     host = document.createElement('div'); host.className = 'parameter-search-tools';
-    host.innerHTML = '<div class="parameter-search-actions"><button type="button" id="parameter-search-open" class="primary" aria-describedby="parameter-search-availability"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" focusable="false"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg><span>Automatic guess…</span></button><button type="button" id="parameter-search-undo" hidden>Undo suggested values</button></div><p class="hint" id="parameter-search-availability"></p>';
+    host.innerHTML = '<div class="parameter-search-actions"><button type="button" id="parameter-search-open" class="primary" aria-describedby="parameter-search-availability"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" focusable="false"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg><span>Computer guess…</span></button><button type="button" id="parameter-search-undo" hidden>Undo suggested values</button></div><p class="hint" id="parameter-search-availability"></p>';
     const parameterHelp = block.querySelector('[data-help="guesses"]');
     if (parameterHelp) {
       const mount = document.createElement('div'); mount.id = 'parameter-search-single-mount';
       parameterHelp.replaceWith(mount); mount.append(host);
-      host.querySelector('.parameter-search-actions').prepend(parameterHelp);
+      const actions=host.querySelector('.parameter-search-actions');
+      const visual=block.querySelector('.visual-match-tools');
+      if(visual) actions.prepend(visual);
+      actions.append(parameterHelp);
     } else {
       const mount = document.createElement('div'); mount.id = 'parameter-search-single-mount';
       block.append(mount); mount.append(host);
     }
     dialog = document.createElement('dialog'); dialog.className = 'parameter-search-dialog';
     dialog.setAttribute('aria-labelledby', 'parameter-search-title'); dialog.setAttribute('aria-describedby', 'parameter-search-description');
-    dialog.innerHTML = `<div class="parameter-search-heading"><h2 id="parameter-search-title">Automatic guess</h2><button type="button" id="parameter-search-close">Close</button></div>
+    dialog.innerHTML = `<div class="parameter-search-heading"><h2 id="parameter-search-title">Computer guess</h2><button type="button" id="parameter-search-close">Close</button></div>
       <p id="parameter-search-description"></p>
       <p id="parameter-search-error" role="alert" hidden></p>
       <section id="parameter-search-choice" aria-labelledby="parameter-search-choice-title">
-        <h3 id="parameter-search-choice-title">Find starting values automatically?</h3>
+        <h3 id="parameter-search-choice-title">Let the computer suggest starting values?</h3>
         <p>Try a quick 20-second guess using automatic search ranges, or choose the ranges and time limit yourself.</p>
         <div class="parameter-search-actions"><button type="button" id="parameter-search-quick" class="primary">Quick guess (20 seconds)</button><button type="button" id="parameter-search-advanced">Set ranges and time</button></div>
       </section>

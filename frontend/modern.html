@@ -12,7 +12,7 @@
 <link rel="stylesheet" href="multivariate.css?v=1">
 <link rel="stylesheet" href="parameter-search.css?v=20261008-quick-guess">
 <link rel="stylesheet" href="analysis-setup.css?v=20261008-beginners">
-<link rel="stylesheet" href="fit-model.css?v=20261008-flow5">
+<link rel="stylesheet" href="fit-model.css?v=20261008-visual-guess-final">
 <script defer src="analysis-export.js?v=20260919-pdf"></script>
 <link rel="icon" href="favicon.ico?v=1" sizes="any"><link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png?v=1"><link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png?v=1"><link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=1"><link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?v=1"><link rel="apple-touch-icon" href="apple-touch-icon.png?v=1">
 </head>
@@ -219,7 +219,8 @@
         </div>
         <div class="param-block">
           <div class="parameter-heading"><h3 class="fit-stage">3. Set starting values</h3><button type="button" class="parameter-guide-button" data-help="guesses">Help with parameters</button></div>
-          <p class="hint">Use Automatic guess for a starting point, or edit the initial guesses below. Fit will refine these values.</p>
+          <div class="visual-match-tools"><button type="button" id="visual-match-open" aria-controls="guess-preview-panel" aria-haspopup="dialog" aria-describedby="visual-match-help">Visual guess…</button><span id="visual-match-recommended" class="recommended-badge">Recommended</span></div>
+          <p id="visual-match-help" class="hint">Adjust the controls until the curve follows your data, then click Fit to calculate the fitted parameters and uncertainties.</p>
           <div class="parameter-table-scroll"><table class="param-table" id="param-table">
             <thead><tr><th id="equation-parameter-heading">Symbol / index</th><th id="equation-name-heading">Report name</th><th>Initial guess — edit here</th></tr></thead><tbody></tbody>
           </table></div>
@@ -229,12 +230,16 @@
             <div class="field"><label for="initial-guesses">Initial guesses (comma-separated)</label><input id="initial-guesses" type="text" class="mono" placeholder="e.g. 1, 0" spellcheck="false"></div>
             <p class="hint">Use parameter order: [0], [1], [2]… Leave a value blank to keep its default or automatic estimate, where available.</p>
           </div></details>
-          <details id="guess-preview-panel" class="guess-preview-panel" open>
-            <summary>Preview starting values</summary>
-            <div class="guess-preview-legend"><span class="preview-line-key">Initial guess</span><span class="preview-point-key">Your data</span></div>
+          <dialog id="guess-preview-panel" class="guess-preview-panel visual-guess-dialog" aria-labelledby="visual-guess-title" aria-describedby="visual-guess-description"><form id="visual-guess-form">
+            <div class="visual-guess-heading"><h2 id="visual-guess-title">Visual guess</h2><button type="button" id="visual-guess-close">Done</button></div>
+            <p id="visual-guess-description" class="hint">Adjust the curve to follow your data. Changes update your starting values immediately. When you are ready, close this form and click Fit to calculate fitted parameters and uncertainties.</p>
+            <div class="visual-match-layout"><div class="visual-preview-plot"><div class="guess-preview-legend"><span class="preview-line-key">Initial guess</span><span class="preview-point-key">Your data</span></div>
             <p class="hint">The curve uses your current starting values. It is not a fit result.</p>
             <div id="guess-preview"></div><p id="guess-preview-note" class="hint"></p>
-          </details>
+            </div><div class="visual-controls-pane"><label class="visual-mode-label" for="visual-adjust-mode">Adjust with <select id="visual-adjust-mode"><option value="buttons">− / + buttons</option><option value="slider">Sliders</option></select></label>
+            <p class="hint">Step sets the −/+ increment. ×10 and ÷10 change the guess and step together. Values and Step accept scientific notation, such as 1e-12.</p><details class="visual-tips"><summary>Adjustment tips</summary><p class="hint">Blank guesses start from model examples, or 1. Slider ranges do not constrain Fit. Log magnitude keeps the current sign and requires a nonzero guess; use ± to change the sign.</p></details>
+            <p id="visual-match-error" class="hint" role="alert" hidden></p><div id="visual-parameters"></div></div></div>
+          </form></dialog>
         </div>
         <details class="fold" id="param-expander"><summary id="fit-range-summary">Fit range: full data</summary><div class="fold-body">
           <div class="field-row"><div class="field"><label for="fit-xmin">X minimum</label><input id="fit-xmin" type="text" class="mono" inputmode="decimal" placeholder="Full data range"></div>
@@ -474,9 +479,9 @@
 <script src="insert-data.js?v=20260920-types" defer></script>
 <script src="multivariate.js?v=20261008-all-analysis" defer></script>
 <script src="app.js?v=20261008-fit-flow3" defer></script>
-<script src="model-library.js?v=5" defer></script>
-<script src="parameter-search.js?v=20261008-all-analysis" defer></script>
+<script src="model-library.js?v=20261008-guess-forms-v3" defer></script>
+<script src="parameter-search.js?v=20261008-guess-forms-v3" defer></script>
 <script defer src="analysis-features.js?v=20261008-fit-flow"></script>
-<script src="fit-model.js?v=20261008-flow3" defer></script>
+<script src="fit-model.js?v=20261008-visual-guess-final" defer></script>
 </body>
 </html>

@@ -42,7 +42,48 @@ body.classic .fit-plot-settings { margin:12px 0; padding:8px 10px; border:1px so
 body.modern .fit-plot-settings > summary { font-size:17px; font-weight:600; }
 .hint-inline { font-size:13px; font-weight:400; color:#667789; }
 .parameter-paste { margin:12px 0; }
-.guess-preview-panel { margin:18px 0; }
+.visual-guess-dialog { width:min(1000px,calc(100vw - 28px)); max-height:90vh; box-sizing:border-box; padding:20px; background:#fff; color:#172b43; border:1px solid #bacbdc; border-radius:8px; overflow:auto; }
+.visual-guess-dialog::backdrop { background:#0006; }
+.visual-guess-dialog [hidden] { display:none!important; }
+.visual-guess-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; position:sticky; top:-20px; z-index:3; margin:-20px -20px 0; padding:12px 20px; background:#fff; border-bottom:1px solid #d4dbe3; }
+.visual-guess-heading h2 { margin:0; font-size:20px; }
+#visual-guess-close { min-height:40px; padding:8px 16px; }
+.visual-match-layout { display:grid; gap:16px; }
+.visual-preview-plot, .visual-controls-pane { min-width:0; }
+.guess-preview-panel { container-type:inline-size; }
+@container (min-width:760px) {
+  .visual-match-layout { grid-template-columns:minmax(0,1.25fr) minmax(0,1fr); align-items:start; }
+  .visual-preview-plot { position:sticky; top:12px; }
+  .visual-controls-pane { max-height:min(560px,calc(90vh - 130px)); overflow:auto; padding:2px 6px 2px 2px; }
+}
+.visual-match-tools { display:flex; flex-direction:column; align-items:flex-start; gap:4px; }
+.parameter-search-actions:has(.visual-match-tools) { align-items:flex-start; }
+body.modern #visual-match-open, body.classic #visual-match-open { background:#245b92; color:#fff; border:1px solid #245b92; font-weight:600; padding:10px 16px; }
+body.modern #visual-match-open:disabled, body.classic #visual-match-open:disabled { opacity:.55; }
+.recommended-badge { background:#e7f3ec; color:#22613e; padding:4px 9px; border-radius:20px; font-size:12px; font-weight:600; }
+.visual-mode-label { display:flex; align-items:center; flex-wrap:wrap; gap:10px; font-weight:600; }
+body.modern #visual-adjust-mode, body.classic #visual-adjust-mode { width:auto; min-width:150px; }
+body.modern .visual-guess-dialog input[type="text"] { min-height:36px; padding:6px 8px; font-size:14px; }
+body.modern .visual-value-row button { min-height:40px; padding:6px 12px; }
+.visual-tips { margin:4px 0 8px; }
+#visual-parameters { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr)); gap:12px; }
+.visual-parameter { min-width:0; padding:12px; border:1px solid #c2cfdb; border-radius:6px; background:#f7f9fc; }
+.visual-parameter-name { display:block; font-weight:600; margin-bottom:8px; overflow-wrap:anywhere; }
+.visual-value-row { display:flex; align-items:center; gap:6px; }
+.visual-value-row input { flex:1; width:0; min-width:0; }
+.visual-value-row button { flex:none; min-width:40px; font-size:19px; }
+.visual-step-row { display:flex; align-items:end; flex-wrap:wrap; gap:8px; margin-top:10px; }
+.visual-step-row > label { flex:1; min-width:90px; font-size:12px; }
+.visual-step-row input { display:block; width:100%; box-sizing:border-box; min-width:0; }
+.visual-magnitude-buttons { display:flex; gap:4px; }
+.visual-magnitude-buttons button { padding:6px 8px; min-height:36px; }
+.visual-slider-controls { margin-top:10px; }
+.visual-slider-controls input[type="range"] { display:block; width:100%; padding:0; accent-color:#245b92; min-height:30px; }
+.visual-range-row { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.visual-range-row label:first-child { grid-column:1/-1; }
+.visual-range-row label { min-width:0; font-size:12px; }
+.visual-range-row input, .visual-range-row select { width:100%; min-width:0; box-sizing:border-box; }
+#visual-match-error { color:#a53030; }
 .guess-preview-panel svg { width:100%; height:auto; display:block; max-height:260px; }
 .guess-preview-legend { display:flex; flex-wrap:wrap; gap:20px; font-size:13px; color:#526476; margin:8px 0; }
 .preview-line-key::before { content:''; display:inline-block; width:22px; border-top:2px dashed #346295; vertical-align:middle; margin-right:6px; }
