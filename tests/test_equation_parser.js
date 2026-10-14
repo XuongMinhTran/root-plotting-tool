@@ -6,18 +6,18 @@ const path=require('node:path');
 const equation=require('../frontend/equation-parser.js');
 const library=JSON.parse(fs.readFileSync(path.join(__dirname,'../frontend/model-library.js'),'utf8')
   .match(/const DATA = ([\s\S]*?);\s*const norm/)[1]);
-const model=library.models.find(m=>m.name==='Double-slit (Gaussian fringe visibility)');
+const model=library.models.find(m=>m.name==='Double-slit (linear fringe visibility)');
 const names=model.symbols.split(',').map(s=>s.trim());
 
-test('nine-parameter model separates readable report names from equation symbols',()=>{
+test('double-slit model separates readable report names from equation symbols',()=>{
   assert.deepEqual(model.params.split(',').map(s=>s.trim()), [
     'count_scale','background','envelope_scale','fringe_frequency','envelope_center',
-    'fringe_origin','visibility','visibility_center','visibility_width'
+    'fringe_origin','visibility','visibility_slope'
   ]);
   assert.equal(model.guesses.split(',').length,names.length);
 });
 
-test('nine-parameter library model imports and retains parameter identities',()=>{
+test('double-slit library model imports and retains parameter identities',()=>{
   const imported=equation.fromRoot(model.formula,names);
   assert.match(imported.latex,/\\operatorname\{sinc\}/);
   assert.deepEqual(imported.parameters,names);
@@ -28,11 +28,11 @@ test('nine-parameter library model imports and retains parameter identities',()=
 
 test('the displayed model equals the physical equation at and around its center',()=>{
   const expression=equation.expression(equation.fromRoot(model.formula,names).latex);
-  for(const parameters of [[400,7,1.3,4.1,.2,.7,.8,1.3,2.4],[400,7,0,4.1,.2,.7,0,1.3,2.4]]) {
-    const [n0,bg,ka,kd,x1,x0,v,xc,w]=parameters;
+  for(const parameters of [[400,7,1.3,4.1,.2,.7,.6,.05],[400,7,0,4.1,.2,.7,0,0]]) {
+    const [n0,bg,ka,kd,x1,x0,v,v1]=parameters;
     for(const x of [-2,x1-1e-10,x1,x1+1e-10,2]) {
       const z=ka*(x-x1), envelope=z===0?1:(Math.sin(z)/z)**2;
-      const expected=bg+n0/2*envelope*(1+v*Math.exp(-(((x-xc)/w)**2))*Math.cos(2*kd*(x-x0)));
+      const expected=bg+n0/2*envelope*(1+(v+v1*(x-x1))*Math.cos(2*kd*(x-x0)));
       const actual=expression.evaluate({...Object.fromEntries(names.map((n,i)=>[n,parameters[i]])),x});
       assert.ok(Math.abs(actual-expected)<1e-9,`${x}: ${actual} versus ${expected}`);
     }

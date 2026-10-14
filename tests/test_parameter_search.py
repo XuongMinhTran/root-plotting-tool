@@ -77,7 +77,7 @@ class NumericalSearchTests(unittest.TestCase):
                 self.assertTrue(all(np.isfinite([p["initial"], p["lower"], p["upper"]]).all()
                                     for p in result["parameters"]))
 
-    def test_nine_parameter_library_model_from_generic_guesses(self):
+    def test_double_slit_library_model_from_generic_guesses(self):
         # An independent shifted experiment with changing contrast and count
         # noise. Fit the curve rather than asserting a unique fringe origin:
         # shifting that parameter by whole periods gives equivalent solutions.
@@ -85,10 +85,10 @@ class NumericalSearchTests(unittest.TestCase):
         import re
         source = (Path(__file__).resolve().parents[1] / "frontend/model-library.js").read_text()
         library = json.loads(re.search(r"const DATA = (.*?);\s*const norm", source, re.S).group(1))
-        model = next(m for m in library["models"] if m["name"] == "Double-slit (Gaussian fringe visibility)")
+        model = next(m for m in library["models"] if m["name"] == "Double-slit (linear fringe visibility)")
         x = np.linspace(3, 8, 101)
         envelope = np.sinc(.87 * (x - 5.3) / np.pi) ** 2
-        expected = 90 + 11000 * envelope * (1 + .7 * np.exp(-((x - 6) / 3.1) ** 2)
+        expected = 90 + 11000 * envelope * (1 + (.65 + .06 * (x - 5.3))
                                            * np.cos(2 * 4.2 * (x - 5.4)))
         errors = np.sqrt(expected)
         measured = expected + np.random.default_rng(123).normal(0, errors)

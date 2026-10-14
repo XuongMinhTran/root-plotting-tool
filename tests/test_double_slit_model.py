@@ -1,4 +1,4 @@
-"""Regression checks for the nine-parameter double-slit library model.
+"""Regression checks for the double-slit library model with linear fringe visibility.
 
 Run with the backend's ROOT, NumPy and Flask dependencies installed:
     python3 -m unittest discover -s tests -v
@@ -24,34 +24,34 @@ def library_model():
     source = (REPO / "frontend/model-library.js").read_text()
     data = json.loads(re.search(r"const DATA = (.*?);\s*const norm", source, re.S).group(1))
     return next(model for model in data["models"]
-                if model["name"] == "Double-slit (Gaussian fringe visibility)")
+                if model["name"] == "Double-slit (linear fringe visibility)")
 
 
 def reference(x, parameters):
     """The supplied physical equation, with its continuous sinc limit."""
-    n0, background, ka, kd, envelope_center, fringe_origin, visibility, center, width = parameters
+    n0, background, ka, kd, envelope_center, fringe_origin, visibility, slope = parameters
     z = ka * (x - envelope_center)
     envelope = 1.0 if z == 0 else (math.sin(z) / z) ** 2
-    contrast = visibility * math.exp(-((x - center) / width) ** 2)
+    contrast = visibility + slope * (x - envelope_center)
     return background + n0 / 2 * envelope * (1 + contrast * math.cos(2 * kd * (x - fringe_origin)))
 
 
-class GaussianVisibilityModelTests(unittest.TestCase):
+class DoubleSlitLinearVisibilityModelTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.model = library_model()
         cls.guesses = [float(value) for value in cls.model["guesses"].split(",")]
         # Independent synthetic experiment; library defaults are only placeholders.
-        cls.parameters = [400, 7, 1.3, 4.1, 0.2, 0.7, 0.8, 1.3, 2.4]
-        cls.function = ROOT.TF1("gaussian_visibility_test", cls.model["formula"], -2, 2)
+        cls.parameters = [400, 7, 1.3, 4.1, 0.2, 0.7, 0.6, 0.08]
+        cls.function = ROOT.TF1("linear_visibility_test", cls.model["formula"], -2, 2)
 
-    def test_formula_is_accepted_with_nine_parameters(self):
+    def test_formula_is_accepted_with_eight_parameters(self):
         ok, message = check_formula(self.model["formula"])
         self.assertTrue(ok, message)
         self.assertTrue(self.function.IsValid())
-        self.assertEqual(self.function.GetNpar(), 9)
-        self.assertEqual(len(self.model["params"].split(",")), 9)
-        self.assertEqual(len(self.guesses), 9)
+        self.assertEqual(self.function.GetNpar(), 8)
+        self.assertEqual(len(self.model["params"].split(",")), 8)
+        self.assertEqual(len(self.guesses), 8)
 
     def test_equation_and_continuous_envelope_center(self):
         for parameters in (self.guesses, self.parameters):
@@ -67,6 +67,7 @@ class GaussianVisibilityModelTests(unittest.TestCase):
         parameters = self.parameters.copy()
         parameters[2] = 0
         parameters[6] = 0
+        parameters[7] = 0
         self.function.SetParameters(*parameters)
         for x in (-2, parameters[4], 2):
             self.assertAlmostEqual(self.function.Eval(x), parameters[1] + parameters[0] / 2)
@@ -75,11 +76,10 @@ class GaussianVisibilityModelTests(unittest.TestCase):
         x = [-2 + 0.05 * i for i in range(81)]
         y = [reference(value, self.parameters) for value in x]
         guesses = self.parameters.copy()
-        for index, factor in ((0, 0.95), (1, 1.1), (2, 1.02), (3, 0.99), (6, 0.9), (8, 1.05)):
+        for index, factor in ((0, 0.95), (1, 1.1), (2, 1.02), (3, 0.99), (6, 0.9), (7, 1.2)):
             guesses[index] *= factor
         guesses[4] += 0.02
         guesses[5] += 0.02
-        guesses[7] -= 0.05
         with app.test_client() as client:
             response = client.post("/fit", json={
                 "x": x, "y": y, "ey": [math.sqrt(value) for value in y],
@@ -90,7 +90,7 @@ class GaussianVisibilityModelTests(unittest.TestCase):
         result = response.get_json()
         self.assertEqual(response.status_code, 200, result.get("error"))
         self.assertTrue(result["converged"], result["status_message"])
-        self.assertEqual(result["ndf"], 72)
+        self.assertEqual(result["ndf"], 73)
         self.assertEqual([p["name"] for p in result["params"]],
                          [name.strip() for name in self.model["params"].split(",")])
         self.assertLess(result["chi2"], 0.001)
