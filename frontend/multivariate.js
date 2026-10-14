@@ -260,6 +260,7 @@
   function buildPayload(d, options = {}) {
     readDom();
     const mv = ensure(d);
+    if (window.SetupView) window.SetupView.assertComplete(d);   // Standard: no gaps in a Per point column
     const inputs = [], input_errors = [], input_names = [];
     let N = null;
     for (let i = 0; i < mv.n; i++) {

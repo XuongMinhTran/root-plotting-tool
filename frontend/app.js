@@ -605,7 +605,7 @@ function syncAnalysisSetup() {
     $('btn-table').classList.toggle('primary', !hasData);
     $('btn-table').textContent = hasData ? 'Edit data…' : 'Add data…';
   }
-  if ($('modern-next')) $('modern-next').disabled = false;
+  if ($('modern-next')) $('modern-next').disabled = !type;
   if ($('plot-choice-hint')) $('plot-choice-hint').textContent = hasPlot
     ? 'Data and fit settings belong to the selected plot. Use New plot to add another.'
     : 'Choose an analysis type above to create a plot. Your data and fit settings belong to the selected plot.';
@@ -764,6 +764,7 @@ function renderDatasetSelector() {
   const removeBtns = document.querySelectorAll('[data-action="dataset-remove"]');
   for (const b of removeBtns) b.disabled = !datasets[activeIdx].analysis_type;
   if (current !== sel.value) { /* nothing else to do */ }
+  window.SetupView?.refresh();   // Standard's data grid mirrors the active dataset
 }
 
 // Each dataset retains its latest result; selection never reruns a fit.
@@ -1139,6 +1140,7 @@ function buildPayload(inputs, fitModel = true) {
   if (cols.x.length === 0) throw new Error(`Paste some X values first (${name} is empty).`);
   if (cols.y.length === 0) throw new Error('Paste some Y values first.');
   if (cols.x.length !== cols.y.length) throw new Error(`X has ${cols.x.length} points but Y has ${cols.y.length}. Each point needs an X and a Y value. Add the missing values or remove the extra ones.`);
+  window.SetupView?.assertComplete(datasets[activeIdx]);
   for (const c of ['ex', 'ey']) {
     if (cols[c].some((v) => v < 0)) throw new Error(`${COLUMN_LABEL[c]} describe a size, so use zero or a positive number.`);
     if (cols[c].length === 1) cols[c] = Array(cols.x.length).fill(cols[c][0]);

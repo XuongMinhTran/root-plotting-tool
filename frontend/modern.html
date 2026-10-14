@@ -17,6 +17,7 @@
 <link rel="icon" href="favicon.ico?v=1" sizes="any"><link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png?v=1"><link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png?v=1"><link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=1"><link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?v=1"><link rel="apple-touch-icon" href="apple-touch-icon.png?v=1">
 <link rel="stylesheet" href="fit-progress.css?v=20261013">
 <link rel="stylesheet" href="ai-starting-values.css?v=20261013">
+<link rel="stylesheet" href="setup-view.css?v=20261014">
 </head>
 <body class="modern standard-workspace">
 <a class="skip-link" href="#main">Skip to the worksheet</a>
@@ -34,18 +35,7 @@
 </header>
 
 <main class="workspace" id="main" tabindex="-1">
-  <div class="worksheet-bar inputs">
-    <div class="doc-actions" role="toolbar" aria-label="Document">
-      <button id="btn-load" type="button">Open…</button>
-      <button id="btn-save" type="button">Save</button>
-      <button type="button" class="danger" data-action="clear-all">Clear all</button>
-    </div>
-    <div class="title-field">
-      <label for="doc-title">Analysis title</label>
-      <input id="doc-title" type="text" placeholder="Untitled analysis">
-    </div>
-  </div>
-
+  <div class="worksheet-head inputs">
     <nav class="steps" aria-label="Worksheet steps">
       <button type="button" class="step-chip" data-target="step-data" aria-current="step">
         <span class="label"><b>Set up analysis</b></span></button>
@@ -54,110 +44,172 @@
       <button type="button" class="step-chip" data-target="step-results">
         <span class="label"><b>Results</b></span></button>
     </nav>
+    <div class="doc-actions" role="toolbar" aria-label="Document">
+      <input id="doc-title" type="text" placeholder="Untitled analysis" aria-label="Analysis title">
+      <button id="btn-load" type="button">Open…</button>
+      <button id="btn-save" type="button">Save</button>
+      <div class="menu-anchor">
+        <button type="button" class="icon-btn" id="doc-more" aria-haspopup="true" aria-expanded="false" aria-controls="doc-more-menu" aria-label="More document actions" title="More document actions">⋯</button>
+        <div class="pop-menu pop-right" id="doc-more-menu" hidden>
+          <button type="button" class="danger-item" data-action="clear-all">Clear all…</button>
+        </div>
+      </div>
+    </div>
+  </div>
   <div id="message" class="message" role="status" aria-live="polite" hidden></div>
 
   <!-- ==================== the worksheet ==================== -->
   <div class="worksheet inputs" id="inputs">
 
-
-
-    <!-- ---------- step 1 ---------- -->
-    <section class="card" id="step-data" aria-labelledby="h-data">
-      <header><h2 id="h-data">Set up your analysis</h2>
-        <button type="button" class="setup-help" data-help="data">How this works</button></header>
-      <div id="panel-data">
-
-
-      <div class="analysis-setup">
-        <div class="field analysis-choice">
-          <label for="analysis-type">1. Choose an analysis type</label>
-          <select id="analysis-type" aria-describedby="analysis-description">
-            <option value="" disabled selected>What kind of data did you measure?</option>
-            <option value="xy">XY — compare two quantities</option>
-            <option value="histogram">Histogram — distribution of one quantity</option>
-            <option value="multivariate">Several inputs and outputs (multivariate)</option>
-          </select>
-          <p id="analysis-description" class="hint">Choose the type that matches your measurements.</p>
-        </div>
-        <details class="setup-examples">
-          <summary>Want to try it out? Load an example</summary>
-          <div class="field">
-            <label for="example-dataset">Optional example</label>
-            <select id="example-dataset">
-              <option value="">Choose an example…</option>
-              <option value="linear" data-analysis-type="xy">Straight line</option>
-              <option value="exp" data-analysis-type="xy">Exponential decay</option>
-              <option value="gaus" data-analysis-type="xy">Gaussian peak</option>
-              <option value="histogram" data-analysis-type="histogram">Count histogram</option>
-              <option value="multivariate" data-analysis-type="multivariate">Beam profile — two inputs, one output</option>
-            </select>
-            <p class="hint">Explore the tool with sample data and a ready-made model. Loading an example replaces the current document after confirmation.</p>
-          </div>
-        </details>
-        <h3 class="setup-step">2. Add your data</h3>
-        <div class="field plot-choice">
-          <label for="dataset-select">Plot</label>
-          <select id="dataset-select" aria-describedby="plot-choice-hint"><option value="">No plots yet — choose an analysis type</option></select>
-          <p id="plot-choice-hint" class="hint">Choose an analysis type above to create a plot. Your data and fit settings belong to the selected plot.</p>
-        </div>
-        <div class="dataset-row">
-          <button type="button" class="primary" id="btn-table" disabled title="Type, paste or edit measurements in a table">Add data…</button>
-          <button type="button" class="small" data-action="dataset-add" hidden title="Create another plot">New plot</button>
-          <details id="plot-options" class="plot-options" hidden>
-            <summary>More plot options</summary>
-            <div id="plot-management-actions" class="plot-options-actions">
-              <button type="button" class="small" data-action="dataset-duplicate" title="Copy this plot and its fit settings">Duplicate</button>
-              <button type="button" class="small" data-action="dataset-rename" title="Rename this plot">Rename</button>
-              <button type="button" class="small" data-action="dataset-remove" title="Delete this plot">Delete</button>
+    <!-- ---------- step 1: set up analysis (setup-view.js draws the grid and preview) ---------- -->
+    <section id="step-data" class="setup-page" aria-labelledby="h-data">
+      <div class="setup-layout" id="setup-layout">
+        <div class="card setup-card" id="setup-card">
+          <header class="setup-card-head">
+            <h2 id="h-data">Your data</h2>
+            <div class="menu-anchor">
+              <button type="button" class="link-btn" id="setup-examples-btn" aria-haspopup="true" aria-expanded="false" aria-controls="setup-examples-menu">or load an example</button>
+              <div class="pop-menu pop-right" id="setup-examples-menu" hidden>
+                <p class="pop-menu-label">XY</p>
+                <button type="button" data-example-key="linear">Straight line</button>
+                <button type="button" data-example-key="exp">Exponential decay</button>
+                <button type="button" data-example-key="gaus">Gaussian peak</button>
+                <p class="pop-menu-label">Histogram</p>
+                <button type="button" data-example-key="histogram">Count histogram</button>
+                <p class="pop-menu-label">Multivariate</p>
+                <button type="button" data-example-key="multivariate">Beam profile: two inputs, one output</button>
+              </div>
             </div>
-          </details>
+          </header>
+
+          <div class="setup-tabs-row" id="setup-tabs-row">
+            <div class="setup-tabs" id="setup-tabs" role="tablist" aria-label="Datasets"></div>
+            <button type="button" class="link-btn setup-new" id="setup-new-dataset">+ New dataset</button>
+            <div class="menu-anchor setup-dataset-more">
+              <button type="button" class="icon-btn" id="setup-dataset-more" aria-haspopup="true" aria-expanded="false" aria-controls="setup-dataset-menu" aria-label="Dataset actions" title="Dataset actions">⋯</button>
+              <div class="pop-menu pop-right" id="setup-dataset-menu" hidden>
+                <div id="plot-management-actions" class="pop-menu-items">
+                  <button type="button" data-action="dataset-rename" title="Rename this dataset">Rename…</button>
+                  <button type="button" data-action="dataset-duplicate" title="Copy this dataset and its fit settings">Duplicate</button>
+                  <button type="button" class="danger-item" data-action="dataset-remove" title="Delete this dataset">Delete…</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="setup-type-row">
+            <div class="setup-field">
+              <label for="setup-type">Data type</label>
+              <select id="setup-type">
+                <option value="" disabled>Choose a data type…</option>
+                <option value="xy">XY: two quantities measured together</option>
+                <option value="histogram">Histogram: one quantity measured many times</option>
+                <option value="multivariate">Multivariate: several inputs and outputs</option>
+              </select>
+            </div>
+            <div class="setup-field" id="setup-hist-source-field" hidden>
+              <label for="hist-source">Entered as</label>
+              <select id="hist-source">
+                <option value="samples">Individual measurements</option>
+                <option value="counts">Pre-binned counts</option>
+              </select>
+            </div>
+            <div class="setup-field setup-dims" id="setup-mv-dims" hidden>
+              <label for="setup-mv-n">Inputs</label>
+              <input type="number" id="setup-mv-n" min="1" max="20" step="1" inputmode="numeric">
+              <label for="setup-mv-m">Outputs</label>
+              <input type="number" id="setup-mv-m" min="1" max="20" step="1" inputmode="numeric">
+            </div>
+          </div>
+
+          <div class="setup-empty" id="setup-empty" hidden>
+            <p class="setup-empty-lede"><b>No dataset yet.</b> What did you measure? Choose a type to start one.</p>
+            <div class="setup-type-choices">
+              <button type="button" data-setup-type="xy"><b>XY</b><span>Two quantities measured together, such as time and temperature.</span></button>
+              <button type="button" data-setup-type="histogram"><b>Histogram</b><span>One quantity measured many times, such as particle energies.</span></button>
+              <button type="button" data-setup-type="multivariate"><b>Multivariate</b><span>A result that depends on several inputs, such as beam intensity across a grid.</span></button>
+            </div>
+          </div>
+
+          <p class="setup-derived" id="setup-derived" hidden>Calculated data. Edit its expression or sources in <a href="uncertainties.html">Analyze Data</a>.</p>
+          <div class="setup-grid-wrap" id="setup-grid-wrap"><table class="setup-grid" id="setup-grid"></table></div>
+          <div class="setup-grid-foot" id="setup-grid-foot">
+            <p class="hint" id="setup-paste-hint">Paste columns straight from Excel or Sheets, in the order shown.</p>
+            <div class="setup-grid-actions">
+              <button type="button" class="link-btn" id="setup-add-rows">+ Add rows</button>
+              <button type="button" class="link-btn" id="setup-import">Import CSV</button>
+              <input type="file" id="setup-import-file" accept=".csv,.tsv,.txt,text/csv,text/plain" hidden>
+            </div>
+          </div>
+          <p class="hint setup-grid-note" id="setup-grid-note" role="status" aria-live="polite" hidden></p>
+          <p class="hint setup-unc-help" id="setup-unc-help">Give every measured quantity an uncertainty if you know it: <b>Per point</b> for a different value on each row, <b>Constant</b> for one value that applies to every row. χ²/NDF and the parameter errors depend on them.</p>
+
+          <div class="setup-hist-options" id="setup-hist-options" hidden>
+            <div id="hist-binning" class="setup-binning">
+              <div class="setup-field"><label for="hist-bins">Bins</label>
+                <input id="hist-bins" type="number" min="1" max="2000" placeholder="Automatic" aria-describedby="hist-bins-help"></div>
+              <div class="setup-field"><label for="hist-min">Range from</label><input id="hist-min" type="text" inputmode="decimal" placeholder="Automatic"></div>
+              <div class="setup-field"><label for="hist-max">to</label><input id="hist-max" type="text" inputmode="decimal" placeholder="Automatic"></div>
+            </div>
+            <p class="hint" id="hist-bins-help">Leave Bins blank to use the range width, rounded up to a whole number. With no range, the smallest and largest measurement set it.</p>
+            <details id="hist-edges-details" class="fold"><summary>Custom bin edges</summary>
+              <div class="fold-body"><div class="field"><label for="hist-edges">Edges, in increasing order</label>
+                <textarea id="hist-edges" rows="3" spellcheck="false" placeholder="0, 1, 2, 4, 8"></textarea>
+                <p class="hint">For N bins, enter N + 1 strictly increasing edges. Explicit edges override Bins and Range.</p></div></div></details>
+            <p class="hint" id="setup-hist-counts-help" hidden>Each row is one bin: where it starts, where it ends, and how many entries it holds. Use whole, unweighted counts from before normalization or background subtraction.</p>
+            <p class="hint">The plot shows counts per unit X, so bins of different widths compare fairly.</p>
+            <button type="button" id="btn-histogram">Plot histogram without fitting</button>
+          </div>
         </div>
+
+        <aside class="card setup-preview" id="setup-preview" aria-labelledby="setup-preview-title">
+          <header class="setup-preview-head"><h3 id="setup-preview-title">Preview</h3><span class="setup-preview-count" id="setup-preview-count"></span></header>
+          <div class="setup-preview-axes" id="setup-preview-axes" hidden>
+            <label>Plot <select id="setup-preview-y" aria-label="Output to plot"></select></label>
+            <label>against <select id="setup-preview-x" aria-label="Input on the horizontal axis"></select></label>
+          </div>
+          <div class="setup-preview-plot" id="setup-preview-plot"></div>
+          <p class="hint setup-preview-note" id="setup-preview-note">Updates as you type, so a typo or a swapped column shows up before you fit.</p>
+        </aside>
       </div>
 
-      <!-- ---- histogram input ---- -->
-      <div id="histogram-data" hidden>
-        <div class="field"><label for="hist-source">Histogram input</label>
-          <select id="hist-source">
-            <option value="samples">Individual measurements</option>
-            <option value="counts">Pre-binned counts</option>
-          </select></div>
-        <div id="hist-samples-group" class="field"><label for="hist-samples">Measurements</label>
-          <textarea id="hist-samples" rows="7" spellcheck="false" placeholder="One measurement per line"></textarea></div>
-        <div id="hist-counts-group" class="field" hidden><label for="hist-counts">Bin counts</label>
-          <textarea id="hist-counts" rows="7" spellcheck="false" placeholder="One nonnegative whole count per bin"></textarea>
-          <p class="hint">Enter unweighted, nonnegative integer counts before normalization or background subtraction.</p></div>
-        <div id="hist-binning" class="row histogram-binning">
-          <div class="field grow"><label for="hist-bins">Number of bins</label>
-            <input id="hist-bins" type="number" min="1" max="2000" placeholder="Automatic" aria-describedby="hist-bins-help"></div>
-          <div class="field grow"><label for="hist-min">Range from</label><input id="hist-min" type="text" placeholder="Automatic"></div>
-          <div class="field grow"><label for="hist-max">to</label><input id="hist-max" type="text" placeholder="Automatic"></div>
+      <!-- The controls below are the source of truth that app.js, multivariate.js and Compact
+           read and save. setup-view.js mirrors them in the grid above and writes edits back. -->
+      <div class="setup-legacy" hidden>
+        <div class="analysis-setup">
+          <select id="analysis-type" aria-hidden="true" tabindex="-1">
+            <option value="" disabled selected>What kind of data did you measure?</option>
+            <option value="xy">XY</option>
+            <option value="histogram">Histogram</option>
+            <option value="multivariate">Multivariate</option>
+          </select>
+          <p id="analysis-description"></p>
+          <select id="example-dataset" tabindex="-1">
+            <option value="">Choose an example…</option>
+            <option value="linear" data-analysis-type="xy">Straight line</option>
+            <option value="exp" data-analysis-type="xy">Exponential decay</option>
+            <option value="gaus" data-analysis-type="xy">Gaussian peak</option>
+            <option value="histogram" data-analysis-type="histogram">Count histogram</option>
+            <option value="multivariate" data-analysis-type="multivariate">Beam profile</option>
+          </select>
+          <select id="dataset-select" tabindex="-1"><option value="">No plots yet</option></select>
+          <p id="plot-choice-hint"></p>
+          <button type="button" id="btn-table" tabindex="-1" disabled>Add data…</button>
+          <details id="plot-options" class="plot-options"><summary>More plot options</summary></details>
         </div>
-        <p class="hint" id="hist-bins-help">Leave the bin count blank to use the range width, rounded up to a whole number (at least one bin). If both range limits are blank, the sample minimum and maximum define the range.</p>
-        <details id="hist-edges-details" class="fold"><summary>Bin edges</summary>
-          <div class="fold-body"><div class="field"><label for="hist-edges">Edges, in increasing order</label>
-            <textarea id="hist-edges" rows="4" spellcheck="false" placeholder="0, 1, 2, 4, 8"></textarea>
-            <p class="hint">For N bins, enter N + 1 strictly increasing edges. Explicit edges override the bin count and range.</p></div></div></details>
-        <p class="hint hist-summary" id="hist-summary" role="status"></p>
-        <p class="hint">The plot shows counts per unit X, so bins of different widths can be compared. Values on the final right edge are included; measurements outside the edges are reported separately.</p>
-        <button type="button" id="btn-histogram">Plot histogram without fitting</button>
+        <div id="histogram-data">
+          <div id="hist-samples-group"><textarea id="hist-samples" tabindex="-1" aria-hidden="true"></textarea></div>
+          <div id="hist-counts-group"><textarea id="hist-counts" tabindex="-1" aria-hidden="true"></textarea></div>
+          <p id="hist-summary"></p>
+        </div>
+        <div id="xy-data">
+          <textarea id="col-x" tabindex="-1" aria-hidden="true"></textarea><span id="count-x"></span>
+          <textarea id="col-y" tabindex="-1" aria-hidden="true"></textarea><span id="count-y"></span>
+          <textarea id="col-ey" tabindex="-1" aria-hidden="true"></textarea><span id="count-ey"></span>
+          <textarea id="col-ex" tabindex="-1" aria-hidden="true"></textarea><span id="count-ex"></span>
+        </div>
+        <div id="multivariate-data"></div>
       </div>
-
-      <!-- ---- XY input ---- -->
-      <div id="xy-data">
-      <div class="columns">
-        <div class="col"><div class="col-head"><span class="cx">X</span><span class="count" id="count-x">0</span></div>
-          <textarea id="col-x" aria-label="X values" spellcheck="false" placeholder="1&#10;2&#10;3"></textarea></div>
-        <div class="col"><div class="col-head"><span class="cy">Y</span><span class="count" id="count-y">0</span></div>
-          <textarea id="col-y" aria-label="Y values" spellcheck="false" placeholder="2.1&#10;3.9&#10;6.2"></textarea></div>
-        <div class="col"><div class="col-head"><span class="cerr">Y uncertainty</span><span class="count" id="count-ey">0</span></div>
-          <textarea id="col-ey" aria-label="Y uncertainties" spellcheck="false" placeholder="optional"></textarea></div>
-        <div class="col"><div class="col-head"><span class="cerr">X uncertainty</span><span class="count" id="count-ex">0</span></div>
-          <textarea id="col-ex" aria-label="X uncertainties" spellcheck="false" placeholder="optional"></textarea></div>
-      </div>
-      <p class="hint">Separate values with newlines, commas, tabs, or spaces. Uncertainties: one value per axis or one per point. Use Add data… to type, paste or edit measurements in a table.</p>
-      </div>
-      </div>
-      <div id="multivariate-data" hidden></div>
     </section>
 
     <!-- ---------- step 2 ---------- -->
@@ -348,8 +400,9 @@
     </div>
   </section>
   <div class="fit-bar">
+    <span id="setup-status" class="setup-status" role="status" aria-live="polite"></span>
     <button id="modern-back" type="button" hidden>Back</button>
-    <button id="modern-next" type="button" class="primary">Continue to fit model</button>
+    <button id="modern-next" type="button" class="primary">Continue to fit model →</button>
     <button id="btn-fit" type="button" class="primary" hidden>Fit</button>
     <span id="fit-status" role="status" aria-live="polite">Ready</span>
     <button type="button" class="fit-bar-save" data-action="save">Save</button>
@@ -484,14 +537,15 @@
 <script src="vendor/mathlive/mathlive.min.js" defer></script>
 <script src="equation-parser.js?v=20261008-sinc" defer></script>
 <script src="equation-editor.js?v=20261008-inline-starts-4" defer></script>
-<script src="modern.js?v=20261013-fit-notice-2" defer></script>
+<script src="modern.js?v=20261014-setup-view" defer></script>
 <script defer src="units.js?v=1"></script><script src="analysis-core.js?v=20260919-units" defer></script>
 <script src="workspace-store.js?v=1" defer></script>
 <script src="plot-style.js?v=1" defer></script>
 <script src="insert-data.js?v=20260920-types" defer></script>
 <script src="multivariate.js?v=20261013-fit-layout" defer></script>
 <script src="fit-progress.js?v=20261013" defer></script>
-<script src="app.js?v=20261013-fit-navigation" defer></script>
+<script src="app.js?v=20261014-setup-view" defer></script>
+<script src="setup-view.js?v=20261014" defer></script>
 <script src="model-library.js?v=20261008-inline-starts-4" defer></script>
 <script src="parameter-search.js?v=20261013-fit-layout" defer></script>
 <script defer src="analysis-features.js?v=20261008-fit-flow"></script>

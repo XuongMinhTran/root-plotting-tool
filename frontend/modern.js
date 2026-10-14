@@ -43,7 +43,14 @@
     $('modern-back').hidden = step === 'data';
     $('modern-back').textContent = step === 'results' ? 'Edit fit model' : 'Back to analysis setup';
     $('btn-fit').hidden = step !== 'function';
+    // On Set up analysis the bar carries the dataset summary instead of the fit status.
+    if ($('setup-status')) $('setup-status').hidden = step !== 'data';
+    $('fit-status').hidden = step === 'data';
+    const barSave = document.querySelector('.fit-bar-save');
+    if (barSave) barSave.hidden = step === 'data';
+    document.body.classList.toggle('on-setup', step === 'data');
     highlight(step);
+    if (step === 'data') window.SetupView?.layout();
     updateResultNotice();
     if (focus) chipFor(step)?.focus?.({ preventScroll: true });
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
