@@ -10,7 +10,7 @@
   }) {
     let active = null;
     return {
-      start(label = 'Fitting') {
+      start(label = 'Fitting', options = {}) {
         active?.finish();
         const run = {
           received() {
@@ -26,10 +26,10 @@
           },
         };
         active = run;
-        view.show(label);
+        view.show(label, options.message || '');
         run.timer = timers.setTimeout(() => {
           if (active === run) view.update('Waiting for the server', WAKEUP_MESSAGE);
-        }, 20000);
+        }, options.wakeupAfter || 20000);
         return run;
       },
       finish() { active?.finish(); },
@@ -47,7 +47,7 @@
     text.hidden = !message;
   }
   root.FitProgress = createProgress({
-    show(label) {
+    show(label, message) {
       if (!dialog) {
         dialog = document.createElement('dialog');
         dialog.className = 'fit-progress';
@@ -62,8 +62,8 @@
         document.body.appendChild(dialog);
         dialog.querySelector('button').addEventListener('click', () => dialog.close());
       }
-      update(label, '');
-      dialog.showModal();
+      update(label, message || '');
+      if (!dialog.open) dialog.showModal();
     },
     update,
     hide() { if (dialog?.open) dialog.close(); },

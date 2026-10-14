@@ -114,3 +114,8 @@ body.modern :is(details, details.fold, details.diagnostic-config, details.ml-gui
 
 .starting-values-panel.is-histogram .parameter-search-tools { display: contents; }
 .starting-values-panel.is-histogram .parameter-search-tools > .hint { display: none; }
+
+/* Brute force fit sits beside Fit as its secondary action. */
+body.modern .fit-bar .brute-force-fit { flex:none; min-height:46px; padding:10px 18px; font-size:15px; font-weight:600; color:#245b92; background:#fff; border:1px solid #8caac7; }
+body.modern .fit-bar .brute-force-fit:hover:not(:disabled) { background:#eaf2fb; border-color:#245b92; }
+@media (max-width:600px) { body.modern .fit-bar .brute-force-fit { min-height:40px; padding:8px 12px; font-size:13px; } }

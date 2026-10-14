@@ -13,7 +13,7 @@ test('guess display is short without changing the canonical value',()=>{
 test('preview evaluates the supplied full precision guesses and active bounds',()=>{
   const curve=ux.previewModel(equation,'[0]*x+[1]',['slope','intercept'],['1.234567890123','-2.45678901234'],2,8);
   assert.equal(curve[0][1],1.234567890123*2-2.45678901234); assert.equal(curve.at(-1)[0],8);
-  assert.throws(()=>ux.previewModel(equation,'[0]*x',['a'],[''],0,10),/Enter or estimate starting values/);
+  assert.throws(()=>ux.previewModel(equation,'[0]*x',['a'],[''],0,10),/Enter starting values/);
   assert.throws(()=>ux.previewModel(equation,'[0]*x',['a'],['1'],2,1),/fit range/);
 });
 test('domain failures produce gaps without fitting a different function',()=>{
@@ -74,9 +74,9 @@ test('logarithmic sliders move by magnitude while preserving negative signs',()=
 test('starting-value provenance survives equivalent numeric formatting',()=>{
   const signature='data-and-model';
   const saved={source:'automatic',values:ux.valuesKey('1e-9, 2.12345678901234'),signature};
-  assert.match(ux.startingStatus('0.000000001, 2.12345678901234',2,saved,signature).text,/Estimated from your data/);
+  assert.match(ux.startingStatus('0.000000001, 2.12345678901234',2,saved,signature).text,/Found by brute force/);
   assert.match(ux.startingStatus('1e-9, 2.12345678901235',2,saved,signature).text,/Starting values set/);
-  assert.match(ux.startingStatus('1e-9, 2.12345678901234',2,saved,'changed-data').text,/changed.*re-estimate/);
+  assert.match(ux.startingStatus('1e-9, 2.12345678901234',2,saved,'changed-data').text,/changed.*Brute force fit again/);
 });
 test('starting-value status distinguishes manual sources and incomplete values',()=>{
   for(const [source,label] of [['adjusted','Adjusted manually'],['edited','Edited']]) {

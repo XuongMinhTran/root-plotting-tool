@@ -40,6 +40,18 @@
     const s=session; if(!s?.inline) return;
     const busy=!!(s.preparing || s.running || s.cancelling), error=el('parameter-search-error').textContent;
     window.FitModelUX?.searchState({busy,cancelling:!!s.cancelling,message:el('parameter-search-status').textContent,error,failed:!!error && !busy && !s.stale},s.datasetId);
+    if (s.fitAfter) bruteStatus(s, busy, error);
+  }
+
+  // Brute force fit: the search runs first, then the normal ROOT fit starts from
+  // the best values found. Its progress shows in the fit bar and dialog.
+  function bruteStatus(s, busy, error) {
+    if (busy) { setStatus(el('fit-status'), 'Brute force fit: ' + el('parameter-search-status').textContent, 'busy'); return; }
+    if (s.result) return;                                   // apply() hands over to Fit
+    if (!error && !s.stale && !s.stopped) return;           // between preparing and searching
+    window.FitProgress?.finish();
+    if (error) setStatus(el('fit-status'), 'Brute force fit stopped: ' + error, 'err');
+    else if (!s.preparing) setStatus(el('fit-status'), 'Brute force fit stopped. Your starting values were kept.', '');
   }
 
   async function request(s, path, options = {}) {
@@ -74,7 +86,7 @@
     el('parameter-search-setup').hidden = s?.mode !== 'advanced' || !s?.parameters;
     el('parameter-search-footer').hidden = s?.mode === 'choice';
     el('parameter-search-start').hidden = s?.mode === 'choice' || !!busy;
-    el('parameter-search-start').textContent = s?.mode === 'quick' ? 'Guess again (20 seconds)' : 'Start search';
+    el('parameter-search-start').textContent = s?.mode === 'quick' ? 'Search again (20 seconds)' : 'Start search';
     el('parameter-search-settings').hidden = s?.mode !== 'quick' || !!busy;
     el('parameter-search-settings').disabled = unavailable;
     el('parameter-search-start').disabled = unavailable;
@@ -87,8 +99,9 @@
     el('parameter-search-progress').hidden = !s?.running;
     el('parameter-search-ranges').setAttribute('aria-busy', String(!!s?.preparing));
     publishInline();
-    const inlineBusy=!!session?.inline && !!busy;
-    if(el('starting-values-estimate')) el('starting-values-estimate').disabled=inlineBusy || fitBusy || !['xy','histogram'].includes(datasets[activeIdx]?.analysis_type) || !el('param-table').querySelector('[data-pguess]');
+    const inlineBusy=!!session?.inline && !!busy, type=datasets[activeIdx]?.analysis_type;
+    const hasParameters=type==='multivariate'?!!document.querySelector('#mv-parameter-rows tr'):!!el('param-table').querySelector('[data-pguess]');
+    if(el('starting-values-estimate')) el('starting-values-estimate').disabled=inlineBusy || fitBusy || !['xy','histogram','multivariate'].includes(type) || !hasParameters;
     el('parameter-search-open').disabled=!!busy || fitBusy;
   }
 
@@ -97,7 +110,7 @@
     s.stale = true;
     warn(reason || 'The data, equation, or starting values changed. Close this window and open a new search for the current inputs.');
     setControls(s);
-    if(s.inline && !s.running) { window.FitModelUX?.searchState(null,s.datasetId); return; }
+    if(s.inline && !s.running) { if (s.fitAfter) bruteStatus(s, false, reason || 'the inputs changed.'); window.FitModelUX?.searchState(null,s.datasetId); return; }
     if (s.running) stop(s, false);
   }
 
@@ -108,9 +121,9 @@
     const mount = kind === 'multivariate' ? el('mv-starting-actions') : kind === 'histogram' ? document.querySelector('#single-fit-block .starting-values-actions') : el('parameter-search-single-mount');
     if (mount && host.parentElement !== mount) mount.append(host);
     el('parameter-search-open').disabled = !supported || fitBusy || !!(session?.preparing || session?.running || session?.cancelling);
-    el('parameter-search-open').textContent=kind==='multivariate'?'Estimate starting values…':'Search options…';
+    el('parameter-search-open').textContent='Brute force options…';
     el('parameter-search-availability').textContent = supported
-      ? 'Let the computer suggest values, then review and apply them.'
+      ? 'Set your own search ranges and time limit, then review the values before applying them.'
       : 'Choose an analysis type to find starting values for your model.';
     const current = (session || undo) ? fingerprint() : null;
     if (session && current !== session.fingerprint) stale(session);
@@ -165,8 +178,8 @@
     });
   }
 
-  async function open(inline=false) {
-    inline=inline===true;
+  async function open(inline=false, fitAfter=false) {
+    inline=inline===true; fitAfter=inline && fitAfter===true;
     refresh();
     if (el('parameter-search-open').disabled) return;
     let payload;
@@ -183,11 +196,15 @@
       payload = multivariate ? window.Multivariate.buildPayload(datasets[activeIdx], { search: true }) : buildPayload(readForm());
       if (!multivariate && !payload.formula) throw new Error('Enter a fit function before searching for starting values.');
     } catch (error) {
-      if(inline) window.FitModelUX?.searchState({busy:false,failed:true,message:'Estimation could not start. Current values kept.',error:error.message});
-      else showMessage('error', error.message);
+      if(inline) window.FitModelUX?.searchState({busy:false,failed:true,message:'Brute force fit could not start. Current values kept.',error:error.message});
+      if (fitAfter || !inline) showMessage('error', error.message);
       return;
     }
-    const s = session = { payload, backend: backendUrl(), fingerprint: fingerprint(), preparing: true, mode: 'choice',inline,datasetId:datasets[activeIdx]?.id || String(activeIdx) };
+    const s = session = { payload, backend: backendUrl(), fingerprint: fingerprint(), preparing: true, mode: 'choice',inline,fitAfter,datasetId:datasets[activeIdx]?.id || String(activeIdx) };
+    if (fitAfter) {
+      showMessage('');
+      window.FitProgress?.start('Brute force fit', { message:'Searching for the parameters that best match your data, for up to 20 seconds. ROOT then runs the final fit from there.', wakeupAfter:45000 });
+    }
     warn(''); status('Preparing search ranges…');
     el('parameter-search-ranges').querySelector('tbody').replaceChildren();
     el('parameter-search-results').hidden = true;
@@ -211,7 +228,7 @@
       s.parameters = prepared.parameters;
       rangeTable(s); addWarnings(prepared.warnings, el('parameter-search-warnings'));
       status(`Ready to search ${s.parameters.length} parameter${s.parameters.length === 1 ? '' : 's'} using ${prepared.n_points} included ${payload.analysis_type === 'histogram' ? 'bins' : 'rows'}${payload.analysis_type === 'multivariate' ? ' across ' + payload.n_outputs + ' output(s)' : ''}.`);
-    } catch (error) { if (session === s) { warn(error.message); status('Estimation could not be prepared. Current values kept.'); } }
+    } catch (error) { if (session === s) { warn(error.message); status('The search could not be prepared. Current values kept.'); } }
     finally {
       s.preparing = false;
       if (session === s) {
@@ -288,7 +305,7 @@
       } else {
         s.running = false;
         if (job.status === 'complete') showResult(s, job.result);
-        else if (job.status === 'cancelled') status('Search stopped. Your starting values have been kept.');
+        else if (job.status === 'cancelled') { s.stopped = true; status('Search stopped. Your starting values have been kept.'); }
         else { status('Search finished without a suggestion.'); warn(job.error || 'No usable starting values were found. Try narrower parameter ranges or different starting values.'); }
         setControls(s);
       }
@@ -307,7 +324,7 @@
 
   async function stop(s, closeAfter) {
     if (!s) return;
-    s.cancelling = true; clearTimeout(s.timer);
+    s.cancelling = true; s.stopped = true; clearTimeout(s.timer);
     if (session === s) { status('Stopping search…'); setControls(s); }
     // start() will perform the cancellation once the pending POST yields an id.
     if (s.running && !s.jobId) { s.closeAfterStop = !!closeAfter; return; }
@@ -320,7 +337,7 @@
       if (session === s) {
         status('Search stopped. Your starting values have been kept.');
         setControls(s);
-        if(s.inline) { window.FitModelUX?.searchState(null,s.datasetId); clearInterval(refreshTimer); session=null; refresh(); }
+        if(s.inline) { if (s.fitAfter) bruteStatus(s, false, ''); window.FitModelUX?.searchState(null,s.datasetId); clearInterval(refreshTimer); session=null; refresh(); }
         if (closeAfter || s.closeAfterStop) dialog.close();
       }
     } catch (error) {
@@ -428,7 +445,11 @@
     writeGuesses(s.result.values.map(String).join(', '),'automatic',s.result);
     undo = { before, fingerprint: fingerprint() };
     s.fingerprint = undo.fingerprint;
-    if(s.inline) { window.FitModelUX?.searchState(null,s.datasetId); clearInterval(refreshTimer); session=null; refresh(); window.FitModelUX?.refresh(); return; }
+    if(s.inline) {
+      window.FitModelUX?.searchState(null,s.datasetId); clearInterval(refreshTimer); session=null; refresh(); window.FitModelUX?.refresh();
+      if (s.fitAfter && typeof runFit === 'function') runFit();
+      return;
+    }
     dialog.close(); refresh();
     showMessage('info', 'Suggested starting values applied. Run Fit to calculate the fit report and uncertainties.');
   }
@@ -445,7 +466,7 @@
   function init() {
     const block = el('single-fit-block'); if (!block) return;
     host = document.createElement('div'); host.className = 'parameter-search-tools';
-    host.innerHTML = '<div class="parameter-search-actions"><button type="button" id="parameter-search-open" aria-describedby="parameter-search-availability">Search options…</button><button type="button" id="parameter-search-undo" hidden>Undo estimate</button></div><p class="hint" id="parameter-search-availability"></p>';
+    host.innerHTML = '<div class="parameter-search-actions"><button type="button" id="parameter-search-open" aria-describedby="parameter-search-availability">Search options…</button><button type="button" id="parameter-search-undo" hidden>Undo applied values</button></div><p class="hint" id="parameter-search-availability"></p>';
     const editor = el('starting-values-editor');
     if (editor) {
       const mount = document.createElement('div'); mount.id = 'parameter-search-single-mount';
@@ -456,13 +477,13 @@
     }
     dialog = document.createElement('dialog'); dialog.className = 'parameter-search-dialog';
     dialog.setAttribute('aria-labelledby', 'parameter-search-title'); dialog.setAttribute('aria-describedby', 'parameter-search-description');
-    dialog.innerHTML = `<div class="parameter-search-heading"><h2 id="parameter-search-title">Computer guess</h2><button type="button" id="parameter-search-close">Close</button></div>
+    dialog.innerHTML = `<div class="parameter-search-heading"><h2 id="parameter-search-title">Brute force search</h2><button type="button" id="parameter-search-close">Close</button></div>
       <p id="parameter-search-description"></p>
       <p id="parameter-search-error" role="alert" hidden></p>
       <section id="parameter-search-choice" aria-labelledby="parameter-search-choice-title">
-        <h3 id="parameter-search-choice-title">Let the computer suggest starting values?</h3>
-        <p>Try a quick 20-second guess using automatic search ranges, or choose the ranges and time limit yourself.</p>
-        <div class="parameter-search-actions"><button type="button" id="parameter-search-quick" class="primary">Quick guess (20 seconds)</button><button type="button" id="parameter-search-advanced">Set ranges and time</button></div>
+        <h3 id="parameter-search-choice-title">Search for starting values by brute force?</h3>
+        <p>The search tries many parameter combinations and keeps the one whose curve is closest to your data. Run a 20-second search with automatic ranges, or choose the ranges and time limit yourself.</p>
+        <div class="parameter-search-actions"><button type="button" id="parameter-search-quick" class="primary">Quick search (20 seconds)</button><button type="button" id="parameter-search-advanced">Set ranges and time</button></div>
       </section>
       <div id="parameter-search-setup" hidden>
         <p>Review the search limits below. Narrow them using what you know about the model, especially for frequencies, widths, and parameter scales.</p>
@@ -484,7 +505,7 @@
       <div class="parameter-search-footer" id="parameter-search-footer"><button type="button" id="parameter-search-start">Start search</button><button type="button" id="parameter-search-settings">Set ranges and time</button><button type="button" id="parameter-search-stop" hidden>Stop search</button><button type="button" id="parameter-search-apply" class="primary" disabled>Apply suggested values</button></div>`;
     document.body.append(dialog);
     el('parameter-search-open').onclick = ()=>open(false);
-    el('starting-values-estimate').onclick = ()=>open(true);
+    el('starting-values-estimate').onclick = ()=>open(true, true);
     el('starting-values-stop').onclick = ()=>stop(session,false);
     el('parameter-search-undo').onclick = undoApply;
     el('parameter-search-quick').onclick = quick;

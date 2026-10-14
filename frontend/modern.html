@@ -12,7 +12,7 @@
 <link rel="stylesheet" href="multivariate.css?v=20261013-fit-layout">
 <link rel="stylesheet" href="parameter-search.css?v=20261008-quick-guess">
 <link rel="stylesheet" href="analysis-setup.css?v=20261008-beginners">
-<link rel="stylesheet" href="fit-model.css?v=20261013-fit-layout">
+<link rel="stylesheet" href="fit-model.css?v=20261014-brute">
 <script defer src="analysis-export.js?v=20260919-pdf"></script>
 <link rel="icon" href="favicon.ico?v=1" sizes="any"><link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png?v=1"><link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png?v=1"><link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=1"><link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?v=1"><link rel="apple-touch-icon" href="apple-touch-icon.png?v=1">
 <link rel="stylesheet" href="fit-progress.css?v=20261014-button">
@@ -280,12 +280,11 @@
             <p id="starting-values-error" class="hint" role="alert" hidden></p>
             <p id="visual-match-help" class="hint">Curve doesn't follow the data? Adjust it before running Fit.</p>
             <div class="starting-values-actions">
-              <button type="button" id="starting-values-estimate" class="primary">Estimate starting values</button>
               <button type="button" id="visual-match-open" aria-controls="visual-adjustments" aria-expanded="false" aria-describedby="visual-match-help">Adjust on the plot</button>
               <button type="button" id="starting-values-manual" aria-controls="starting-values-editor" aria-expanded="false">Enter values manually</button>
-              <button type="button" id="starting-values-stop" hidden>Stop estimating</button>
+              <button type="button" id="starting-values-stop" hidden>Stop brute force</button>
             </div>
-            <details id="starting-values-notes" class="starting-values-notes" hidden><summary>Estimate notes</summary><ul id="starting-values-warnings"></ul></details>
+            <details id="starting-values-notes" class="starting-values-notes" hidden><summary>Brute force notes</summary><ul id="starting-values-warnings"></ul></details>
           </div>
           <details id="starting-values-editor" class="starting-values-editor"><summary>Edit values</summary>
           <div class="parameter-table-scroll"><table class="param-table" id="param-table">
@@ -398,6 +397,7 @@
     <button id="modern-back" type="button" hidden>Back</button>
     <button id="modern-next" type="button" class="primary">Continue to fit model →</button>
     <button id="btn-fit" type="button" class="primary" hidden>Fit</button>
+    <button id="starting-values-estimate" type="button" class="brute-force-fit" hidden title="Search for the parameters that best match your data (about 20 seconds), then run the ROOT fit from there.">Brute force fit</button>
     <span id="fit-status" role="status" aria-live="polite">Ready</span>
     <button type="button" class="fit-bar-save" data-action="save">Save</button>
   </div>
@@ -530,19 +530,19 @@
 <script src="vendor/mathlive/mathlive.min.js" defer></script>
 <script src="equation-parser.js?v=20261008-sinc" defer></script>
 <script src="equation-editor.js?v=20261008-inline-starts-4" defer></script>
-<script src="modern.js?v=20261014-setup-view" defer></script>
+<script src="modern.js?v=20261014-brute" defer></script>
 <script defer src="units.js?v=1"></script><script src="analysis-core.js?v=20260919-units" defer></script>
 <script src="workspace-store.js?v=1" defer></script>
 <script src="plot-style.js?v=1" defer></script>
 <script src="insert-data.js?v=20260920-types" defer></script>
 <script src="multivariate.js?v=20261013-fit-layout" defer></script>
-<script src="fit-progress.js?v=20261013" defer></script>
+<script src="fit-progress.js?v=20261014-brute" defer></script>
 <script src="app.js?v=20261014-one-ui" defer></script>
 <script src="setup-view.js?v=20261014-5" defer></script>
 <script src="model-library.js?v=20261008-inline-starts-4" defer></script>
-<script src="parameter-search.js?v=20261013-fit-layout" defer></script>
+<script src="parameter-search.js?v=20261014-brute" defer></script>
 <script defer src="analysis-features.js?v=20261014-exclusions"></script>
-<script src="fit-model.js?v=20261013-fit-layout" defer></script>
+<script src="fit-model.js?v=20261014-brute" defer></script>
 <script src="ai-starting-values.js?v=20261013-fit-layout" defer></script>
 </body>
 </html>
