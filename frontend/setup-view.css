@@ -92,6 +92,7 @@ body.modern .setup-tabs-row .setup-new:hover:not(:disabled) { text-decoration: u
 .setup-type-row { display: flex; flex-wrap: wrap; gap: 12px 26px; align-items: center; margin-bottom: 18px; }
 .setup-field { display: flex; align-items: center; gap: 10px; }
 .setup-field > label { font-size: 14.5px; color: var(--ink-soft); white-space: nowrap; }
+body.modern #setup-type.is-empty { color: var(--muted); }
 body.modern .setup-field select { min-height: 40px; padding: 7px 34px 7px 12px; font-size: 15px; width: auto; max-width: 100%; }
 body.modern .setup-dims input[type=number] { width: 72px; flex: none; }
 body.modern .setup-dims input[type=number] { min-height: 40px; padding: 7px 10px; }

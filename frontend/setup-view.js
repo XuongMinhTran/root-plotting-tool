@@ -336,19 +336,9 @@ const lastFilledRow = v => {
 /** The grid -> the controls the rest of the app reads. */
 function commit() {
   if (!view) return;
-  const d = active();
-  const promote = d && !d.analysis_type && lastFilledRow(view) >= 0;
   committing++;
-  try {
-    if (promote) {                       // first data in the empty step: it becomes a real XY dataset
-      d.analysis_type = 'xy';
-      $('analysis-type').value = 'xy';
-      syncAnalysisControls();
-    }
-    writeSources();
-  } finally { committing--; }
+  try { writeSources(); } finally { committing--; }
   view.signature = sourceSignature(active(), view.type, view.columns);
-  if (promote) renderDatasetSelector();   // shows the new tab; the grid is already current
   if (typeof autosave === 'function') autosave();
   scheduleSummary();
 }
@@ -524,7 +514,7 @@ function renderSummary() {
   const d = active();
   const next = $('modern-next');
   if (!d || !d.analysis_type || !view) {
-    status.textContent = 'No data yet · type or paste your measurements';
+    status.textContent = 'No dataset yet · select a data type to start';
     status.className = 'setup-status';
     if (next) next.disabled = true;
     return;
@@ -568,13 +558,10 @@ function renderTabs() {
   $('setup-tabs-row').hidden = !typed.length;
 }
 
-/** Before any dataset exists the step still shows a ready XY table; the
- *  first value typed or pasted makes it Dataset 1. */
-const shownType = d => d?.analysis_type || 'xy';
-
 function renderTypeRow(d) {
-  const type = shownType(d);
+  const type = d?.analysis_type || '';
   $('setup-type').value = type;
+  $('setup-type').classList.toggle('is-empty', !type);
   $('setup-hist-source-field').hidden = type !== 'histogram';
   $('setup-mv-dims').hidden = type !== 'multivariate';
   if (type === 'multivariate' && d.mv) {
@@ -582,7 +569,9 @@ function renderTypeRow(d) {
     if (document.activeElement !== $('setup-mv-m')) $('setup-mv-m').value = d.mv.m;
   }
   const counts = type === 'histogram' && $('hist-source').value === 'counts';
-  $('setup-unc-help').hidden = type === 'histogram';
+  // Before a type is chosen the card holds only the Data type menu.
+  for (const id of ['setup-grid-wrap', 'setup-grid-foot']) $(id).hidden = !type;
+  $('setup-unc-help').hidden = !type || type === 'histogram';
   $('setup-hist-options').hidden = type !== 'histogram';
   $('hist-edges-details').hidden = counts;
   if (type === 'histogram' && !counts && $('hist-edges').value.trim()) $('hist-edges-details').open = true;
@@ -835,7 +824,7 @@ function renderPreview() {
   const axes = $('setup-preview-axes');
   const d = active();
   axes.hidden = true;
-  if (!view) { count.textContent = ''; box.innerHTML = emptyPreview('Type or paste your measurements. They are plotted here as you go.'); return; }
+  if (!view) { count.textContent = ''; box.innerHTML = emptyPreview('Select a data type, then type or paste your measurements. They are plotted here as you go.'); return; }
   const filled = view.check.filled;
   const xTitle = ($('x-title')?.value || '').trim(), yTitle = ($('y-title')?.value || '').trim();
   if (view.type === 'xy') {
@@ -907,8 +896,11 @@ function refresh() {
     const d = active();
     renderTabs();
     renderTypeRow(d);
-    const type = shownType(d);
-    if (d) {
+    const type = d?.analysis_type || '';
+    if (!type) {
+      view = null;
+      $('setup-grid').innerHTML = '';
+    } else {
       const columns = ADAPTERS[type].columns(d);
       const signature = sourceSignature(d, type, columns);
       if (!view || view.signature !== signature) {
