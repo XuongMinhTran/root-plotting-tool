@@ -352,7 +352,7 @@ $('open').onclick=()=>$('file').click();$('file').onchange=async()=>{
   if(file.size>50e6)throw Error('Choose a session file smaller than 50 MB.');
   const incoming=S.materialize(S.normalize(JSON.parse(await file.text())));
   if(doc.objects.length&&!await ask('Open session','Replace the current datasets, fits, and calculations in all workspaces? Save first if you want to keep them.'))return;
-  history.push(clone(session));incoming.revision=S.read(localStorage).revision;session=incoming;doc=S.projected(session);saved=snapshot();restoredDirty=false;persist();render();notify('Loaded the complete session. It is also available in Compact and Standard.');
+  history.push(clone(session));incoming.revision=S.read(localStorage).revision;session=incoming;doc=S.projected(session);saved=snapshot();restoredDirty=false;persist();render();notify('Loaded the complete session. It is also available in Make a Plot.');
  }catch(e){notify(e.message,true);}finally{$('file').value='';}
 };
 $('export-analysis').onclick=()=>{persist();if(autoSaved)AnalysisExport.open(session);};

@@ -2,7 +2,6 @@
 .parameter-search-actions{display:flex;align-items:center;flex-wrap:wrap;gap:8px}
 .parameter-search-actions [data-help="guesses"]{margin:0;min-height:44px}
 .parameter-search-tools>.hint{margin:6px 0 0}
-.classic .parameter-search-tools{margin-top:8px}
 #parameter-search-open{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:10px 16px;font-size:14px;font-weight:700;line-height:1.3}
 #parameter-search-open svg{flex:none}
 #parameter-search-open:focus-visible{outline:3px solid var(--accent,#145aa0);outline-offset:3px}
@@ -40,5 +39,4 @@
 .search-curve{fill:none;stroke:#155eb3;stroke-width:2}
 .search-point{fill:#252e3e;opacity:.75}
 .modern .parameter-search-dialog{background:#fff;--frame-2:#fff;--shadow:#d4dbe3;--ink:#172b43}
-.classic .parameter-search-dialog{border-radius:0}
 @media(max-width:540px){.parameter-search-dialog{padding:16px}.parameter-search-heading{align-items:flex-start;top:-16px;margin:-16px -16px 0;padding:12px 16px}.parameter-search-heading h2{font-size:18px}.parameter-search-dialog th,.parameter-search-dialog td{padding:7px}.parameter-search-dialog input{min-width:90px}.parameter-search-footer{bottom:-16px}.parameter-search-footer button{flex:1 1 auto}.parameter-search-dialog .primary{padding:0 12px}}

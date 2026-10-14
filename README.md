@@ -7,7 +7,7 @@ computed by ROOT's fitter (Minuit), drawn in the browser by JSROOT.
 
 ```
 backend/    Python + Flask + PyROOT, runs in a Docker container (rootproject/root)
-frontend/   landing page, Classic and Modern interfaces (no build step)
+frontend/   landing page, Make a Plot and Analyze Data pages (no build step)
 examples/   sample saved documents (JSON) you can load into the page
 start       one command: build if needed, run, open the browser
 root-run    helper: run any command inside the ROOT container
@@ -80,25 +80,25 @@ the API. Set `FRONTEND_DIR` to serve the frontend from somewhere else.
 
 ## Open the frontend
 
-<http://localhost:8000> is the front page once the server is up — choose **Make a Plot** and **Classic** or **Modern**. Opening `frontend/index.html` directly from disk works too. Classic is the compact desktop-style layout. Modern uses separate Set up analysis, Fit model, and Results pages. Both share the analysis and backend in `app.js`.
+<http://localhost:8000> is the front page once the server is up — choose **Make a Plot** (`modern.html`). Opening `frontend/index.html` directly from disk works too. Make a Plot has separate Set up analysis, Fit model, and Results steps; its behavior lives in `app.js`.
 
-Standard’s **Set up analysis** step is one card: dataset tabs, a **Data type** menu, and a table you type or paste into directly (columns X, Y, X uncertainty, Y uncertainty; histogram and multivariate data use the same table). Each uncertainty column is **Per point**, **Constant** (one value for every row) or **None**. A live preview sits beside the table, and moves below it when the window is narrow or the table is wide. With no dataset yet, the step offers the three data types to start one. Compact keeps the same features with shorter labels and fewer hints; full help remains available through **How this works**. In both interfaces, selecting a type creates a plot automatically, and **Add data…** opens its table for XY, histogram, or multivariate data. Optional examples let you try the tool with sample data and a model, and match the analysis type. The labelled **Plot** selector switches between plots, while **More plot options** keeps Rename, Duplicate, point exclusions, and Delete out of the way until a plot exists.
+The **Set up analysis** step is one card: dataset tabs, a **Data type** menu, and a table you type or paste into directly (columns X, Y, X uncertainty, Y uncertainty; histogram and multivariate data use the same table). Each uncertainty column is **Per point**, **Constant** (one value for every row) or **None**. A live preview sits beside the table, and moves below it when the window is narrow or the table is wide. With no dataset yet, the card shows only the Data type menu (**Select data type…**); choosing One variable f(x), Histogram or Multivariate creates Dataset 1. **Options** holds Rename, Duplicate and Delete, with **Point exclusions** beside it for f(x) data.
 
 Both interfaces default to a keyboard-operated equation editor for supported models. Type `A exp(-x/tau)+B`, `x_0`, `x^2`, or `sqrt`; common Greek names become symbols automatically. The Typing reference documents multiplication, constants, and supported functions. The editor also supports the unnormalized diffraction function `sinc(z) = sin(z)/z`, with its exact continuous value of 1 at zero. The nine-parameter Gaussian-visibility double-slit model opens as an editable equation in both interfaces, including when imported from its guarded ROOT formula. The editor translates the expression to ROOT and creates parameter fields; rearranging terms preserves parameter identities and initial guesses. ROOT expression mode supports ROOT-specific syntax that the visual editor cannot represent. The advanced ROOT mode remains available in both interfaces, with an auto-growing multiline field and preserved formulas when visual translation is unavailable.
 
-The Fit model flow starts with one **Choose a model** entry point (common presets and the experiment library), followed by the equation and editable starting values. Standard explains the steps; Compact has the same controls with shorter guidance. **Estimate starting values** runs the existing quick 20-second search only when clicked. **Search options…**, under **Edit values**, offers custom ranges and time. Fit stays in the sticky action bar alongside Save. Plot settings, diagnostics, and confidence bands are optional collapsed controls below the main flow. Starting values display about four significant figures, retain their full precision internally, and expand to the full value when selected.
+The Fit model flow starts with one **Choose a model** entry point (common presets and the experiment library), followed by the equation and editable starting values. Each step is explained on the page. **Estimate starting values** runs the existing quick 20-second search only when clicked. **Search options…**, under **Edit values**, offers custom ranges and time. Fit stays in the sticky action bar alongside Save. Plot settings, diagnostics, and confidence bands are optional collapsed controls below the main flow. Starting values display about four significant figures, retain their full precision internally, and expand to the full value when selected.
 
 The inline **Starting curve** preview overlays the current model on included XY measurements within the active fit range. The status records whether values were estimated, adjusted manually, or edited, and prompts a review after the data or model changes. The parameter table is under collapsed **Edit values**. Estimation stays on demand; loading data or choosing a model does not start a server search. Successful quick estimates fill the values and update the curve inline. Failed estimates keep the current values and offer manual adjustment. Editing while an estimate runs stops that search so its result cannot overwrite the edit.
 
 **Adjust on the plot** reveals inline controls and fills blank guesses from model examples, or 1 for other expressions. It defaults to −/+ buttons with an editable positive **Step**, **×10/÷10** to change only the step by an order of magnitude, and **±** to flip the sign. Values and steps accept scientific notation. Changing Step recenters the slider on the current value; in linear mode, each slider increment uses the new Step. Optional sliders offer editable linear ranges or logarithmic magnitude ranges; these ranges do not constrain Fit. The preview uses a steady data scale and updates in the browser without a server search. It does not replace a saved fit or calculate fit uncertainties. Unsupported ROOT functions and histogram models can show the curve returned by an estimate; live adjustment requires an XY model supported by the equation evaluator.
 
-Equation drafts and symbol mappings are saved per dataset, including incomplete drafts. An incomplete equation cannot submit the previous valid formula. Unchanged equations survive Classic/Modern switching; editing the ROOT formula invalidates its old visual representation. MathLive 0.110.0 and its fonts are bundled locally under `frontend/vendor/mathlive/` (MIT license); equation editing does not require a CDN. The parser uses an explicit arithmetic/function grammar and does not evaluate user JavaScript.
+Equation drafts and symbol mappings are saved per dataset, including incomplete drafts. An incomplete equation cannot submit the previous valid formula. Unchanged equations survive reloading and reopening; editing the ROOT formula invalidates its old visual representation. MathLive 0.110.0 and its fonts are bundled locally under `frontend/vendor/mathlive/` (MIT license); equation editing does not require a CDN. The parser uses an explicit arithmetic/function grammar and does not evaluate user JavaScript.
 
-Both interfaces provide a data table through **Add data…** (or **Edit data…** after entering measurements). Paste a rectangular block from Excel directly into the grid, or choose **Import from text…** to preview a file and assign columns. Names such as `u(Voltage)` are matched to their measurement column. Importing creates a new dataset by default; replacing the selected dataset requires confirmation and clears its old result. Blank or invalid mapped cells are reported rather than silently dropped.
+Paste a rectangular block from Excel or Sheets straight into the Set up analysis table, or choose **Import CSV**. A header row is matched to columns by name (`x`, `y`, `u(x)`, `sigma_y`, …); without one, columns fill in the order shown. Importing over existing data asks for confirmation. Blank or invalid cells are flagged in the table and in the status bar rather than silently dropped.
 
-You can also open `frontend/classic.html` or `frontend/modern.html` directly.
+You can also open `frontend/modern.html` directly.
 Serving the pages from one address (which `./start` does) keeps autosave shared
-when you switch between Classic and Modern. The page uses whichever origin
+between Make a Plot and Analyze Data. The page uses whichever origin
 served it if that origin answers `/health`, and otherwise
 `http://localhost:8000`; the "Backend URL" setting overrides both.
 
@@ -146,7 +146,7 @@ Multivariate searches accept up to 100,000 output measurements in total.
   be edited in the main form or beneath each table in the table editor. Done
   applies table edits; Cancel discards them. Older documents migrate their shared
   settings to each existing dataset, and save/load preserves subsequent changes.
-- **Optional plots** include residuals, pulls, data/fit ratio, percentage difference, and a residual histogram. Select any combination under **Labels & plot → Plot options** (Classic) or **Fit settings → Labels and plot options** (Modern), then fit again. All are off by default. **Advanced optional plot settings** lets you rename each selected plot, set axis labels and Y limits, panel height, point scope, grids, reference lines, uncertainty bars, and histogram bins. Settings are saved with the document; older single-panel selections migrate automatically. Ratio and percentage uncertainty bars hold the fitted model fixed and are not model confidence bands. Undefined points are omitted with an explanatory message.
+- **Optional plots** include residuals, pulls, data/fit ratio, percentage difference, and a residual histogram. Select any combination under **Plot settings** on the Fit model step, then fit again. All are off by default. **Advanced optional plot settings** lets you rename each selected plot, set axis labels and Y limits, panel height, point scope, grids, reference lines, uncertainty bars, and histogram bins. Settings are saved with the document; older single-panel selections migrate automatically. Ratio and percentage uncertainty bars hold the fitted model fixed and are not model confidence bands. Undefined points are omitted with an explanatory message.
 - **Export PNG** renders the current plot to an image.
 - The form is autosaved in your browser (localStorage) so a reload does not
   lose your work; fitting and parameter-search requests send the selected data
@@ -181,8 +181,8 @@ for χ². All optional panels remain off by default.
 
 Save/load and autosave retain the analysis type, both input formats, binning,
 method and results. CSV reports include a bin table with counts, density and
-predicted counts. **Example: count histogram** is available in Classic's Fit
-menu and Modern's More menu, and as `examples/04-count-histogram.json`.
+predicted counts. **Count histogram** is available under **or load an example**, and as
+`examples/04-count-histogram.json`.
 
 The separate `POST /histogram` endpoint accepts a `histogram` object with
 `source: "samples"`, `samples`, `bins`, optional `range` and `edges`, or
@@ -244,7 +244,7 @@ docker run --rm --platform linux/amd64 -v "$PWD:/work:ro" -w /work rootfit-backe
 
 ## Shared analysis session
 
-Classic, Modern, and Analyze Data use **one document** and the `rootfit.autosave` browser key. Opening a session in any workspace replaces the same shared session. Saving in any workspace writes all datasets, per-dataset fit settings and results (including canvases and covariance), notes, quantities, calculation definitions, and source links to one JSON file. Browser autosave is not a permanent backup.
+Make a Plot and Analyze Data use **one document** and the `rootfit.autosave` browser key. Opening a session in any workspace replaces the same shared session. Saving in any workspace writes all datasets, per-dataset fit settings and results (including canvases and covariance), notes, quantities, calculation definitions, and source links to one JSON file. Browser autosave is not a permanent backup.
 
 Datasets have stable IDs. Analyze Data shows a dataset box with Raw data and Fit results; no import or copy step is required. Pasted measurements become datasets available in the plotting interfaces. Calculated columns become linked plotting datasets; their Y values and uncertainties are regenerated from the calculation. Scalar quantities remain available for further calculations. Extra source columns and their metadata survive opening and saving in the plotting interfaces.
 
@@ -267,7 +267,7 @@ Reference: [TF1](https://root.cern/doc/master/classTF1.html),
 
 ### Analysis features
 
-- **Point exclusions** (XY data, Standard and Compact): uncheck rows and optionally record reasons. Original values remain in the session. Refit after changes; excluded measurements are open gray markers and do not enter the fit or diagnostics. If excluded row values or positions change, review exclusions before fitting again.
+- **Point exclusions** (f(x) data, the button beside **Options**): uncheck rows and optionally record reasons. Original values remain in the session. Refit after changes; excluded measurements are open gray markers and do not enter the fit or diagnostics. If excluded row values or positions change, review exclusions before fitting again.
 - **Calculated columns** (Analyze Data): select Calculated column as the result type, insert source columns, and enter an expression. Values and first-order propagated standard uncertainties appear alongside their source dataset and update from the stored calculation. Separate inputs are assumed independent except where fit covariance or shared input identities are available. Units are labels, not automatic conversions.
 - **Correlation matrix**: available below the fit report and in Analyze Data. Undefined zero-variance correlations are shown as a dash.
 - **Confidence bands**: choose None, 68%, 95%, or 99% under plot settings and refit. ROOT computes pointwise linearized covariance intervals, without extra chi-square normalization. These are not simultaneous bands or prediction intervals. Bands require a converged fit with an accurate covariance matrix. Histogram bands describe the fitted density (counts per unit X).

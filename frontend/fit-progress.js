@@ -1,4 +1,4 @@
-/* Shared fit progress for Standard and Compact. */
+/* Fit progress for the plotting workspace. */
 (function (root) {
   'use strict';
 

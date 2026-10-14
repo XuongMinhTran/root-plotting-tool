@@ -1,5 +1,5 @@
 /*
- * app.js - shared behavior for classic.html and modern.html.
+ * app.js - the plotting workspace's behavior (modern.html).
  *
  * Sections:
  *   1. helpers            element lookup, number formatting, downloads
@@ -50,7 +50,7 @@ async function resolveBackend() {
   resolvedBackend = DEFAULT_BACKEND;
   return resolvedBackend;
 }
-const LAYOUT_KEY = 'rootfit.layout' + (window.location?.pathname.endsWith('/modern.html') ? '.modern' : '');
+const LAYOUT_KEY = 'rootfit.layout.modern';   // the saved plot height
 
 /** Round `value` so that its uncertainty shows two significant figures,
  *  e.g. (1.97539, 0.045541) -> "1.975 ± 0.046". */
@@ -574,7 +574,7 @@ function syncAnalysisControls() {
   if (intro && multivariate) intro.textContent = 'Enter each input and output as a column, give one model per output with inputs x0, x1, … and shared parameters [0], [1], …, then Fit.';
 }
 
-// The same beginner setup flow is used by the Standard and Compact workspaces.
+// Setup state shared by the data step and the fit step.
 let datasetExampleOptions = null;
 let datasetExamplesType = null;
 function syncAnalysisSetup() {
@@ -592,14 +592,7 @@ function syncAnalysisSetup() {
     multivariate: 'Use several inputs and outputs when a result depends on more than one quantity, such as beam intensity at different horizontal and vertical positions.'
   };
   if ($('analysis-description')) {
-    const compactDescriptions = {
-      xy: 'Two columns: X and Y.',
-      histogram: 'One measured quantity, grouped into bins.',
-      multivariate: 'Multiple input columns and one or more outputs.'
-    };
-    $('analysis-description').textContent = document.body.classList.contains('classic')
-      ? compactDescriptions[type] || 'Choose a type to create a plot.'
-      : descriptions[type] || 'XY: compare two quantities. Histogram: show the distribution of one quantity. Several inputs and outputs: model how multiple quantities affect a result.';
+    $('analysis-description').textContent = descriptions[type] || 'XY: compare two quantities. Histogram: show the distribution of one quantity. Several inputs and outputs: model how multiple quantities affect a result.';
   }
   if ($('btn-table')) {
     $('btn-table').classList.toggle('primary', !hasData);
@@ -1110,13 +1103,6 @@ function setResultEnabled(on) {
   for (const el of document.querySelectorAll('[data-needs-result]')) el.disabled = !on;
   $('report-tools').hidden = !on;
   window.AnalysisFeatures?.renderResult(on ? lastResult : null);
-  const d = datasets[activeIdx];
-  const hasData = d?.analysis_type === 'histogram'
-    ? parseColumn(d.histogram?.[d.histogram.source === 'counts' ? 'counts' : 'samples'] || '').values.length > 0
-    : !!(d && parseColumn(d.x || '').values.length && parseColumn(d.y || '').values.length);
-  for (const el of document.querySelectorAll('[data-classic-analysis]')) {
-    el.hidden = !(on && hasData && lastResult?.params?.length);
-  }
 }
 
 /** Turn the form into the JSON body the backend expects. Throws an Error with
@@ -1938,7 +1924,7 @@ async function exportSvg() {
   }
 }
 
-// --- resizable panels: a splitter between the columns and a handle under the plot ---
+// --- resizable plot: a handle under the plot sets its height ---
 function loadLayout() {
   try { return JSON.parse(storageGet(LAYOUT_KEY) || '{}') || {}; } catch (_) { return {}; }
 }
@@ -1946,55 +1932,13 @@ function saveLayout(patch) { storageSet(LAYOUT_KEY, JSON.stringify({ ...loadLayo
 
 function applyLayout() {
   const l = loadLayout();
-  if (l.left) $('main').style.setProperty('--left-w', l.left + 'px');
   if (l.plotH) $('plot').style.height = l.plotH + 'px';
-}
-
-function resetLayout() {
-  storageRemove(LAYOUT_KEY);
-  const main = $('main');
-  if (main) main.style.removeProperty('--left-w');
-  const plot = $('plot');
-  const frame = plot && plot.closest ? plot.closest('.canvas-frame') : null;
-  plotExpanded = false;
-  if (frame) frame.classList.remove('plot-fullscreen');
-  try { document.body.style.overflow = ''; } catch (_) { /* ignore */ }
-  syncExpandButton();
-  if (plot) plot.style.height = '';
-  replotToSize();
 }
 
 function initResizers() {
   applyLayout();
 
-  // Column splitter (Compact only): drag the boundary between inputs and results.
-  const main = $('main');
-  const splitter = $('splitter');
-  if (splitter && main) {
-    splitter.addEventListener('pointerdown', (ev) => {
-      ev.preventDefault();
-      splitter.setPointerCapture(ev.pointerId);
-      document.body.classList.add('resizing-x');
-      const rect = main.getBoundingClientRect();
-      const move = (e) => {
-        const w = Math.max(300, Math.min(rect.width - 380, e.clientX - rect.left - 16));
-        main.style.setProperty('--left-w', w + 'px');
-      };
-      const up = () => {
-        splitter.removeEventListener('pointermove', move);
-        splitter.removeEventListener('pointerup', up);
-        document.body.classList.remove('resizing-x');
-        const w = parseFloat(getComputedStyle(main).getPropertyValue('--left-w'));
-        if (w) saveLayout({ left: Math.round(w) });
-        replotToSize();
-      };
-      splitter.addEventListener('pointermove', move);
-      splitter.addEventListener('pointerup', up);
-    });
-    splitter.addEventListener('dblclick', resetLayout);
-  }
-
-  // Plot height handle (both interfaces): drag the bar under the plot to grow it
+  // Plot height handle: drag the bar under the plot to grow it
   // downward as far as you like; double-click resets to the default height.
   const handle = $('plot-resizer');
   const plot = $('plot');
@@ -2077,7 +2021,7 @@ function isWorkspaceDestination(href) {
     const target = new URL(href, here);
     const directory = here.pathname.slice(0, here.pathname.lastIndexOf('/') + 1);
     return target.protocol === here.protocol && target.host === here.host
-      && ['index.html','classic.html','modern.html','contact.html','about.html','uncertainties.html',''].some(page => target.pathname === directory + page);
+      && ['index.html','modern.html','contact.html','about.html','uncertainties.html',''].some(page => target.pathname === directory + page);
   } catch (_) { return false; }
 }
 function prepareWorkspaceNavigation(href) {
@@ -2419,40 +2363,17 @@ const ACTIONS = {
   'dataset-duplicate': duplicateDataset,
   'dataset-rename': renameDataset,
   'dataset-remove': removeDataset,
-  'reset-layout': resetLayout,
   'report-copy': copyReport,
   'report-txt': () => { if (lastResult) downloadText(reportText(lastResult), fileBaseName() + '-report.txt'); },
   'report-csv': () => { if (lastResult) downloadText(reportCsv(lastResult), fileBaseName() + '-report.csv', 'text/csv'); },
   help: (el) => showHelp(el.dataset.help, null),
 };
 
-/** Menu bar behavior, like TGMenuBar. */
-function initMenus() {
-  const bar = $('menubar');
-  const menus = [...bar.querySelectorAll('.menu')];
-  const closeAll = () => menus.forEach((m) => m.classList.remove('open'));
-  const anyOpen = () => menus.some((m) => m.classList.contains('open'));
-  for (const m of menus) {
-    const title = m.querySelector('.menu-title');
-    title.addEventListener('click', (ev) => {
-      ev.stopPropagation();
-      const wasOpen = m.classList.contains('open');
-      closeAll();
-      if (!wasOpen) m.classList.add('open');
-    });
-    title.addEventListener('mouseenter', () => { if (anyOpen()) { closeAll(); m.classList.add('open'); } });
-    title.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); title.click(); } });
-    m.querySelector('.dropdown').addEventListener('click', () => closeAll());
-  }
-  document.addEventListener('click', closeAll);
-  document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') { closeAll(); hideHelp(); } });
-}
-
 // ================================================================ 12. wiring
 
 function init() {
   document.addEventListener('click', handleWorkspaceLink);
-  initMenus();
+  document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') hideHelp(); });
   plotStyle = (window.PlotStyle && window.PlotStyle.load()) || null;
   syncExpandButton();
   initResizers();

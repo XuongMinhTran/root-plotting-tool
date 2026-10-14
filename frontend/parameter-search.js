@@ -1,4 +1,4 @@
-/* Shared starting-value search for the Standard and Compact workspaces.
+/* Starting-value search for the plotting workspace.
  * Search results are deliberately separate from fitted results and reports. */
 (() => {
   'use strict';

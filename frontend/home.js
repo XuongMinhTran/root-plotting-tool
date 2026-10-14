@@ -16,17 +16,15 @@ void (async function warmBackend() {
   } catch (_) { /* Waking up is best-effort; the home page stays usable. */ }
 })();
 
-const chooser = document.getElementById('workspace-dialog');
 const about = document.getElementById('root-dialog');
-document.getElementById('make-plot').addEventListener('click', () => chooser.showModal());
 for (const trigger of document.querySelectorAll('#what-root, [data-root-intro]')) {
   trigger.addEventListener('click', () => about.showModal());
 }
-for (const dialog of [chooser, about]) {
+for (const dialog of [about]) {
   dialog.querySelector('[data-close]').addEventListener('click', () => dialog.close());
   dialog.addEventListener('click', event => {
     const r = dialog.getBoundingClientRect();
     if (event.target === dialog && (event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom)) dialog.close();
   });
 }
-if (location.hash === '#choose') chooser.showModal();
+if (location.hash === '#choose') location.replace('modern.html');   // old links to the interface chooser

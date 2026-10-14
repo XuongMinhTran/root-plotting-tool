@@ -7,7 +7,7 @@
  * multivariate.js already own (col-x, col-y, col-ex, col-ey, hist-samples,
  * hist-counts, hist-edges and the hidden multivariate columns), and every edit
  * is written back to them with an input event. Saving, autosave, fitting and
- * the Compact workspace therefore keep reading exactly what they read before.
+ * Analyze Data therefore keep reading exactly what they read before.
  * The only new saved field is dataset.uncertainty_modes, which remembers the
  * mode chosen for each uncertainty column.
  *
@@ -221,7 +221,7 @@ if (typeof document === 'undefined') return;
 // ================================================================ the page
 
 const $ = id => document.getElementById(id);
-if (!$('setup-grid')) return;          // Compact and other pages have no setup grid
+if (!$('setup-grid')) return;          // other pages have no setup grid
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const MIN_ROWS = 8, SPARE_ROWS = 2, PREVIEW_WIDTH = 340, LAYOUT_GAP = 24, LAYOUT_SLACK = 16;
 

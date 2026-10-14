@@ -1,6 +1,6 @@
 // insert-data.js — the shared "Insert data" table editor (window.InsertData).
 //
-// One data-entry system for the plotting tool (Compact + Standard) and for
+// One data-entry system for the plotting tool and for
 // Analyze Data. The page supplies a small *host adapter*; this module owns the
 // dialog behaviour and edits a working COPY of the datasets. "Done" commits the
 // copy through host.commit(); "Cancel" (or Escape) discards it.

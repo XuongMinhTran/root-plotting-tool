@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="description" content="Fit a function to your measurements with CERN ROOT and read off the parameters, uncertainties and goodness of fit.">
-<title>Standard workspace · ROOT-A-TRON 3000</title>
+<title>Make a Plot · ROOT-A-TRON 3000</title>
 <link rel="stylesheet" href="style.css?v=20260919-plot-options">
 <link rel="stylesheet" href="modern.css?v=20261013-fit-notice">
 <link rel="stylesheet" href="site-brand.css?v=1">
@@ -27,8 +27,7 @@
     <span class="brand-text"><span class="brand-name">ROOT-A-TRON 3000</span></span>
   </a>
   <nav aria-label="Interfaces">
-    <a href="modern.html" aria-current="page">Standard</a>
-    <a href="classic.html">Compact</a>
+    <a href="modern.html" aria-current="page">Make a Plot</a>
     <a href="uncertainties.html">Analyze Data</a>
     <a href="index.html">Home</a>
   </nav>
@@ -167,7 +166,7 @@
         </aside>
       </div>
 
-      <!-- The controls below are the source of truth that app.js, multivariate.js and Compact
+      <!-- The controls below are the source of truth that app.js and multivariate.js
            read and save. setup-view.js mirrors them in the grid above and writes edits back. -->
       <div class="setup-legacy" hidden>
         <div class="analysis-setup">
@@ -411,8 +410,7 @@
   <span>Powered by <a href="https://root.cern" target="_blank" rel="noopener">CERN ROOT</a></span>
 </div></footer>
 
-<!-- Shared hooks app.js expects; Standard has no desktop menu bar or panel splitter. -->
-<div id="menubar" hidden></div><span id="jsroot-status" hidden></span>
+<span id="jsroot-status" hidden></span>
 <input id="file-input" type="file" accept=".json,application/json" hidden>
 <div id="help-pop" class="help-pop" hidden></div>
 <div id="drop-overlay" class="drop-overlay" hidden><div>Drop a saved document (.json) to open it</div></div>
@@ -538,7 +536,7 @@
 <script src="insert-data.js?v=20260920-types" defer></script>
 <script src="multivariate.js?v=20261013-fit-layout" defer></script>
 <script src="fit-progress.js?v=20261013" defer></script>
-<script src="app.js?v=20261014-setup-view" defer></script>
+<script src="app.js?v=20261014-one-ui" defer></script>
 <script src="setup-view.js?v=20261014-4" defer></script>
 <script src="model-library.js?v=20261008-inline-starts-4" defer></script>
 <script src="parameter-search.js?v=20261013-fit-layout" defer></script>

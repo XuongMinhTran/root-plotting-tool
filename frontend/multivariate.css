@@ -1,5 +1,5 @@
 /* multivariate.css - data grid, model editors and result tables for the
-   Multivariate (R^n -> R^m) analysis type. Styled to match the Classic GUI. */
+   Multivariate (R^n -> R^m) analysis type. */
 
 #multivariate-data .mv-dims {
   display: flex;
@@ -123,15 +123,15 @@
 .mv-models { gap: 16px; }
 .mv-model-row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
 .mv-model-label { text-align: left; white-space: normal; overflow-wrap: anywhere; font-size: 14px; }
-body.modern textarea.mv-equation, body.classic textarea.mv-equation {
+body.modern textarea.mv-equation{
   box-sizing: border-box; width: 100%; min-width: 0; min-height: 86px;
   padding: 12px; border: 1px solid #bacbdc; border-radius: 4px; background: #fff;
   font: 14px/1.7 ui-monospace, SFMono-Regular, Consolas, monospace;
   resize: vertical; white-space: pre-wrap; overflow-wrap: anywhere;
 }
 .mv-param-table input { box-sizing: border-box; width: 100%; min-width: 0; }
-body.modern .mv-param-table [data-mv-name], body.classic .mv-param-table [data-mv-name] { background: #f7f8fa; border-color: transparent; color: #617183; }
-body.modern .mv-param-table [data-mv-guess], body.classic .mv-param-table [data-mv-guess] { border: 1px solid #8da8c2; color: #18364f; font-weight: 600; background: #fff; }
+body.modern .mv-param-table [data-mv-name]{ background: #f7f8fa; border-color: transparent; color: #617183; }
+body.modern .mv-param-table [data-mv-guess]{ border: 1px solid #8da8c2; color: #18364f; font-weight: 600; background: #fff; }
 .mv-params label { min-width: min(200px, 100%); }
 #mv-starting-actions { margin-top: 18px; align-items: flex-start; }
 #mv-starting-actions .parameter-search-tools { display: contents; }

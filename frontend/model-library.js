@@ -5,7 +5,7 @@
  * (via applyFunctionExample). Each model carries per-parameter guidance on how
  * to read good starting guesses off the data; that guidance is surfaced both
  * here and in the "Help with parameters" popover (see guideFor). Loaded on the
- * Classic and Standard pages only. Every formula is validated (check_formula)
+ * plotting page only. Every formula is validated (check_formula)
  * and every non-linear one is confirmed to converge (scipy) in scratch/models.py.
  */
 (function () {

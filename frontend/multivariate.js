@@ -1,6 +1,6 @@
 /*
  * multivariate.js - the "Multivariate (R^n -> R^m)" analysis type for the
- * Classic workspace. It is additive: it owns its own data-entry grid, model
+ * plotting workspace. It is additive: it owns its own data-entry grid, model
  * editors and result table, and app.js calls into window.Multivariate at a few
  * well-defined moments (load a dataset, build the fit payload, render a result).
  * The XY and histogram paths are untouched.

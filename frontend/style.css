@@ -47,7 +47,7 @@ p { margin: 6px 0; }
 .hint-inline { color: var(--muted); font-weight: normal; font-size: 12.5px; }
 
 /* ---- the two bevels that define the look ------------------------------ */
-.raised, button, .menubar, .toolbar {
+.raised, button, .toolbar {
   border-style: solid; border-width: 1px;
   border-color: var(--hilite) var(--shadow) var(--shadow) var(--hilite);
 }
@@ -56,36 +56,6 @@ p { margin: 6px 0; }
   border-color: var(--shadow) var(--hilite) var(--hilite) var(--shadow);
   box-shadow: inset 1px 1px 0 var(--dark);
 }
-
-/* ---- menu bar (TGMenuBar) --------------------------------------------- */
-.menubar {
-  display: flex; align-items: stretch; background: var(--frame); padding: 0 6px; height: 30px;
-  border-top-color: transparent; border-left-color: transparent; border-right-color: transparent;
-  position: relative; z-index: 20;
-}
-.menu { position: relative; }
-.menu-title { display: flex; align-items: center; height: 100%; padding: 0 12px; cursor: default; user-select: none; }
-.menu.open > .menu-title, .menu-title:hover { background: var(--accent); color: var(--accent-ink); }
-.menu-title:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-.dropdown {
-  display: none; position: absolute; top: 100%; left: 0; min-width: 250px; background: var(--frame);
-  border: 1px solid; border-color: var(--hilite) var(--shadow) var(--shadow) var(--hilite);
-  box-shadow: 1px 1px 0 var(--dark), 4px 6px 14px rgba(0, 0, 0, 0.18); padding: 4px 0; z-index: 30;
-}
-.menu.open > .dropdown { display: block; }
-.dropdown button, .dropdown a {
-  display: flex; justify-content: space-between; align-items: center; width: 100%; min-height: 0; text-align: left;
-  padding: 7px 20px 7px 16px; border: 0; background: none; font: inherit; color: var(--ink); text-decoration: none;
-  cursor: default; box-shadow: none;
-}
-.dropdown button:hover, .dropdown a:hover, .dropdown button:focus-visible, .dropdown a:focus-visible {
-  background: var(--accent); color: var(--accent-ink); outline: none;
-}
-.dropdown button:disabled { color: var(--shadow); text-shadow: none; }
-.dropdown button:disabled:hover { background: none; color: var(--shadow); }
-.dropdown hr { border: 0; border-top: 1px solid var(--shadow); border-bottom: 1px solid var(--hilite); margin: 4px 0; }
-.dropdown .shortcut { color: var(--muted); margin-left: 28px; font-size: 12.5px; }
-.dropdown button:hover .shortcut { color: var(--accent-ink); }
 
 /* ---- toolbar (TGToolBar) ---------------------------------------------- */
 .toolbar {
@@ -181,29 +151,14 @@ fieldset.group > legend { padding: 0 6px; margin-left: 6px; font-weight: bold; l
 label.check { display: inline-flex; align-items: center; gap: 6px; margin: 0; cursor: pointer; }
 label.check input { width: 15px; height: 15px; margin: 0; accent-color: var(--accent); }
 
-/* ---- layout ----------------------------------------------------------- */
-.main {
-  flex: 1; display: grid; grid-template-columns: var(--left-w, minmax(360px, 460px)) 10px minmax(0, 1fr); gap: 8px;
-  padding: 12px 16px 16px; align-items: start;
-}
-.splitter { align-self: stretch; cursor: col-resize; position: relative; }
-.splitter::after {
-  content: ""; position: absolute; top: 0; bottom: 0; left: 4px; width: 2px;
-  border-left: 1px solid var(--shadow); border-right: 1px solid var(--hilite);
-}
-.splitter:hover::after, body.resizing-x .splitter::after { border-color: var(--accent); }
+/* ---- plot height handle --------------------------------------------- */
 .hsplitter { height: 10px; cursor: row-resize; position: relative; margin: 2px 0 4px; }
 .hsplitter::after {
   content: ""; position: absolute; left: 40%; right: 40%; top: 4px; height: 2px;
   border-top: 1px solid var(--shadow); border-bottom: 1px solid var(--hilite);
 }
 .hsplitter:hover::after, body.resizing-y .hsplitter::after { border-color: var(--accent); }
-body.resizing-x, body.resizing-x * { cursor: col-resize !important; user-select: none; }
 body.resizing-y, body.resizing-y * { cursor: row-resize !important; user-select: none; }
-@media (max-width: 960px) {
-  .main { grid-template-columns: 1fr !important; }
-  .splitter { display: none; }
-}
 
 /* the Fit button stays in view while scrolling a long form */
 .inputs .actions {
@@ -406,11 +361,8 @@ dialog.resizable .titlebar { flex: none; }
 #import-mapping .field { margin: 4px 0; min-width: 150px; }
 #import-mapping select { width: 100%; }
 
-/* Navigation preserves the compact Classic workspace. */
-.workspace-home { font-weight: bold; text-decoration: none; margin-right: 12px; }
-.workspace-switch { font-size: 12px; white-space: nowrap; }
 
-/* Optional diagnostic plots: shared controls, compact in Classic. */
+/* Optional diagnostic plots. */
 .optional-plots { border: 0; padding: 0; margin: 14px 0 0; min-width: 0; }
 .optional-plots > legend { padding: 0; font-weight: bold; }
 .optional-choices { display: grid; gap: 8px; margin: 12px 0; }
@@ -436,10 +388,6 @@ dialog.resizable .titlebar { flex: none; }
 .table-fit-settings .row { flex-wrap: wrap; }
 .table-fit-settings input { width: 100%; box-sizing: border-box; }
 
-/* Classic data-section action stays with its heading. */
-fieldset.data-group > legend { width: calc(100% - 12px); box-sizing: border-box; }
-.data-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.data-section-heading > .expand { flex-shrink: 0; }
 
 /* Application prompts use each workspace's existing dialog frame. */
 dialog.app-dialog { width: min(480px, 92vw); max-height: 90vh; }
@@ -447,9 +395,6 @@ dialog.app-dialog { width: min(480px, 92vw); max-height: 90vh; }
 .app-dialog .actions { justify-content: flex-end; }
 .app-dialog .dialog-error { color: var(--err); margin: 8px 0; }
 .app-dialog input[aria-invalid="true"] { outline: 2px solid var(--err); }
-body.classic button.danger {
-  --button-top: #fbe1dc; --button-bottom: #e4a49b; --button-edge: #9a5a50; --button-ink: #571f19;
-}
 body.modern button.danger { background: #a72d25; border-color: #a72d25; color: white; }
 body.modern button.danger:hover:not(:disabled) { background: #86221c; border-color: #86221c; }
 

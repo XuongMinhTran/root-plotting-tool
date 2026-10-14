@@ -1,4 +1,4 @@
-/* Shared header typography; Classic retains its own styling. */
+/* Shared header typography. */
 .site-header .site-name,
 .masthead .brand-name,
 .masthead > .brand:not(:has(.brand-name)) {
