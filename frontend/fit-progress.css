@@ -12,10 +12,12 @@ dialog.fit-progress::backdrop { background:#eef3f7e8; }
 .fit-progress-dots span:nth-child(2) { animation-delay:.16s; }
 .fit-progress-dots span:nth-child(3) { animation-delay:.32s; }
 body dialog.fit-progress .fit-progress-hide {
-  margin:24px 0 0; padding:10px 12px; min-height:44px; border:0; border-radius:4px;
-  background:transparent; color:#346295; box-shadow:none; text-shadow:none; font:inherit; font-size:13px;
+  margin:26px 0 0; padding:10px 22px; min-height:44px; border:1px solid #9fb6cf; border-radius:6px;
+  background:#fff; color:#27496f; box-shadow:0 1px 2px #172b4214; text-shadow:none;
+  font:inherit; font-size:15px; font-weight:600; cursor:pointer;
 }
-body dialog.fit-progress .fit-progress-hide:hover { background:#eef3f7; }
+body dialog.fit-progress .fit-progress-hide:hover { background:#eaf0f7; border-color:#346295; }
+body dialog.fit-progress .fit-progress-hide:active { background:#dde8f4; }
 .fit-progress-hide:focus-visible { outline:2px solid #346295; outline-offset:2px; }
 @keyframes fit-progress-pulse { 0%, 80%, 100% { opacity:.35; transform:translateY(0); } 40% { opacity:1; transform:translateY(-5px); } }
 @media (prefers-reduced-motion:reduce) { .fit-progress-dots span { animation:none; } }
