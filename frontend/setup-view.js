@@ -336,9 +336,19 @@ const lastFilledRow = v => {
 /** The grid -> the controls the rest of the app reads. */
 function commit() {
   if (!view) return;
+  const d = active();
+  const promote = d && !d.analysis_type && lastFilledRow(view) >= 0;
   committing++;
-  try { writeSources(); } finally { committing--; }
+  try {
+    if (promote) {                       // first data in the empty step: it becomes a real XY dataset
+      d.analysis_type = 'xy';
+      $('analysis-type').value = 'xy';
+      syncAnalysisControls();
+    }
+    writeSources();
+  } finally { committing--; }
   view.signature = sourceSignature(active(), view.type, view.columns);
+  if (promote) renderDatasetSelector();   // shows the new tab; the grid is already current
   if (typeof autosave === 'function') autosave();
   scheduleSummary();
 }
@@ -514,7 +524,7 @@ function renderSummary() {
   const d = active();
   const next = $('modern-next');
   if (!d || !d.analysis_type || !view) {
-    status.textContent = 'No dataset yet · choose a data type to start';
+    status.textContent = 'No data yet · type or paste your measurements';
     status.className = 'setup-status';
     if (next) next.disabled = true;
     return;
@@ -558,10 +568,13 @@ function renderTabs() {
   $('setup-tabs-row').hidden = !typed.length;
 }
 
+/** Before any dataset exists the step still shows a ready XY table; the
+ *  first value typed or pasted makes it Dataset 1. */
+const shownType = d => d?.analysis_type || 'xy';
+
 function renderTypeRow(d) {
-  const type = d?.analysis_type || '';
+  const type = shownType(d);
   $('setup-type').value = type;
-  $('setup-type').classList.toggle('is-empty', !type);
   $('setup-hist-source-field').hidden = type !== 'histogram';
   $('setup-mv-dims').hidden = type !== 'multivariate';
   if (type === 'multivariate' && d.mv) {
@@ -569,9 +582,7 @@ function renderTypeRow(d) {
     if (document.activeElement !== $('setup-mv-m')) $('setup-mv-m').value = d.mv.m;
   }
   const counts = type === 'histogram' && $('hist-source').value === 'counts';
-  $('setup-empty').hidden = !!type;
-  for (const id of ['setup-grid-wrap', 'setup-grid-foot']) $(id).hidden = !type;
-  $('setup-unc-help').hidden = !type || type === 'histogram';
+  $('setup-unc-help').hidden = type === 'histogram';
   $('setup-hist-options').hidden = type !== 'histogram';
   $('hist-edges-details').hidden = counts;
   if (type === 'histogram' && !counts && $('hist-edges').value.trim()) $('hist-edges-details').open = true;
@@ -580,7 +591,6 @@ function renderTypeRow(d) {
   $('setup-paste-hint').textContent = type === 'multivariate'
     ? 'Paste columns straight from Excel or Sheets, in the order shown. A header row with these column names is matched by name.'
     : 'Paste columns straight from Excel or Sheets, in the order shown.';
-  $('setup-new-dataset').disabled = !type;
 }
 
 function uniqueName() {
@@ -825,7 +835,7 @@ function renderPreview() {
   const axes = $('setup-preview-axes');
   const d = active();
   axes.hidden = true;
-  if (!d?.analysis_type || !view) { count.textContent = ''; box.innerHTML = emptyPreview('Choose a data type, then type or paste your measurements. They are plotted here as you go.'); return; }
+  if (!view) { count.textContent = ''; box.innerHTML = emptyPreview('Type or paste your measurements. They are plotted here as you go.'); return; }
   const filled = view.check.filled;
   const xTitle = ($('x-title')?.value || '').trim(), yTitle = ($('y-title')?.value || '').trim();
   if (view.type === 'xy') {
@@ -881,7 +891,7 @@ function layout() {
   const card = $('setup-card');
   const style = getComputedStyle(card);
   const chrome = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight) + 2;
-  const need = (view && active()?.analysis_type ? gridMinWidth(view.columns) : 520) + chrome + LAYOUT_GAP + PREVIEW_WIDTH + LAYOUT_SLACK;
+  const need = (view ? gridMinWidth(view.columns) : 520) + chrome + LAYOUT_GAP + PREVIEW_WIDTH + LAYOUT_SLACK;
   const stacked = width < need;
   const changed = box.classList.contains('is-stacked') !== stacked;
   box.classList.toggle('is-stacked', stacked);
@@ -897,11 +907,8 @@ function refresh() {
     const d = active();
     renderTabs();
     renderTypeRow(d);
-    const type = d?.analysis_type || '';
-    if (!type) {
-      view = null;
-      $('setup-grid').innerHTML = '';
-    } else {
+    const type = shownType(d);
+    if (d) {
       const columns = ADAPTERS[type].columns(d);
       const signature = sourceSignature(d, type, columns);
       if (!view || view.signature !== signature) {
@@ -951,7 +958,6 @@ function init() {
   for (const b of document.querySelectorAll('[data-example-key]')) b.addEventListener('click', () => loadExample(b.dataset.exampleKey));
 
   $('setup-type').addEventListener('change', ev => chooseType(ev.target.value));
-  for (const b of document.querySelectorAll('[data-setup-type]')) b.addEventListener('click', () => chooseType(b.dataset.setupType));
   $('setup-new-dataset').addEventListener('click', newDatasetOfActiveType);
 
   const tabs = $('setup-tabs');

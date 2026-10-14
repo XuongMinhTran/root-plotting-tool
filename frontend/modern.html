@@ -17,7 +17,7 @@
 <link rel="icon" href="favicon.ico?v=1" sizes="any"><link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png?v=1"><link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png?v=1"><link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=1"><link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?v=1"><link rel="apple-touch-icon" href="apple-touch-icon.png?v=1">
 <link rel="stylesheet" href="fit-progress.css?v=20261013">
 <link rel="stylesheet" href="ai-starting-values.css?v=20261013">
-<link rel="stylesheet" href="setup-view.css?v=20261014">
+<link rel="stylesheet" href="setup-view.css?v=20261014-2">
 </head>
 <body class="modern standard-workspace">
 <a class="skip-link" href="#main">Skip to the worksheet</a>
@@ -101,7 +101,6 @@
             <div class="setup-field">
               <label for="setup-type">Data type</label>
               <select id="setup-type">
-                <option value="" disabled>Choose a data type…</option>
                 <option value="xy">XY: two quantities measured together</option>
                 <option value="histogram">Histogram: one quantity measured many times</option>
                 <option value="multivariate">Multivariate: several inputs and outputs</option>
@@ -119,15 +118,6 @@
               <input type="number" id="setup-mv-n" min="1" max="20" step="1" inputmode="numeric">
               <label for="setup-mv-m">Outputs</label>
               <input type="number" id="setup-mv-m" min="1" max="20" step="1" inputmode="numeric">
-            </div>
-          </div>
-
-          <div class="setup-empty" id="setup-empty" hidden>
-            <p class="setup-empty-lede"><b>No dataset yet.</b> What did you measure? Choose a type to start one.</p>
-            <div class="setup-type-choices">
-              <button type="button" data-setup-type="xy"><b>XY</b><span>Two quantities measured together, such as time and temperature.</span></button>
-              <button type="button" data-setup-type="histogram"><b>Histogram</b><span>One quantity measured many times, such as particle energies.</span></button>
-              <button type="button" data-setup-type="multivariate"><b>Multivariate</b><span>A result that depends on several inputs, such as beam intensity across a grid.</span></button>
             </div>
           </div>
 
@@ -545,7 +535,7 @@
 <script src="multivariate.js?v=20261013-fit-layout" defer></script>
 <script src="fit-progress.js?v=20261013" defer></script>
 <script src="app.js?v=20261014-setup-view" defer></script>
-<script src="setup-view.js?v=20261014" defer></script>
+<script src="setup-view.js?v=20261014-2" defer></script>
 <script src="model-library.js?v=20261008-inline-starts-4" defer></script>
 <script src="parameter-search.js?v=20261013-fit-layout" defer></script>
 <script defer src="analysis-features.js?v=20261008-fit-flow"></script>
