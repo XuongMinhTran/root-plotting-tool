@@ -17,7 +17,7 @@
 <link rel="icon" href="favicon.ico?v=1" sizes="any"><link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png?v=1"><link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png?v=1"><link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=1"><link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?v=1"><link rel="apple-touch-icon" href="apple-touch-icon.png?v=1">
 <link rel="stylesheet" href="fit-progress.css?v=20261013">
 <link rel="stylesheet" href="ai-starting-values.css?v=20261013">
-<link rel="stylesheet" href="setup-view.css?v=20261014-3">
+<link rel="stylesheet" href="setup-view.css?v=20261014-4">
 </head>
 <body class="modern standard-workspace">
 <a class="skip-link" href="#main">Skip to the worksheet</a>
@@ -85,14 +85,17 @@
           <div class="setup-tabs-row" id="setup-tabs-row">
             <div class="setup-tabs" id="setup-tabs" role="tablist" aria-label="Datasets"></div>
             <button type="button" class="link-btn setup-new" id="setup-new-dataset">+ New dataset</button>
-            <div class="menu-anchor setup-dataset-more">
-              <button type="button" class="icon-btn" id="setup-dataset-more" aria-haspopup="true" aria-expanded="false" aria-controls="setup-dataset-menu" aria-label="Dataset actions" title="Dataset actions">⋯</button>
+            <div class="setup-dataset-actions">
+              <span id="point-exclusions-slot"></span>
+              <div class="menu-anchor">
+              <button type="button" class="setup-options-btn" id="setup-dataset-more" aria-haspopup="true" aria-expanded="false" aria-controls="setup-dataset-menu">Options <span class="caret" aria-hidden="true">▾</span></button>
               <div class="pop-menu pop-right" id="setup-dataset-menu" hidden>
                 <div id="plot-management-actions" class="pop-menu-items">
                   <button type="button" data-action="dataset-rename" title="Rename this dataset">Rename…</button>
                   <button type="button" data-action="dataset-duplicate" title="Copy this dataset and its fit settings">Duplicate</button>
                   <button type="button" class="danger-item" data-action="dataset-remove" title="Delete this dataset">Delete…</button>
                 </div>
+              </div>
               </div>
             </div>
           </div>
@@ -539,7 +542,7 @@
 <script src="setup-view.js?v=20261014-4" defer></script>
 <script src="model-library.js?v=20261008-inline-starts-4" defer></script>
 <script src="parameter-search.js?v=20261013-fit-layout" defer></script>
-<script defer src="analysis-features.js?v=20261008-fit-flow"></script>
+<script defer src="analysis-features.js?v=20261014-exclusions"></script>
 <script src="fit-model.js?v=20261013-fit-layout" defer></script>
 <script src="ai-starting-values.js?v=20261013-fit-layout" defer></script>
 </body>

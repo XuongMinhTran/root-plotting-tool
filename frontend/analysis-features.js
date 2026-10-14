@@ -6,6 +6,7 @@ function refresh(){
  const d=datasets[activeIdx];if(!d)return;
  el('confidence-level').value=String(d.confidenceLevel||'');
  el('point-exclusions').disabled=d.analysis_type!=='xy';
+ if(el('point-exclusions-slot'))el('point-exclusions').hidden=d.analysis_type!=='xy';   // Standard: shown beside Options for XY data only
  el('point-exclusions').textContent='Point exclusions'+(d.exclusions?.length?' ('+d.exclusions.length+')':'')+'…';
 }
 function exclusions(){
@@ -60,8 +61,8 @@ function init(){
  const settings=document.createElement('div');settings.className='feature-settings';settings.innerHTML='<label for="confidence-level">Confidence band</label><select id="confidence-level"><option value="">None</option><option value="0.68">68%</option><option value="0.95">95%</option><option value="0.99">99%</option></select><p class="hint">Show the uncertainty range around the fitted curve. Run Fit to update it. This describes uncertainty in the curve, not the spread of new measurements.</p>';
  (document.querySelector('.fit-plot-settings .plot-settings-body') || el('step-options') || fit.parentElement).append(settings);
  const btn=document.createElement('button');btn.type='button';btn.id='point-exclusions';btn.className='small';btn.textContent='Point exclusions…';btn.onclick=exclusions;
- const row=el('plot-management-actions')||document.querySelector('.dataset-row'),del=row&&row.querySelector('[data-action="dataset-remove"]');
- if(row){if(del)row.insertBefore(btn,del);else row.append(btn);}
+ const slot=el('point-exclusions-slot'),row=el('plot-management-actions')||document.querySelector('.dataset-row'),del=row&&row.querySelector('[data-action="dataset-remove"]');
+ if(slot)slot.append(btn);else if(row){if(del)row.insertBefore(btn,del);else row.append(btn);}
  const host=document.createElement('div');host.id='parameter-correlations';el('report').after(host);
  const exportButton=document.createElement('button');exportButton.type='button';exportButton.textContent='Export';exportButton.onclick=()=>window.AnalysisExport.open(buildDocument());el('report-tools').after(exportButton);
  el('confidence-level').onchange=()=>{datasets[activeIdx].confidenceLevel=Number(el('confidence-level').value)||null;autosave();};refresh();renderResult(lastResult);
