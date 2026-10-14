@@ -20,7 +20,7 @@
 
 const MODES = ['per-point', 'constant', 'none'];
 const MODE_LABEL = { 'per-point': 'Per point', constant: 'Constant', none: 'None' };
-const TYPE_LABEL = { xy: 'XY', histogram: 'Histogram', multivariate: 'Multivariate' };
+const TYPE_LABEL = { xy: 'f(x)', histogram: 'Histogram', multivariate: 'Multivariate' };
 
 function tokens(text) { return String(text ?? '').split(/[\s,;]+/).filter(t => t !== ''); }
 function isNumber(s) { const t = String(s ?? '').trim(); return t !== '' && Number.isFinite(Number(t)); }
