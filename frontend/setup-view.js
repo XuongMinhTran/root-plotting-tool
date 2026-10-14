@@ -95,16 +95,41 @@ function matchHeader(header, columns) {
  *  columns from the start column in the order shown. A block wider than that
  *  also fills the uncertainty columns that are Constant or None, in display
  *  order, and returns them in `enable` so the caller can switch them to Per point. */
-function pasteTargets(columns, editable, startCol, width, header) {
+function pasteTargets(columns, editable, startCol, width, header, order = columns.map((_, i) => i)) {
   if (header) {
     const mapped = matchHeader(header, columns);
     if (mapped) return { targets: mapped, enable: mapped.filter(c => !editable[c] && columns[c].kind === 'unc') };
   }
-  const shown = columns.map((_, i) => i).filter(i => i >= startCol && !columns[i].readOnly && columns[i].kind !== 'derived');
+  const shown = order.slice(Math.max(0, order.indexOf(startCol))).filter(i => !columns[i].readOnly && columns[i].kind !== 'derived');
   const open = shown.filter(i => editable[i]);
   if (width <= open.length) return { targets: open.slice(0, width), enable: [] };
   const targets = shown.slice(0, width);
   return { targets, enable: targets.filter(c => !editable[c]) };
+}
+
+/** A saved column order (column ids) -> display order (column indices). A column
+ *  the saved order does not know, such as a newly added input, goes right after
+ *  the rightmost of the columns that normally come before it. */
+function resolveOrder(columns, savedIds) {
+  const ids = columns.map(c => c.id);
+  const order = [];
+  for (const id of Array.isArray(savedIds) ? savedIds : []) {
+    const i = ids.indexOf(id);
+    if (i >= 0 && !order.includes(i)) order.push(i);
+  }
+  columns.forEach((_, i) => {
+    if (order.includes(i)) return;
+    const after = Math.max(-1, ...order.filter(j => j < i).map(j => order.indexOf(j)));
+    order.splice(after + 1, 0, i);
+  });
+  return order;
+}
+
+/** Display order with column `col` moved to display position `to`. */
+function moveColumn(order, col, to) {
+  const out = order.filter(c => c !== col);
+  out.splice(Math.max(0, Math.min(out.length, to)), 0, col);
+  return out;
 }
 
 /** Grid rows -> validation. `editable[c]` says whether a column holds per-row values. */
@@ -214,7 +239,7 @@ function gridMinWidth(columns) {
   return 44 + columns.reduce((w, c) => w + (c.kind === 'unc' ? 160 : 120), 0);
 }
 
-const Core = { MODES, tokens, isNumber, splitCells, joinCells, resolveMode, splitRow, parseBlock, matchHeader, pasteTargets, validateRows, binsFromRows, histogramFromSamples, niceTicks, fmtTick, gridMinWidth };
+const Core = { MODES, tokens, isNumber, splitCells, joinCells, resolveMode, splitRow, parseBlock, matchHeader, pasteTargets, resolveOrder, moveColumn, validateRows, binsFromRows, histogramFromSamples, niceTicks, fmtTick, gridMinWidth };
 if (typeof module !== 'undefined' && module.exports) { module.exports = Core; return; }
 if (typeof document === 'undefined') return;
 
@@ -318,7 +343,9 @@ function buildView(d, type) {
   });
   const total = Math.max(MIN_ROWS, rowCount + SPARE_ROWS);
   const rows = Array.from({ length: total }, (_, r) => columns.map((_, c) => cells[c][r] ?? ''));
-  return { id: d.id, type, columns, rows, modes, consts, signature: '', derived: !!d.derivedFrom };
+  const orderKey = type === 'histogram' ? 'histogram:' + $('hist-source').value : type;
+  const order = resolveOrder(columns, d.column_order?.[orderKey]);
+  return { id: d.id, type, columns, rows, modes, consts, order, orderKey, signature: '', derived: !!d.derivedFrom };
 }
 
 const editableCol = (v, c) => {
@@ -372,7 +399,14 @@ function writeSources() {
 
 // ---------------------------------------------------------------- grid rendering
 
-function headerCell(c, i) {
+const GRIP = '<svg viewBox="0 0 10 16" width="10" height="16" aria-hidden="true"><circle cx="2.5" cy="3" r="1.4"/><circle cx="7.5" cy="3" r="1.4"/><circle cx="2.5" cy="8" r="1.4"/><circle cx="7.5" cy="8" r="1.4"/><circle cx="2.5" cy="13" r="1.4"/><circle cx="7.5" cy="13" r="1.4"/></svg>';
+function grip(i) {
+  if (view.columns.length < 2) return '';
+  const col = view.columns[i], name = col.kind === 'unc' ? col.label : (col.name ?? col.label);
+  return `<button type="button" class="col-grip" data-grip="${i}" title="Drag to move this column" aria-label="Move the ${esc(name)} column. Left and right arrow keys move it.">${GRIP}</button>`;
+}
+
+function headerCell(i) {
   const col = view.columns[i];
   if (col.kind === 'unc') {
     const mode = view.modes[col.modeKey];
@@ -380,14 +414,14 @@ function headerCell(c, i) {
     const constant = mode === 'constant'
       ? `<input type="text" class="unc-const${view.issues?.some(x => x.constant && x.col === i) ? ' is-bad' : ''}" data-const="${i}" inputmode="decimal" spellcheck="false" placeholder="value" value="${esc(view.consts[col.modeKey] ?? '')}" aria-label="${esc(col.label)}, one value for every row"${col.readOnly ? ' readonly' : ''}>`
       : '';
-    return `<th scope="col" class="col-unc mode-${mode}"><span class="th-label">${esc(col.label)}</span>
+    return `<th scope="col" class="col-unc mode-${mode}"><span class="th-top">${grip(i)}<span class="th-label">${esc(col.label)}</span></span>
       <select class="unc-mode" data-mode="${i}" aria-label="${esc(col.label)}"${col.readOnly ? ' disabled' : ''}>${opts}</select>${constant}</th>`;
   }
   if (col.nameField) {
-    return `<th scope="col" class="col-value col-named"><span class="th-group">${esc(col.group)}</span>
+    return `<th scope="col" class="col-value col-named"><span class="th-top">${grip(i)}<span class="th-group">${esc(col.group)}</span></span>
       <input type="text" class="th-name" data-name="${i}" value="${esc(col.name)}" spellcheck="false" aria-label="Name of ${esc(col.label.toLowerCase())}"></th>`;
   }
-  return `<th scope="col" class="col-value"><span class="th-label">${esc(col.label)}</span></th>`;
+  return `<th scope="col" class="col-value"><span class="th-top">${grip(i)}<span class="th-label">${esc(col.label)}</span></span></th>`;
 }
 
 function bodyCell(r, c, firstEmpty) {
@@ -406,7 +440,7 @@ function bodyCell(r, c, firstEmpty) {
 }
 
 function rowHtml(r, firstEmpty) {
-  return `<tr data-row="${r}"><th scope="row" class="rownum">${r + 1}</th>${view.columns.map((_, c) => bodyCell(r, c, r === firstEmpty)).join('')}</tr>`;
+  return `<tr data-row="${r}"><th scope="row" class="rownum">${r + 1}</th>${view.order.map(c => bodyCell(r, c, r === firstEmpty)).join('')}</tr>`;
 }
 
 function renderGrid() {
@@ -416,8 +450,10 @@ function renderGrid() {
   const firstEmpty = lastFilledRow(view) + 1;
   const groups = view.type === 'multivariate';
   table.className = 'setup-grid type-' + view.type + (groups ? ' has-names' : '');
-  table.innerHTML = `<colgroup><col class="c-num">${view.columns.map(c => `<col class="c-${c.kind}">`).join('')}</colgroup>
-    <thead><tr><th scope="col" class="rownum">#</th>${view.columns.map(headerCell).join('')}</tr></thead>
+  const custom = view.order.some((c, k) => c !== k);
+  $('setup-reset-order').hidden = !custom;
+  table.innerHTML = `<colgroup><col class="c-num">${view.order.map(c => `<col class="c-${view.columns[c].kind}">`).join('')}</colgroup>
+    <thead><tr><th scope="col" class="rownum">#</th>${view.order.map(headerCell).join('')}</tr></thead>
     <tbody>${view.rows.map((_, r) => rowHtml(r, firstEmpty)).join('')}</tbody>`;
 }
 
@@ -429,8 +465,8 @@ function repaintRows() {
   const firstEmpty = lastFilledRow(view) + 1;
   const tbody = $('setup-grid').tBodies[0];
   [...tbody.rows].forEach((tr, r) => {
-    [...tr.cells].slice(1).forEach((td, c) => {
-      const col = view.columns[c];
+    [...tr.cells].slice(1).forEach((td, pos) => {
+      const c = view.order[pos], col = view.columns[c];
       if (col.kind === 'unc' && view.modes[col.modeKey] !== 'per-point') {
         const filled = view.check.filledSet.has(r);
         const text = !filled ? '' : view.modes[col.modeKey] === 'none' ? '—' : (view.consts[col.modeKey] ?? '');
@@ -471,7 +507,7 @@ function addRows(k = 10) {
   focusCell(lastFilledRow(view) + 1, firstEditable());
 }
 
-function firstEditable() { return view.columns.findIndex((_, c) => editableCol(view, c)); }
+function firstEditable() { return view.order.find(c => editableCol(view, c)) ?? -1; }
 function focusCell(r, c) {
   const input = $('setup-grid').querySelector(`input[data-r="${r}"][data-c="${c}"]`);
   if (input) { input.focus(); input.select?.(); }
@@ -632,7 +668,7 @@ function showNote(text) {
 function placeBlock(block, r0, c0) {
   const width = Math.max(...block.rows.map(r => r.length));
   const editable = view.columns.map((_, c) => editableCol(view, c));
-  const { targets, enable } = pasteTargets(view.columns, editable, c0, width, block.header);
+  const { targets, enable } = pasteTargets(view.columns, editable, c0, width, block.header, view.order);
   if (!targets.length) return 0;
   for (const c of enable) {
     const key = view.columns[c].modeKey;
@@ -672,7 +708,7 @@ async function importFile(file) {
     if (!ok) return;
   }
   view.rows = [];
-  const start = view.columns.findIndex(c => c.kind === 'value' && !c.readOnly);
+  const start = view.order.find(c => view.columns[c].kind === 'value' && !view.columns[c].readOnly);
   if (!placeBlock(block, 0, start)) return;
   commit();
   renderGrid();
@@ -712,7 +748,7 @@ function renameUncertaintyLabels() {
     if (!target) return;
     c.label = (target.name || target.label) + ' uncertainty';
     c.of = target.name;
-    const th = $('setup-grid').tHead.rows[0].cells[i + 1];
+    const th = $('setup-grid').tHead.rows[0].cells[view.order.indexOf(i) + 1];
     th.querySelector('.th-label').textContent = c.label;
     th.querySelector('select').setAttribute('aria-label', c.label);
   });
@@ -748,9 +784,90 @@ function onGridKeydown(ev) {
   } else if (ev.key === 'ArrowUp' && r > 0) next = [r - 1, c];
   else if ((ev.key === 'ArrowRight' && t.selectionStart === t.value.length) || (ev.key === 'ArrowLeft' && t.selectionEnd === 0)) {
     const step = ev.key === 'ArrowRight' ? 1 : -1;
-    for (let k = c + step; k >= 0 && k < view.columns.length; k += step) if (editableCol(view, k)) { next = [r, k]; break; }
+    for (let k = view.order.indexOf(c) + step; k >= 0 && k < view.order.length; k += step) if (editableCol(view, view.order[k])) { next = [r, view.order[k]]; break; }
   }
   if (next && focusCell(...next)) ev.preventDefault();
+}
+
+// ---------------------------------------------------------------- moving columns
+// Column order is display only: the data, the model's x0, x1, … and saving are
+// unaffected. Pasting follows the order shown. The order is kept per dataset.
+
+function applyOrder(order, focusCol) {
+  view.order = order;
+  const d = active();
+  if (d) {
+    const ids = order.map(c => view.columns[c].id);
+    const isDefault = order.every((c, k) => c === k);
+    const saved = { ...(d.column_order || {}) };
+    if (isDefault) delete saved[view.orderKey]; else saved[view.orderKey] = ids;
+    if (Object.keys(saved).length) d.column_order = saved; else delete d.column_order;
+    if (typeof autosave === 'function') autosave();
+  }
+  renderGrid();
+  if (focusCol !== undefined) $('setup-grid').querySelector(`[data-grip="${focusCol}"]`)?.focus();
+}
+
+function columnName(c) { const col = view.columns[c]; return col.kind === 'unc' ? col.label : (col.name ?? col.label); }
+
+function dragColumn(gripEl, ev) {
+  const col = +gripEl.dataset.grip;
+  const table = $('setup-grid'), wrap = $('setup-grid-wrap');
+  const from = view.order.indexOf(col);
+  const marker = document.createElement('div');
+  marker.className = 'col-drop-marker';
+  wrap.appendChild(marker);
+  const cells = () => [...table.querySelectorAll(`tr > :nth-child(${view.order.indexOf(col) + 2})`)];
+  cells().forEach(cell => cell.classList.add('col-dragging'));
+  table.classList.add('is-dragging');
+  gripEl.setPointerCapture?.(ev.pointerId);
+  let target = from, moved = false, scrollTimer = 0;
+  const startX = ev.clientX;
+  const place = x => {
+    const ths = [...table.tHead.rows[0].cells].slice(1).map(th => th.getBoundingClientRect());
+    let p = ths.filter(r => r.left + r.width / 2 < x).length;
+    target = p;
+    const wrapBox = wrap.getBoundingClientRect();
+    const edge = p < ths.length ? ths[p].left : ths[ths.length - 1].right;
+    marker.style.left = (edge - wrapBox.left + wrap.scrollLeft - 1) + 'px';
+    marker.style.height = table.offsetHeight + 'px';
+    marker.hidden = p === from || p === from + 1;
+    clearInterval(scrollTimer);
+    const speed = x < wrapBox.left + 40 ? -12 : x > wrapBox.right - 40 ? 12 : 0;
+    if (speed) scrollTimer = setInterval(() => { wrap.scrollLeft += speed; }, 16);
+  };
+  const move = e => { if (Math.abs(e.clientX - startX) > 3) moved = true; if (moved) place(e.clientX); };
+  const end = commitMove => {
+    clearInterval(scrollTimer);
+    gripEl.removeEventListener('pointermove', move);
+    gripEl.removeEventListener('pointerup', up);
+    gripEl.removeEventListener('pointercancel', cancel);
+    document.removeEventListener('keydown', esc, true);
+    marker.remove();
+    table.classList.remove('is-dragging');
+    cells().forEach(cell => cell.classList.remove('col-dragging'));
+    if (!commitMove || !moved) return;
+    const to = target > from ? target - 1 : target;
+    if (to !== from) { applyOrder(moveColumn(view.order, col, to), col); showNote(`Moved ${columnName(col)} to column ${to + 1}.`); }
+  };
+  const up = () => end(true), cancel = () => end(false);
+  const esc = e => { if (e.key === 'Escape') { e.stopPropagation(); end(false); } };
+  marker.hidden = true;
+  gripEl.addEventListener('pointermove', move);
+  gripEl.addEventListener('pointerup', up);
+  gripEl.addEventListener('pointercancel', cancel);
+  document.addEventListener('keydown', esc, true);
+}
+
+function onGripKeydown(ev) {
+  const g = ev.target.closest?.('.col-grip');
+  if (!g || (ev.key !== 'ArrowLeft' && ev.key !== 'ArrowRight' && ev.key !== 'Home' && ev.key !== 'End')) return;
+  ev.preventDefault();
+  const col = +g.dataset.grip, at = view.order.indexOf(col);
+  const to = ev.key === 'Home' ? 0 : ev.key === 'End' ? view.order.length - 1 : at + (ev.key === 'ArrowRight' ? 1 : -1);
+  if (to < 0 || to >= view.order.length || to === at) return;
+  applyOrder(moveColumn(view.order, col, to), col);
+  showNote(`Moved ${columnName(col)} to column ${to + 1}.`);
 }
 
 // ---------------------------------------------------------------- preview
@@ -900,6 +1017,7 @@ function refresh() {
     if (!type) {
       view = null;
       $('setup-grid').innerHTML = '';
+      $('setup-reset-order').hidden = true;
     } else {
       const columns = ADAPTERS[type].columns(d);
       const signature = sourceSignature(d, type, columns);
@@ -982,6 +1100,19 @@ function init() {
   grid.addEventListener('change', onGridChange);
   grid.addEventListener('keydown', onGridKeydown);
   grid.addEventListener('paste', onPaste);
+  grid.addEventListener('pointerdown', ev => {
+    const g = ev.target.closest('.col-grip');
+    if (!g || ev.button > 0) return;
+    ev.preventDefault();
+    g.focus();
+    dragColumn(g, ev);
+  });
+  grid.addEventListener('keydown', onGripKeydown);
+  $('setup-reset-order').addEventListener('click', () => {
+    if (!view) return;
+    applyOrder(view.columns.map((_, i) => i));
+    showNote('Columns are back in their original order.');
+  });
   $('setup-add-rows').addEventListener('click', () => addRows(10));
   $('setup-import').addEventListener('click', () => $('setup-import-file').click());
   $('setup-import-file').addEventListener('change', ev => { importFile(ev.target.files[0]); ev.target.value = ''; });

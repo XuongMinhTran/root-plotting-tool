@@ -156,6 +156,24 @@ body.modern .setup-grid-note { margin: 6px 0 0; color: #2a6b45; }
 body.modern .setup-unc-help { margin: 8px 0 0; font-size: 13.5px; color: var(--ink-soft); max-width: 78ch; }
 body.modern .setup-unc-help b { color: var(--ink); }
 
+/* moving columns */
+.setup-grid-wrap { position: relative; }
+.setup-grid .th-top { display: flex; align-items: center; gap: 4px; margin-left: -6px; min-width: 0; }
+.setup-grid .th-top .th-label, .setup-grid .th-top .th-group { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.setup-grid .th-top .th-group { margin-bottom: 0; }
+.setup-grid .col-named .th-top { margin-bottom: 4px; }
+body.modern .setup-grid button.col-grip {
+  flex: none; display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 22px; min-height: 0;
+  padding: 0; border: 0; border-radius: 4px; background: none; color: #a3adb8; cursor: grab; touch-action: none;
+}
+body.modern .setup-grid button.col-grip svg { fill: currentColor; }
+body.modern .setup-grid button.col-grip:hover:not(:disabled) { background: #e1e7ee; color: var(--ink-soft); }
+body.modern .setup-grid button.col-grip:focus-visible { outline: 2px solid var(--blue); outline-offset: 0; color: var(--ink); }
+.setup-grid.is-dragging, .setup-grid.is-dragging * { cursor: grabbing !important; user-select: none; }
+.setup-grid .col-dragging, .setup-grid thead th.col-dragging { background: #e4ecf6; }
+.setup-grid td.col-dragging input { background: transparent; }
+.col-drop-marker { position: absolute; top: 0; width: 3px; background: var(--blue); border-radius: 2px; pointer-events: none; z-index: 5; }
+
 /* histogram options */
 .setup-hist-options { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
 .setup-binning { display: flex; flex-wrap: wrap; gap: 10px 22px; }

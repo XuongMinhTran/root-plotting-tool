@@ -96,3 +96,24 @@ test('the preview moves below once the grid needs the width',()=>{
   const mv=sv.gridMinWidth([...Array(4)].map(()=>({kind:'value'})).concat([...Array(4)].map(()=>({kind:'unc'}))));
   assert.ok(narrow<700); assert.ok(mv>1100);
 });
+
+test('column order is display only and survives added or removed columns',()=>{
+  const cols=['x','y','ex','ey'].map(id=>({id}));
+  assert.deepEqual(sv.resolveOrder(cols,undefined),[0,1,2,3]);
+  assert.deepEqual(sv.resolveOrder(cols,['x','ex','y','ey']),[0,2,1,3]);
+  assert.deepEqual(sv.resolveOrder(cols,['ey','gone','x']),[3,0,1,2]);       // unknown ids dropped, missing ones placed after their neighbour
+  const mv=['in0','in1','in2','out0'].map(id=>({id}));
+  assert.deepEqual(sv.resolveOrder(mv,['in1','in0','out0']),[1,0,2,3]);      // a new input lands next to the previous one
+  assert.deepEqual(sv.moveColumn([0,1,2,3],3,1),[0,3,1,2]);
+  assert.deepEqual(sv.moveColumn([0,1,2,3],0,3),[1,2,3,0]);
+  assert.deepEqual(sv.moveColumn([0,1,2,3],2,9),[0,1,3,2]);
+});
+
+test('pasting follows the order shown',()=>{
+  const editable=[true,true,false,true];
+  // X, X unc, Y, Y unc on screen; X unc is None
+  assert.deepEqual(sv.pasteTargets(XY,editable,0,3,null,[0,2,1,3]),{targets:[0,1,3],enable:[]});
+  assert.deepEqual(sv.pasteTargets(XY,editable,0,4,null,[0,2,1,3]),{targets:[0,2,1,3],enable:[2]});
+  // Y unc moved before Y: pasting two columns from Y uncertainty fills Y uncertainty, then Y
+  assert.deepEqual(sv.pasteTargets(XY,editable,3,2,null,[0,3,1,2]),{targets:[3,1],enable:[]});
+});
