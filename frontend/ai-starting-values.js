@@ -94,14 +94,13 @@
     dialog.setAttribute('aria-labelledby', 'ai-starting-title');
     dialog.innerHTML = `
       <button type="button" class="ai-starting-close" aria-label="Close AI starting values">×</button>
-      <h2 id="ai-starting-title">Ask AI for starting values</h2>
-      <p>Stuck? Time to ask uncle ChatGPT or aunty Claude.</p>
-      <ol class="ai-starting-steps">
-        <li><strong>Copy the prompt</strong> below, or download the .txt file. It includes your model, parameter order, data and uncertainties.</li>
-        <li><strong>Paste the copied text into ChatGPT, Claude or another AI chat</strong>, or attach the .txt file and send it. The instructions are already included—there’s nothing else to write.</li>
-        <li><strong>Copy the final comma-separated values</strong> into Manual entry here. Review the values and the starting curve where available, adjust if needed, then run Fit.</li>
-      </ol>
-      <p class="ai-starting-hint">Suggestions can be wrong—review them before fitting. Nothing is sent to an AI service by this tool.</p>
+      <h2 id="ai-starting-title">Stuck? Time to ask uncle ChatGPT or aunty Claude.</h2>
+      <ul class="ai-starting-steps">
+        <li>Copy the prompt, or download it as a .txt file. It already has your model, parameter order, data and uncertainties.</li>
+        <li>Paste it into ChatGPT, Claude or any AI chat (or attach the .txt) and send. No need to write anything else.</li>
+        <li>Put the comma-separated values from the end of its reply into manual entry, check the starting curve, then run Fit.</li>
+      </ul>
+      <p class="ai-starting-hint">Suggestions can be wrong—review them before fitting. ROOT-A-TRON does not have uncle ChatGPT’s number: nothing is sent to an AI service by this tool.</p>
       <p id="ai-starting-error" role="alert" hidden></p>
       <details id="ai-starting-preview"><summary>Review the prompt and data</summary>
         <textarea id="ai-starting-prompt" aria-label="Prompt and data for AI" readonly spellcheck="false"></textarea>
@@ -109,7 +108,7 @@
       <div class="ai-starting-actions">
         <button type="button" class="primary" id="ai-starting-copy">Copy prompt</button>
         <button type="button" id="ai-starting-download">Download .txt</button>
-        <button type="button" id="ai-starting-manual">Manual entry</button>
+        <button type="button" id="ai-starting-manual" hidden>Go to manual entry</button>
       </div>
       <p id="ai-starting-status" role="status" aria-live="polite"></p>`;
     document.body.append(dialog);
@@ -118,26 +117,47 @@
       const r = dialog.getBoundingClientRect();
       if (event.target === dialog && (event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom)) dialog.close();
     });
+    // Once the prompt has left the dialog, the next step is bringing the values back.
+    const offerManualEntry = (focus = true) => {
+      const manual = $('ai-starting-manual');
+      manual.hidden = false;
+      manual.classList.add('primary');
+      $('ai-starting-copy').classList.remove('primary');
+      if (focus) manual.focus();
+    };
     $('ai-starting-copy').addEventListener('click', async () => {
       const text = $('ai-starting-prompt').value;
-      try { await navigator.clipboard.writeText(text); $('ai-starting-status').textContent = 'Copied. Paste it into your AI chat.'; }
-      catch (_) {
+      try {
+        await navigator.clipboard.writeText(text);
+        $('ai-starting-status').textContent = 'Copied. Paste it into your AI chat, then come back here for manual entry.';
+        offerManualEntry();
+      } catch (_) {
         $('ai-starting-preview').open = true;
         $('ai-starting-prompt').focus(); $('ai-starting-prompt').select();
-        $('ai-starting-status').textContent = 'Copy the selected text, or use Download .txt.';
+        $('ai-starting-status').textContent = 'Copy the selected text, or use Download .txt. Then come back here for manual entry.';
+        offerManualEntry(false);
       }
     });
     $('ai-starting-download').addEventListener('click', () => {
       downloadText($('ai-starting-prompt').value, 'starting-values-prompt.txt', 'text/plain;charset=utf-8');
-      $('ai-starting-status').textContent = 'Download requested. Attach the .txt file to your AI chat.';
+      $('ai-starting-status').textContent = 'Download requested. Attach the .txt file to your AI chat, then come back here for manual entry.';
+      offerManualEntry();
     });
+    // Manual entry: the comma-separated starting values field, opened, in view and focused.
     $('ai-starting-manual').addEventListener('click', () => {
       dialog.close();
-      if ($('analysis-type').value === 'multivariate') { $('mv-parameter-paste').open = true; $('mv-par-guesses').focus(); return; }
-      $('starting-values-manual').click();
-      const paste = document.querySelector('.parameter-paste');
-      if (paste) paste.open = true;
-      $('initial-guesses').focus();
+      const multivariate = $('analysis-type').value === 'multivariate';
+      const field = $(multivariate ? 'mv-par-guesses' : 'initial-guesses');
+      if (multivariate) $('mv-parameter-paste').open = true;
+      else {
+        $('starting-values-editor').open = true;
+        $('starting-values-manual')?.setAttribute('aria-expanded', 'true');
+        const paste = field.closest('details');
+        if (paste) paste.open = true;
+      }
+      field.scrollIntoView({ block: 'center' });
+      field.focus({ preventScroll: true });
+      field.select();
     });
   }
   trigger.addEventListener('click', () => {
@@ -146,6 +166,9 @@
     $('ai-starting-status').textContent = '';
     $('ai-starting-error').hidden = true;
     $('ai-starting-preview').open = false;
+    $('ai-starting-manual').hidden = true;
+    $('ai-starting-manual').classList.remove('primary');
+    $('ai-starting-copy').classList.add('primary');
     let ready = false;
     try {
       const multivariate = $('analysis-type').value === 'multivariate';
