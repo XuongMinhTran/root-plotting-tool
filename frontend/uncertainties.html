@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Analyze Data · ROOT-A-TRON 3000</title>
-<link rel="stylesheet" href="analysis.css?v=20261015-drop">
+<link rel="stylesheet" href="analysis.css?v=20261015-calc">
 <link rel="stylesheet" href="multivariate.css?v=1">
 <script defer src="vendor/mathlive/mathlive.min.js"></script>
 <script defer src="equation-parser.js?v=20260919-units"></script>
-<script defer src="units.js?v=1"></script><script defer src="analysis-core.js?v=20260919-units"></script><script defer src="workspace-store.js?v=1"></script><script defer src="multivariate.js?v=1"></script><script defer src="insert-data.js?v=20260920-types"></script><script defer src="analysis.js?v=20261015-drop"></script>
+<script defer src="units.js?v=20261015-calc"></script><script defer src="calc-assist.js?v=20261015-calc"></script><script defer src="analysis-core.js?v=20260919-units"></script><script defer src="workspace-store.js?v=1"></script><script defer src="multivariate.js?v=1"></script><script defer src="insert-data.js?v=20260920-types"></script><script defer src="analysis.js?v=20261015-calc"></script>
 <link rel="stylesheet" href="site-brand.css?v=1">
 <link rel="stylesheet" href="analysis-features.css?v=20260919-export">
 <script defer src="analysis-export.js?v=20260919-pdf"></script>
@@ -32,13 +32,27 @@
 </section>
 <aside class="inspector" aria-labelledby="operation-title"><h2 id="operation-title">Analysis tools</h2><button id="calculate" class="primary" disabled>Calculate quantity or column</button><h2 id="edit-data-heading" class="data-actions-title">Edit data</h2><button id="edit-source" hidden>Edit source data</button><button id="edit-exclusions" hidden>Point exclusions…</button><h2 class="data-actions-title">Manage data</h2><button id="export" disabled>Export table</button><button id="delete" class="danger" disabled>Delete</button><section id="relationships"></section></aside>
 </div>
-<section id="calculation-page" class="calculation-page" aria-labelledby="calculation-heading" hidden tabindex="-1"><form id="calculation-form"><h2 id="calculation-heading">Calculate quantity or column</h2><p>Calculate from measurement columns or fitted parameters. Source uncertainties and fit covariance are propagated to the result.</p><h3>Source quantities</h3><p class="note">Select a column or fitted parameter to insert it into the expression. Columns contain one value per row; fitted parameters are single values with uncertainties. Parameter [0], [1], etc. refer to the indices in the fit function.</p><div id="calculation-sources" class="calculation-sources"></div><h3>Calculation</h3><label>Result type<select id="calculation-kind"><option value="quantity">Quantity (single value)</option><option value="column">Calculated column (one value per row)</option></select></label>
-<div class="two-fields"><label>Name<input id="calculation-name" required maxlength="120"></label><label>Result unit<input id="calculation-unit" placeholder="e.g. s" maxlength="40"></label></div>
-<label for="calculation-expression">Expression</label><math-field id="calculation-expression" math-virtual-keyboard-policy="manual" aria-label="Calculation expression"></math-field>
-<p class="note">Type an expression, then assign its symbols to source values or columns. For example, <code>t ln(2)</code> or <code>V/I</code>. Type <code>\tau</code> for τ and <code>\sqrt</code> for a square root.</p>
-<details class="equation-help"><summary>Typing reference</summary><p>Type <code>\alpha</code>, <code>\lambda</code>, <code>\sigma</code>, <code>\tau</code>, or <code>\pi</code> followed by Space for Greek symbols. Use <code>^</code> for powers, <code>_</code> for subscripts, <code>/</code> for fractions, and <code>\sqrt</code> for a square root. Use arrow keys to leave an exponent or fraction.</p><p>Functions require parentheses: <code>exp(x)</code>, <code>ln(x)</code>, <code>sin(x)</code>. Adjacent symbols multiply. Assign each variable to a source quantity below; inserted quantities are assigned automatically. Example: <code>t ln(2)</code>. Assign units to each input and select a result unit. Compatible units are converted automatically; enter 1 for dimensionless quantities.</p></details><details><summary>Unit reference</summary><p>Units are case-sensitive. Examples: <code>mm</code>, <code>cm</code>, <code>nm</code>, <code>mm^-1</code>, <code>m/s^2</code>, <code>J/(mol*K)</code>, <code>V/A</code>, <code>eV</code>. Use <code>*</code>, <code>/</code>, parentheses, and numerical powers. Enter <code>1</code> for dimensionless quantities. Angles accept <code>rad</code> or <code>deg</code>. Celsius, Fahrenheit, and decibels are unsupported.</p><p>For a wavelength calculated as πd/(kD), assign d in mm, D in cm, k in mm^-1 if the fitted position was in mm, and the result in nm. Source unit assignments describe the existing numbers; they do not change the fitted data.</p></details><h3>Symbol assignments</h3><p id="binding-help" class="note">Inserted quantities are assigned automatically. For symbols you type, choose the corresponding source below.</p><div id="bindings"></div><h3>Result preview</h3><div id="calculation-preview" aria-live="polite"></div>
-<details><summary>Uncertainty method</summary><p>First-order propagation using numerical partial derivatives. Imported fit covariance and shared inputs are retained through subsequent calculations. Separate sources are assumed independent. Rows are paired by position; a scalar applies to every row. If an input uncertainty is unspecified, the result uncertainty is left unspecified.</p><p>Units and uncertainties are converted together, with dimensional consistency checked. Linear propagation may be inadequate near singularities or for large uncertainties and strongly nonlinear expressions.</p></details>
-<p id="calculation-error" class="form-error" role="alert"></p><div class="dialog-actions"><button type="button" id="cancel-calculation">Cancel</button><button type="submit" class="primary">Save calculation</button></div></form></section>
+<section id="calculation-page" class="calculation-page calc" aria-labelledby="calculation-heading" hidden tabindex="-1"><form id="calculation-form" novalidate>
+<header class="calc-head"><div><h2 id="calculation-heading">New calculation</h2><p id="calc-dataset" class="calc-dataset"></p></div><div class="calc-head-actions"><button type="button" id="cancel-calculation">Cancel</button><button type="submit" class="primary" id="save-calculation">Save</button></div></header>
+<div class="calc-bar">
+<input id="calculation-name" class="calc-name" maxlength="120" aria-label="Name" placeholder="Name" autocomplete="off" spellcheck="false">
+<span class="calc-eq" aria-hidden="true">=</span>
+<math-field id="calculation-expression" class="calc-formula" math-virtual-keyboard-policy="manual" aria-label="Formula" placeholder="\text{Click a source below, or type a formula}"></math-field>
+<span class="calc-eq calc-eq-result" aria-hidden="true">=</span>
+<div class="calc-result" aria-live="polite"><div id="calculation-preview" class="calc-value"></div><label class="calc-unit"><span>Unit</span><input id="calculation-unit" maxlength="40" autocomplete="off" spellcheck="false" aria-describedby="calc-unit-hint"></label><span id="calc-unit-hint" class="calc-unit-hint"></span></div>
+</div>
+<p id="calculation-error" class="form-error calc-error" role="alert"></p>
+<div id="bindings" class="calc-symbols" aria-live="polite"></div>
+<div id="calc-rows" class="calc-rows"></div>
+<h3 class="calc-sub">Sources <span>click to insert</span></h3>
+<div id="calculation-sources" class="calc-sources"></div>
+<details class="calc-help"><summary>Typing, units and uncertainty</summary><ul>
+<li>Type a symbol's name to use a source: <code>x</code>, or <code>\tau</code> then Space for τ. A symbol that matches no source asks what it is.</li>
+<li><code>/</code> makes a fraction, <code>^</code> a power, <code>_</code> a subscript, <code>\sqrt</code> a square root. Functions need parentheses: <code>ln(x)</code>, <code>exp(x)</code>, <code>sin(x)</code>. Arrow keys leave a fraction or exponent.</li>
+<li>Units come from the sources. A source without a unit counts as a plain number; give it one under the formula if it has one. The result unit is suggested; type another compatible unit (e.g. <code>nm</code>, <code>mm/s</code>, <code>J/(mol*K)</code>) to convert.</li>
+<li>Uncertainties propagate to first order with numerical derivatives, keeping fit covariance and shared inputs. Separate sources are independent. Rows pair up by position; a single value applies to every row. This can be inaccurate near singularities or with large, strongly nonlinear uncertainties.</li>
+</ul></details>
+</form></section>
 
 </main>
 <footer><span>ROOT-A-TRON 3000</span><span>Powered by CERN ROOT</span></footer>

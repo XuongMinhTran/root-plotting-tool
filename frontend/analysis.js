@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const $=id=>document.getElementById(id), C=AnalysisCore, E=RootEquation;
+const $=id=>document.getElementById(id), C=AnalysisCore, E=RootEquation, A=CalcAssist, Un=AnalysisUnits;
 const S=WorkspaceStore, KEY=S.KEY, clone=v=>JSON.parse(JSON.stringify(v));
 let session=S.empty(), doc=S.projected(session), history=[], view='table', editing=null, dirty=false;
 let saved='', autoSaved=false, restoredDirty=false;
@@ -161,56 +161,115 @@ function parseSource(){
  if(editing){const en=calculationEngine(doc.objects.map(x=>x.id===editing?o:x));for(const id of dependants(editing))en.get(id);}
  return o;
 }
-function sourceOptions(exclude){
- const blocked=exclude?dependants(exclude):new Set();
- return doc.objects.filter(o=>o.id!==exclude&&!blocked.has(o.id)&&sourceDataset(o)?.id===calculationDatasetId).flatMap(o=>C.fields(o).map(f=>{
-  const owner=sourceDataset(o),type=o.kind==='fit'?'Fit parameters':o.kind==='measurements'?'Measurement columns':o.kind==='calculation'?'Calculated quantities':'Entered quantities';
-  const group=(owner?.name||o.name)+' - '+type;
-  const p=o.kind==='fit'?o.parameters[Number(f.key)]:null;
-  const name=p?(/^(?:p)?\d+$/.test(f.name)?'Parameter ['+f.key+']':f.name+' ['+f.key+']'):f.name;
-  const detail=p?fmt(p.value)+' ± '+fmt(p.error)+(f.unit?' '+f.unit:''):
-    o.kind==='measurements'?o.columns[Number(f.key)].values.length+' values'+(f.unit?' · '+f.unit:''):f.unit;
-  return {value:JSON.stringify({id:o.id,key:f.key}),label:group+' / '+name+(f.unit?' ['+f.unit+']':''),name,detail,group,formula:o.kind==='fit'?o.formula:'',unavailable:o.incomplete?'No values available':o.stale?'Refit after changing the data or model':null};
- }));
+// ---- Calculation formula bar -------------------------------------------
+// The page asks for as little as possible: a formula. Each source has a
+// readable symbol (τ, x, N_0), clicking inserts it, typing it links it, the
+// result unit is suggested and single value vs column follows from the inputs.
+let bindings={},previewTimer,calculationDatasetId=null,sources=[],variables=[],picking=null,unitTouched=false,suggestedUnit='',lastRows=0,parsed=null;
+const sameSource=(b,s)=>!!b&&!b.literal&&b.id===s.id&&String(b.key)===String(s.key);
+function fitSymbols(o){
+ if(o.kind!=='fit')return [];
+ const eq=session.inputs.datasets.find(d=>d.id===o.datasetId)?.fit?.equation;
+ return eq?.mode==='equation'&&Array.isArray(eq.parameters)&&eq.parameters.length===o.parameters.length?eq.parameters:[];
+}
+function sourceList(exclude){
+ const blocked=exclude?dependants(exclude):new Set(),taken=new Set(),out=[],rank={measurements:0,fit:1,values:2,calculation:3};
+ const objects=doc.objects.filter(o=>o.id!==exclude&&!blocked.has(o.id)&&!o.incomplete&&sourceDataset(o)?.id===calculationDatasetId).sort((a,b)=>(rank[a.kind]??9)-(rank[b.kind]??9));
+ let engine=null;try{engine=calculationEngine();}catch{}
+ for(const o of objects){
+  const preferred=fitSymbols(o);
+  C.fields(o).forEach((f,i)=>{
+   const p=o.kind==='fit'||o.kind==='values'?o.parameters[Number(f.key)]:null;
+   const symbol=A.symbolFor(f.name,preferred[i],taken);taken.add(symbol);
+   let detail='';
+   if(p)detail=fmt(p.value)+' ± '+fmt(p.error)+(f.unit?' '+f.unit:'');
+   else if(o.kind==='measurements')detail=o.columns[Number(f.key)].values.length+' rows'+(f.unit?' · '+f.unit:'');
+   else{try{const r=engine.get(o.id);detail=r.length===1?resultText(r[0])+(f.unit?' '+f.unit:''):r.length+' rows'+(f.unit?' · '+f.unit:'');}catch{}}
+   out.push({id:o.id,key:String(f.key),symbol,name:o.kind==='fit'&&/^p?\d+$/.test(f.name)?'Parameter ['+f.key+']':f.name,unit:f.unit,detail,
+    group:{measurements:'Columns',fit:'Fit parameters',values:'Quantities',calculation:'Calculated'}[o.kind],
+    index:o.kind==='fit'&&!/^p?\d+$/.test(f.name)?Number(f.key):null,formula:o.kind==='fit'?o.formula:'',stale:o.stale?'Refit first':''});
+  });
+ }
+ return out;
+}
+function symHtml(symbol){const [base,sub]=symbol.split('_');return '<span class="calc-sym">'+esc(E.symbolLabel(base))+(sub?'<sub>'+esc(sub)+'</sub>':'')+'</span>';}
+function chipHtml(s,i,{compact=false,current=false}={}){
+ const plain=s.name===s.symbol||s.name===E.symbolLabel(s.symbol);
+ return `<button type="button" class="calc-chip${current?' is-current':''}" data-source="${i}" ${s.stale?'disabled':''} aria-label="${esc(s.symbol+': '+s.name)}">${symHtml(s.symbol)}<span class="calc-chip-text">${plain?'':'<span class="calc-chip-name">'+esc(s.name)+(s.index!==null?' <small>['+s.index+']</small>':'')+'</span>'}${compact?'':'<small>'+esc(s.stale||s.detail)+'</small>'}</span></button>`;
 }
 function renderCalculationSources(){
- const groups=new Map();
- for(const option of sourceOptions(editing)){if(!groups.has(option.group))groups.set(option.group,[]);groups.get(option.group).push(option);}
- $('calculation-sources').innerHTML=[...groups].map(([name,options])=>'<section class="quantity-group"><h4>'+esc(name)+'</h4>'+(options[0].formula?'<p class="quantity-formula">Fit function: <code>'+esc(options[0].formula)+'</code></p>':'')+'<div class="quantity-buttons">'+options.map(s=>`<button type="button" data-source="${esc(s.value)}" ${s.unavailable?'disabled':''}><strong>${esc(s.name)}</strong><small>${esc(s.unavailable||s.detail)}</small></button>`).join('')+'</div></section>').join('');
+ const groups=new Map();sources.forEach((s,i)=>{if(!groups.has(s.group))groups.set(s.group,[]);groups.get(s.group).push([s,i]);});
+ $('calculation-sources').innerHTML=groups.size?[...groups].map(([name,list])=>'<div class="calc-group"><div class="calc-group-name">'+esc(name)+(list[0][0].formula?' <code title="Fit function">'+esc(list[0][0].formula)+'</code>':'')+'</div><div class="calc-chips">'+list.map(([s,i])=>chipHtml(s,i)).join('')+'</div></div>').join(''):'<p class="note">This dataset has nothing to calculate from yet. Enter its data or run a fit, or type a formula with your own numbers.</p>';
 }
-
-let bindings={},previewTimer,calculationDatasetId=null;
-function readBindings(){
- const result={};
- document.querySelectorAll('[data-binding]').forEach(select=>{
-  const symbol=select.dataset.binding;if(!select.value)return;
-  if(select.value==='literal'){
-   const box=select.closest('.binding-entry'),value=box.querySelector('[data-value]').value,error=box.querySelector('[data-error]').value;
-   result[symbol]={literal:true,value:value.trim()===''?null:Number(value),error:error.trim()===''?null:Number(error),unit:box.querySelector('[data-unit]').value};
-  }else {const source=JSON.parse(select.value),unit=select.closest('.binding-entry').querySelector('[data-source-unit]').value.trim();result[symbol]={...source,unit};}
- });return result;
+function boundSource(b){return b&&!b.literal?sources.find(s=>sameSource(b,s)):null;}
+function fieldUnit(b){const o=doc.objects.find(x=>x.id===b.id);return o?C.fields(o).find(f=>f.key===String(b.key))?.unit||'':'';}
+function unitOf(b){return b.literal?b.unit||'':(fieldUnit(b)||b.unit||'');}
+function renderSymbols(){
+ $('bindings').innerHTML=variables.map(v=>{
+  const b=bindings[v],s=boundSource(b),open=picking===v||!b;
+  let body;
+  if(open){
+   const base=v.split('_')[0],order=sources.map((x,i)=>[x,i]).sort((p,q)=>(q[0].symbol.split('_')[0]===base)-(p[0].symbol.split('_')[0]===base));
+   body=`<span class="calc-ask">${b?'Change to':'What is '+symHtml(v)+'?'}</span><span class="calc-chips calc-chips-inline">${order.map(([x,i])=>chipHtml(x,i,{compact:true,current:sameSource(b,x)})).join('')}<button type="button" class="calc-chip calc-number" data-number="${esc(v)}">A number…</button>${b?'<button type="button" class="calc-link" data-keep>Keep</button>':''}</span>`;
+  }else if(b.literal){
+   body=`<span class="calc-literal"><input data-value="${esc(v)}" inputmode="decimal" aria-label="${esc(E.symbolLabel(v))} value" placeholder="value" value="${esc(b.value??'')}"><span>±</span><input data-error="${esc(v)}" inputmode="decimal" aria-label="${esc(E.symbolLabel(v))} uncertainty" placeholder="0" value="${esc(b.error??'')}"><input data-unit="${esc(v)}" class="calc-literal-unit" aria-label="${esc(E.symbolLabel(v))} unit" placeholder="unit" value="${esc(b.unit||'')}"></span><button type="button" class="calc-link" data-change="${esc(v)}">Change</button>`;
+  }else if(s){
+   const needsUnit=!s.unit;
+   const plain=s.name===v||s.name===E.symbolLabel(v);
+   body=`<span class="calc-what">${plain?'':'<strong>'+esc(s.name)+'</strong>'}<small>${esc([s.group==='Columns'?'column':s.group==='Calculated'?'calculation':'fit parameter'+(s.index!==null?' ['+s.index+']':''),s.detail].filter(Boolean).join(' · '))}</small></span>${needsUnit?`<label class="calc-src-unit">unit <input data-source-unit="${esc(v)}" placeholder="none" value="${esc(b.unit||'')}" aria-label="Unit of ${esc(s.name)}"></label>`:''}<button type="button" class="calc-link" data-change="${esc(v)}">Change</button>`;
+  }else body=`<span class="calc-what"><strong>Missing source</strong><small>It was deleted or refit is needed</small></span><button type="button" class="calc-link" data-change="${esc(v)}">Change</button>`;
+  return `<div class="calc-symbol${open?' is-open':''}${!b?' is-missing':''}" data-symbol="${esc(v)}">${symHtml(v)}${body}</div>`;
+ }).join('');
 }
-function buildBindings(){
- const previous={...bindings,...readBindings()};bindings=previous;
- try{
-  if(!$('calculation-expression').value.trim()){$('bindings').innerHTML='';$('calculation-error').textContent='';$('calculation-preview').textContent='Enter an expression to preview the result.';return;}
-  const expr=E.expression($('calculation-expression').value),options=sourceOptions(editing).filter(s=>!s.unavailable);
-  $('bindings').innerHTML=expr.variables.map(symbol=>{
-   const prior=previous[symbol],label=esc(E.symbolLabel(symbol));
-   const source=doc.objects.find(o=>o.id===prior?.id),sourceUnit=source?C.fields(source).find(f=>f.key===String(prior?.key))?.unit||'':'';
-   return `<div class="binding-entry"><label class="binding"><span>${label}</span><select data-binding="${esc(symbol)}"><option value="">Choose a source…</option><option value="literal" ${prior?.literal?'selected':''}>Enter a value…</option>${options.map(o=>`<option value="${esc(o.value)}" ${JSON.stringify(prior&&{id:prior.id,key:prior.key})===o.value?'selected':''}>${esc(o.label)}</option>`).join('')}</select></label><label class="source-unit-field" ${!prior||prior.literal?'hidden':''}>Source unit<input data-source-unit aria-label="${label} source unit" placeholder="e.g. mm^-1; 1 for dimensionless" value="${esc(sourceUnit||prior?.unit||'')}" ${sourceUnit?'readonly':''}></label><div class="literal-fields" ${prior?.literal?'':'hidden'}><label>Value<input data-value aria-label="${label} value" type="text" inputmode="decimal" value="${esc(prior?.value??'')}"></label><label>Standard uncertainty<input data-error aria-label="${label} standard uncertainty" type="text" inputmode="decimal" value="${esc(prior?.error??'')}"></label><label>Unit<input data-unit aria-label="${label} unit" value="${esc(prior?.unit||'')}"></label><p class="note">Enter 0 for an exact constant. Units are converted automatically; enter 1 for dimensionless quantities.</p></div></div>`;
-  }).join('');
-  $('calculation-error').textContent='';preview();
- }catch(e){$('bindings').innerHTML='';$('calculation-preview').textContent='';$('calculation-error').textContent=e.message.replace(/before fitting/g,'before calculating');}
+function friendly(message){
+ return message.replace(/before fitting/g,'').replace(/in a fit expression/g,'in a formula').replace(/Use ROOT expression mode[^.]*\./g,'').replace(/Assign a source to (.+)\./,'Say what $1 is.').trim();
 }
-function calculation(){
- const b=readBindings();
- for(const [symbol,binding] of Object.entries(b))if(!binding.literal&&sourceDataset(doc.objects.find(o=>o.id===binding.id))?.id!==calculationDatasetId)throw Error('Choose a source from the selected dataset for '+symbol+'.');
- return {id:editing||'preview',kind:'calculation',unitMode:'checked',ownerDatasetId:calculationDatasetId,resultMode:$('calculation-kind').value,name:$('calculation-name').value.trim()||'Calculated quantity',unit:$('calculation-unit').value.trim(),expression:$('calculation-expression').value,bindings:b};
+function draft(unit){
+ const used=Object.fromEntries(variables.filter(v=>bindings[v]).map(v=>{const b=bindings[v];return [v,b.literal?{literal:true,value:b.value,error:b.error??0,unit:b.unit||''}:{id:b.id,key:b.key,...(!fieldUnit(b)&&b.unit?{unit:b.unit}:{})}];}));
+ return {id:editing||'preview',kind:'calculation',unitMode:'checked',ownerDatasetId:calculationDatasetId,resultMode:'quantity',name:$('calculation-name').value.trim()||defaultName(),unit,expression:$('calculation-expression').value,bindings:used};
+}
+function defaultName(){const names=new Set(doc.objects.map(o=>o.name));let n=1;while(names.has('Calculation '+n))n++;return 'Calculation '+n;}
+function evaluate(o){return calculationEngine(doc.objects.filter(x=>x.id!==editing).concat(o)).get(o.id);}
+function showResult(text,{rows=null,error=''}={}){
+ $('calculation-preview').innerHTML=text;$('calculation-error').textContent=error;
+ $('calc-rows').innerHTML=rows||'';
+}
+function refresh(){
+ clearTimeout(previewTimer);
+ const latex=$('calculation-expression').value.trim();parsed=null;
+ document.querySelector('.calc-unit').hidden=!latex;
+ if(!latex){variables=[];renderSymbols();lastRows=0;showResult('<span class="calc-placeholder">result</span>');unitHint();return;}
+ try{parsed=E.expression(latex);}catch(e){showResult('<span class="calc-placeholder">…</span>',{error:friendly(e.message)});return;}
+ variables=parsed.variables;
+ for(const v of variables)if(!bindings[v]){const s=sources.find(x=>x.symbol===v&&!x.stale);if(s)bindings[v]={id:s.id,key:s.key};}
+ if(picking&&!variables.includes(picking))picking=null;
+ renderSymbols();preview();
 }
 function preview(){
- try{const o=calculation(),objects=doc.objects.filter(x=>x.id!==editing).concat(o),result=calculationEngine(objects).get(o.id);$('calculation-preview').innerHTML=result.length===1?esc(resultText(result[0])+' '+o.unit):table(['Row','Value','Standard uncertainty'],result.slice(0,10).map((r,i)=>[i+1,fmt(r.value),fmt(r.uncertainty)]))+'<p class="note">'+result.length+' rows'+(result.length>10?'; showing the first 10':'')+'.</p>';$('calculation-error').textContent='';}
- catch(e){$('calculation-preview').textContent='';$('calculation-error').textContent=e.message.replace(/before fitting/g,'before calculating');}
+ if(!parsed)return;
+ const missing=variables.filter(v=>!bindings[v]);
+ if(missing.length){lastRows=0;showResult('<span class="calc-placeholder">?</span>');$('calculation-error').textContent='';unitHint();return;}
+ const literal=variables.find(v=>bindings[v].literal&&!(bindings[v].value!==null&&bindings[v].value!==''&&Number.isFinite(Number(bindings[v].value))));
+ if(literal){lastRows=0;showResult('<span class="calc-placeholder">?</span>',{error:'Enter a value for '+E.symbolLabel(literal)+'.'});return;}
+ try{
+  const units={},atoms={};
+  for(const v of variables){const text=unitOf(bindings[v]);try{units[v]=Un.parse(text);}catch(e){throw Error(E.symbolLabel(v)+': '+e.message);}atoms[v]=A.unitAtoms(text);}
+  const dim=Un.dimension(parsed.ast,units).dim;
+  const si=evaluate(draft(A.siString(dim))),mags=si.map(r=>Math.abs(r.value)).filter(Number.isFinite).sort((a,b)=>a-b);
+  suggestedUnit=A.suggestUnit(dim,mags[Math.floor(mags.length/2)],A.symbolicUnit(parsed.ast,atoms));
+  if(!unitTouched)$('calculation-unit').value=suggestedUnit;
+  unitHint();
+  const unit=$('calculation-unit').value.trim();let rows;
+  try{rows=evaluate(draft(unit));}catch(e){if(/result unit is incompatible/.test(e.message))throw Error('“'+unit+'” doesn’t fit this result. '+(suggestedUnit?'It can be shown in '+suggestedUnit+' or a compatible unit.':'It is a plain number: leave the unit blank.'));throw e;}
+  lastRows=rows.length;
+  if(rows.length===1)showResult('<span class="calc-num">'+esc(resultText(rows[0]))+'</span>');
+  else showResult('<span class="calc-num">'+rows.length+' values</span><span class="calc-kind">one per row</span>',{rows:table(['Row',unit?'Value ('+unit+')':'Value'],rows.slice(0,5).map((r,i)=>[i+1,resultText(r)]))+(rows.length>5?'<p class="note">First 5 of '+rows.length+' rows.</p>':'')});
+ }catch(e){lastRows=0;showResult('<span class="calc-placeholder">?</span>',{error:friendly(e.message)});}
+}
+function unitHint(){
+ const unit=$('calculation-unit').value.trim(),hint=$('calc-unit-hint');
+ if(unitTouched&&unit!==suggestedUnit&&parsed)hint.innerHTML='<button type="button" class="calc-link" id="calc-unit-reset">Use '+esc(suggestedUnit||'no unit')+'</button>';
+ else hint.textContent=parsed&&!unitTouched?(suggestedUnit?'suggested':'no unit'):'';
 }
 function closeCalculation(){
  clearTimeout(previewTimer);$('calculation-page').hidden=true;
@@ -222,27 +281,58 @@ function calculationDialog(edit=false){
  const owner=sourceDataset(current());
  if(!owner){notify('Select a dataset before creating or editing a calculation.',true);return;}
  calculationDatasetId=owner.id;
- $('calculation-heading').textContent=(edit?'Edit calculation':'Calculate quantity or column')+' - '+owner.name;
- $('calculation-form').querySelector('[type=submit]').textContent=edit?'Save changes':'Save calculation';
- editing=edit?current().id:null;const o=edit?current():null;bindings=clone(o?.bindings||{});
- let mode=o?.resultMode||'quantity';
- if(o&&!o.resultMode){try{if(calculationEngine().get(o.id).length>1)mode='column';}catch{}}
- $('calculation-kind').value=mode;
- $('calculation-name').value=o?.name||'';$('calculation-unit').value=o?.unit||'';
+ editing=edit?current().id:null;const o=edit?current():null;
+ $('calculation-heading').textContent=edit?'Edit '+o.name:'New calculation';
+ $('calc-dataset').textContent='From '+owner.name;
+ $('save-calculation').textContent=edit?'Save changes':'Save';
+ bindings=clone(o?.bindings||{});picking=null;variables=[];suggestedUnit='';
+ $('calculation-name').value=o?.name||'';$('calculation-name').placeholder=defaultName();
+ unitTouched=!!o;$('calculation-unit').value=o?.unit||'';
  $('calculation-expression').setValue(o?.expression||'',{silenceNotifications:true});
- $('bindings').innerHTML='';$('calculation-error').textContent='';$('calculation-preview').textContent='Enter an expression to preview the result.';
- renderCalculationSources();
+ sources=sourceList(editing);renderCalculationSources();
  document.querySelector('.analysis-workspace').hidden=true;document.querySelector('.toolbar').hidden=true;
- $('calculation-page').hidden=false;historyReplace('#calculate');window.scrollTo(0,0);$('calculation-page').focus();if(o)buildBindings();
+ $('calculation-page').hidden=false;historyReplace('#calculate');window.scrollTo(0,0);
+ refresh();
+ requestAnimationFrame(()=>$('calculation-expression').focus());
 }
 $('cancel-calculation').onclick=closeCalculation;
-$('calculation-sources').onclick=e=>{
- const button=e.target.closest('[data-source]');if(!button||button.disabled)return;
- const source=JSON.parse(button.dataset.source);
- let symbol=Object.keys(bindings).find(k=>JSON.stringify(bindings[k])===JSON.stringify(source));
- if(!symbol){let index=1;while(bindings['q_'+index])index++;symbol='q_'+index;bindings[symbol]=source;}
- const field=$('calculation-expression');field.focus();field.insert(symbol.replace(/_(\d+)$/, '_{$1}'));buildBindings();
-};
+function insertSource(s){
+ let symbol=Object.keys(bindings).find(k=>sameSource(bindings[k],s));
+ if(!symbol){
+  symbol=s.symbol;
+  if(bindings[symbol]&&!sameSource(bindings[symbol],s))symbol=A.symbolFor(s.name,null,new Set([...Object.keys(bindings),...variables,...sources.map(x=>x.symbol)]));
+  bindings[symbol]={id:s.id,key:s.key};
+ }
+ const field=$('calculation-expression');field.focus();field.insert(E.symbolLatex(symbol),{selectionMode:'after'});refresh();
+}
+function onCalcClick(e){
+ const chip=e.target.closest('[data-source]'),row=e.target.closest('[data-symbol]');
+ if(chip){
+  const s=sources[Number(chip.dataset.source)];if(!s||chip.disabled)return;
+  if(row){bindings[row.dataset.symbol]={id:s.id,key:s.key};picking=null;renderSymbols();preview();}
+  else insertSource(s);
+  return;
+ }
+ const number=e.target.closest('[data-number]');
+ if(number){const v=number.dataset.number;bindings[v]={literal:true,value:null,error:null,unit:''};picking=null;renderSymbols();preview();$('bindings').querySelector(`[data-value="${CSS.escape(v)}"]`)?.focus();return;}
+ const change=e.target.closest('[data-change]');if(change){picking=change.dataset.change;renderSymbols();return;}
+ if(e.target.closest('[data-keep]')){picking=null;renderSymbols();return;}
+ if(e.target.id==='calc-unit-reset'){unitTouched=false;preview();}
+}
+$('calculation-page').addEventListener('click',onCalcClick);
+// Keep the caret in the formula while clicking a source to insert it.
+$('calculation-sources').addEventListener('mousedown',e=>{if(e.target.closest('[data-source]'))e.preventDefault();});
+$('bindings').addEventListener('input',e=>{
+ const t=e.target,v=t.dataset.value||t.dataset.error||t.dataset.unit||t.dataset.sourceUnit;if(!v||!bindings[v])return;
+ if(t.dataset.value)bindings[v].value=t.value.trim()===''?null:Number(t.value);
+ else if(t.dataset.error)bindings[v].error=t.value.trim()===''?null:Number(t.value);
+ else if(t.dataset.unit)bindings[v].unit=t.value.trim();
+ else bindings[v].unit=t.value.trim();
+ clearTimeout(previewTimer);previewTimer=setTimeout(preview,150);
+});
+$('calculation-unit').addEventListener('input',()=>{unitTouched=$('calculation-unit').value.trim()!=='';clearTimeout(previewTimer);previewTimer=setTimeout(preview,150);});
+$('calculation-unit').addEventListener('blur',()=>{if(!unitTouched){$('calculation-unit').value=suggestedUnit;unitHint();}});
+$('calculation-page').addEventListener('keydown',e=>{if(e.key==='Escape'&&picking){picking=null;renderSymbols();e.stopPropagation();}});
 
 function download(text,name,type='application/json'){const a=document.createElement('a'),url=URL.createObjectURL(new Blob([text],{type}));a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 function example(){const id=uid(),q=uid();return[{id,kind:'fit',name:'Decay fit',origin:'Illustrative fit parameters',formula:'[0]*exp(-x/[1])',parameters:[{name:'Amplitude',value:100,error:4,unit:'counts'},{name:'Lifetime',value:2.4,error:.08,unit:'s'}],covariance:[[16,-.12],[-.12,.0064]]},{id:q,kind:'calculation',name:'Half-life',expression:'t\\ln(2)',unit:'s',bindings:{t:{id,key:'1'}}}];}
@@ -321,8 +411,16 @@ $('source-type').onchange=helpSource;
 $('source-form').onsubmit=e=>{e.preventDefault();try{const o=parseSource();change(()=>{const i=doc.objects.findIndex(x=>x.id===o.id);if(i<0)doc.objects.push(o);else doc.objects[i]=o;doc.selected=o.id;});$('source-dialog').close();}catch(e){$('source-error').textContent=e.message;}};
 $('calculate').onclick=()=>{if(!window.MathfieldElement){notify('The equation editor could not load. Reload the page and try again.',true);return;}calculationDialog();};$('edit-calculation').onclick=()=>calculationDialog(true);
 $('calculation-expression').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();e.stopPropagation();}});
-$('calculation-expression').addEventListener('input',()=>{clearTimeout(previewTimer);previewTimer=setTimeout(buildBindings,180);});$('bindings').onchange=e=>{if(e.target.matches('[data-binding]')){const box=e.target.closest('.binding-entry');box.querySelector('.literal-fields').hidden=e.target.value!=='literal';const field=box.querySelector('.source-unit-field'),input=box.querySelector('[data-source-unit]');field.hidden=!e.target.value||e.target.value==='literal';if(!field.hidden){const b=JSON.parse(e.target.value),source=doc.objects.find(o=>o.id===b.id),unit=C.fields(source).find(f=>f.key===String(b.key))?.unit||'';input.value=unit;input.readOnly=!!unit;}}bindings={...bindings,...readBindings()};preview();};$('bindings').oninput=e=>{if(!e.target.matches('select')){bindings={...bindings,...readBindings()};preview();}};$('calculation-unit').oninput=preview;
-$('calculation-form').onsubmit=e=>{e.preventDefault();clearTimeout(previewTimer);buildBindings();try{const o=calculation();if(!o.name.trim())throw Error('Enter a name.');const en=calculationEngine(doc.objects.filter(x=>x.id!==editing).concat(o));const rows=en.get(o.id);if(o.resultMode==='quantity'&&rows.length>1)throw Error('This expression produces multiple rows. Select Calculated column as the result type.');if(o.resultMode==='column'&&!Object.values(o.bindings).some(b=>!b.literal&&en.get(b.id,b.key).length>1))throw Error('Bind at least one measurement column to calculate a value for each row.');if(!editing)o.id=uid();change(()=>{const i=doc.objects.findIndex(x=>x.id===o.id);if(i<0)doc.objects.push(o);else doc.objects[i]=o;doc.selected=o.id;});closeCalculation();}catch(e){$('calculation-error').textContent=e.message;}};
+$('calculation-expression').addEventListener('input',()=>{clearTimeout(previewTimer);previewTimer=setTimeout(refresh,150);});
+$('calculation-form').onsubmit=e=>{e.preventDefault();refresh();try{
+ if(!$('calculation-expression').value.trim())throw Error('Write a formula first: click a source below or type one.');
+ if(!parsed)throw Error($('calculation-error').textContent||'Check the formula.');
+ const missing=variables.filter(v=>!bindings[v]);if(missing.length)throw Error('Say what '+missing.map(v=>E.symbolLabel(v)).join(', ')+(missing.length>1?' are':' is')+': pick a source or enter a number.');
+ if($('calculation-error').textContent)throw Error($('calculation-error').textContent);
+ const o=draft($('calculation-unit').value.trim());o.name=$('calculation-name').value.trim()||$('calculation-name').placeholder||defaultName();
+ const rows=evaluate(o);o.resultMode=rows.length>1?'column':'quantity';
+ if(!editing)o.id=uid();change(()=>{const i=doc.objects.findIndex(x=>x.id===o.id);if(i<0)doc.objects.push(o);else doc.objects[i]=o;doc.selected=o.id;});closeCalculation();
+}catch(err){$('calculation-error').textContent=friendly(err.message);}};
 $('rename').onclick=async()=>{const o=current(),owner=session.inputs.datasets.find(d=>d.id===o.datasetId),raw=doc.objects.find(x=>x.id===(owner?.derivedFrom||o.datasetId))||o,name=await ask('Rename dataset or quantity','',raw.name,'Rename');if(name?.trim())change(()=>{raw.name=name.trim();});};
 $('delete').onclick=async()=>{
  const o=current(),remove=new Set([o.id]);
