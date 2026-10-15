@@ -142,7 +142,7 @@
       },
       {
         id: 'look', title: 'Starting values: your call',
-        text: `<p>Look at the preview: the dashed curve is the model with the library's generic starting values, and it doesn't follow the data. A fit only finds the best curve <em>near</em> where it starts, so starting values matter.</p><p>Three honest ways to get them. Pick one:</p>`,
+        text: `<p>Look at the preview: the dashed curve is the model with the library's generic starting values, and it doesn't follow the data. A fit only finds the best curve <em>near</em> where it starts, so starting values matter.</p><p>Starting values are <em>guesses</em>, not answers. They only have to be in the right neighbourhood: the fit will move every one of them. Three honest ways to guess. Pick one:</p>`,
         choices: [
           {id: 'adjust', goto: 'adjust-open', label: 'Adjust on the plot', desc: 'Nudge each value until the curve roughly follows the data. The physicist\'s way.'},
           {id: 'ai', goto: 'ai-open', label: 'Ask an AI', desc: 'Copy a ready-made prompt into ChatGPT or Claude and paste its numbers back.'},
@@ -152,19 +152,19 @@
       // --- branch: adjust on the plot ---
       {
         id: 'adjust-open', branch: 'adjust', title: 'Open the controls', target: '#visual-match-open', tick: annotate, leave: unannotate,
-        text: `<p>The preview now has labels A to F on it: those are the features a starting value describes. Press <strong>Adjust on the plot</strong>.</p>`,
+        text: `<p>The preview now has labels A to F on it: those are the features you estimate each starting value from, by eye. Press <strong>Adjust on the plot</strong>.</p>`,
         done: () => $('visual-match-open')?.getAttribute('aria-expanded') === 'true',
         demo: () => $('visual-match-open').click(),
       },
       {
-        id: 'adjust-do', branch: 'adjust', title: 'Make the curve follow the data', live: true, tick: annotate, leave: unannotate,
+        id: 'adjust-do', branch: 'adjust', title: 'Estimate, don\'t calculate', live: true, tick: annotate, leave: unannotate,
         text: () => {
           const g = numbers($('initial-guesses')?.value), f = features();
           const row = (i, label, hint) => `<li class="${TARGETS[i](g[i]) ? 'tut-ok' : ''}">${label} <span>${hint}</span></li>`;
           const peak = f ? Math.round(f.top[1] / 1000) + '000' : 'the tallest peak', sp = f ? f.spacing.toFixed(2) : '0.75';
-          return `<p>A starting value is a number you read off the plot. The letters on the preview show where each one comes from. Type each into its box (or use − / + with a bigger Step) and watch the dashed curve move.</p>
+          return `<p>A starting value is a <strong>rough estimate</strong> you read off the plot by eye. Nothing here needs to be exact: the fit takes it from there. If the tallest peak looks like "about 46 thousand", that is the number. The letters on the preview show where each estimate comes from. Type each into its box (or use − / + with a bigger Step) and watch the dashed curve move.</p>
           <ul class="tut-check">${row(0, 'count_scale ≈ 58000', `A: the tallest peak is about ${peak}; the envelope is a bit taller than any one fringe, so take about 1.3 × that`)}${row(1, 'background ≈ 700', 'B: the floor the pattern falls to far from the centre, below what this plot shows')}${row(2, 'envelope_scale ≈ 1', 'leave it')}${row(3, 'fringe_frequency ≈ 4.1', `C: fringes repeat every ${sp}, and π ÷ ${sp} ≈ ${f ? (Math.PI / f.spacing).toFixed(1) : '4.2'}`)}${row(4, 'envelope_center ≈ 5.5', 'D: the middle of the whole pattern, where the envelope peaks')}${row(5, 'fringe_origin ≈ 5.75', 'E: where the brightest single fringe sits')}${row(6, 'visibility ≈ 0.5', 'F: how deep the dips go between fringes, 0 (no dips) to 1 (down to the floor)')}${row(7, 'visibility_slope ≈ 0', 'leave it')}</ul>
-          <p>Roughly right is enough: the fit does the rest. Each line ticks when its value is close enough.</p>`;
+          <p>Each line ticks when your estimate is in the right neighbourhood, and the bands are wide on purpose: 50000 or 70000 for count_scale is as good as 58000. If the dashed curve is in the same place as the data and wiggles about as often, you're done. The fit sharpens the numbers; you only point it in the right direction.</p>`;
         },
         done: () => { const g = numbers($('initial-guesses')?.value); return g.length === 8 && TARGETS.every((ok, i) => ok(g[i])); },
         next: 'fit',
@@ -196,7 +196,7 @@
       // --- main line resumes ---
       {
         id: 'fit', title: 'Fit', target: '#btn-fit',
-        text: `<p>Press <strong>Fit</strong>. ROOT adjusts all eight values to minimise χ², the weighted distance between the curve and your points.</p>`,
+        text: `<p>Press <strong>Fit</strong>. Now the computer takes over: starting from your estimates, ROOT adjusts all eight values until χ², the weighted distance between curve and points, is as small as it can get. Your guesses are gone; what comes back are the fitted values, each with an uncertainty.</p>`,
         done: () => !!result(),
         demo: () => $('btn-fit').click(),
       },
