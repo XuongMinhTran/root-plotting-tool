@@ -26,7 +26,7 @@
   panel.innerHTML = `<div class="tut-head"><span class="tut-kicker">Tutorial</span><strong class="tut-title">${esc(lesson.title)}</strong><button type="button" class="tut-collapse" aria-expanded="true" title="Hide or show the steps">hide</button></div>
     <ol class="tut-progress" aria-hidden="true"></ol>
     <div class="tut-body"><div class="tut-count"></div><h2 class="tut-step-title"></h2><div class="tut-text"></div><div class="tut-actions"></div><p class="tut-done-note" hidden>✓ Done</p></div>
-    <div class="tut-foot"><button type="button" class="link-btn tut-demo" hidden>Show me</button><button type="button" class="link-btn tut-skip" hidden>Skip this step</button><button type="button" class="link-btn tut-exit">Exit tutorial</button></div>`;
+    <div class="tut-foot"><button type="button" class="link-btn tut-back" hidden>← Back</button><button type="button" class="link-btn tut-demo" hidden>Show me</button><button type="button" class="link-btn tut-skip" hidden>Next →</button><button type="button" class="link-btn tut-exit">Exit tutorial</button></div>`;
   document.body.appendChild(panel);
   document.body.classList.add('with-tutorial');
   const live = document.createElement('div'); live.className = 'sr-only'; live.setAttribute('aria-live', 'polite'); panel.appendChild(live);
@@ -37,7 +37,9 @@
     e.currentTarget.textContent = open ? 'hide' : 'show';
   });
   panel.querySelector('.tut-exit').addEventListener('click', () => exit());
-  panel.querySelector('.tut-skip').addEventListener('click', () => advance(true));
+  // Back and Next move freely through the steps the user can see (the main line plus their chosen branch); checks still tick steps off on their own.
+  panel.querySelector('.tut-skip').addEventListener('click', () => { const step = byId[state.step], next = typeof step.next === 'function' ? step.next(ctx) : step.next || visibleSteps()[visibleSteps().indexOf(step) + 1]?.id; if (next) go(next); });
+  panel.querySelector('.tut-back').addEventListener('click', () => { const list = visibleSteps(), i = list.indexOf(byId[state.step]); if (i > 0) { hold = list[i - 1].id; go(hold); } });
   panel.querySelector('.tut-demo').addEventListener('click', async () => {
     const step = byId[state.step];
     try { await step.demo?.(ctx); } catch (e) { console.warn('tutorial demo', e); }
@@ -93,6 +95,8 @@
       : (step.actions || '');
     panel.querySelector('.tut-demo').hidden = !step.demo;
     panel.querySelector('.tut-skip').hidden = !!step.choices || !!step.final;
+    panel.querySelector('.tut-skip').textContent = state.done.includes(step.id) ? 'Next →' : 'Skip →';
+    panel.querySelector('.tut-back').hidden = at <= 0;
     panel.querySelector('.tut-done-note').hidden = true;
     panel.classList.toggle('is-final', !!step.final);
     highlight(step);
@@ -102,9 +106,10 @@
   function go(stepId) {
     if (!byId[stepId]) return;
     byId[state.step]?.leave?.(ctx);
+    if (hold !== stepId) hold = null;
     state.step = stepId; save(); render();
   }
-  let advancing = false;
+  let advancing = false, hold = null;   // hold: a step reached with Back stays put even though its check already passes
   function advance(skipped) {
     const step = byId[state.step];
     if (!state.done.includes(step.id)) state.done.push(step.id);
@@ -120,6 +125,7 @@
   function tick() {
     if (advancing) return;
     const step = byId[state.step];
+    if (hold === step.id) { panel.querySelector('.tut-done-note').hidden = !state.done.includes(step.id); return; }
     if (!step || step.choices || step.final) return;
     step.tick?.(ctx);
     if (step.live) {   // steps whose text reports progress re-render as the state changes

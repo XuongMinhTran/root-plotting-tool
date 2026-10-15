@@ -30,6 +30,7 @@ body.with-tutorial { --tut-w: 320px; }
 .tut-foot { display: flex; gap: 12px; flex-wrap: wrap; padding: 8px 12px; border-top: 1px solid #c9d6e4; font-size: 13px; }
 .tut-foot .link-btn { padding: 0; min-height: 0; }
 .tut-foot .tut-exit { margin-left: auto; }
+.tut-foot .tut-back { color: #526273; }
 #tutorial-panel.is-collapsed { bottom: auto; }
 #tutorial-panel.is-collapsed .tut-body, #tutorial-panel.is-collapsed .tut-foot { display: none; }
 
