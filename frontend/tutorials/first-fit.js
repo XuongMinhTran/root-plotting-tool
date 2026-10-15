@@ -81,7 +81,7 @@
 
   window.TutorialLessons = window.TutorialLessons || {};
   window.TutorialLessons['first-fit'] = {
-    title: 'Your first fit',
+    title: 'A first fit',
     start(ctx) {
       // Work in a fresh dataset so nothing of the user's is touched.
       if (typeof syncActiveFromColumns !== 'function') return;
@@ -96,13 +96,13 @@
     steps: [
       {
         id: 'welcome', title: 'Get the data',
-        text: `<p>In about five minutes you will take real measurements from a double-slit experiment, fit the physics to them and read off how visible the fringes are.</p>
+        text: `<p>This lesson fits a double-slit interference model to measured detector counts and reads the fringe visibility off the result. It takes about five minutes.</p>
           <p>Download the data. It has three columns: detector position <code>x</code>, counts <code>y</code>, and the uncertainty on each count.</p>`,
         actions: `<a class="tut-download" href="tutorials/double-slit.xlsx" download data-next>Excel file (.xlsx)</a><a class="tut-download" href="tutorials/double-slit.csv" download data-next>CSV file</a>`,
         done: ctx => ctx.flags['welcome:next'],
       },
       {
-        id: 'type', title: 'Say what kind of data it is', target: '#setup-type',
+        id: 'type', title: 'Choose the data type', target: '#setup-type',
         text: `<p>Choose <strong>One variable f(x)</strong>: one measured quantity (counts) that depends on one other (position).</p>`,
         done: () => active().analysis_type === 'xy',
         demo: () => { const s = $('setup-type'); s.value = 'xy'; fire(s, 'change'); },
@@ -134,18 +134,18 @@
         demo: () => $('modern-next').click(),
       },
       {
-        id: 'model', title: 'Choose the physics', target: '#model-library-btn',
+        id: 'model', title: 'Choose the model', target: '#model-library-btn',
         text: `<p>Press <strong>Choose a model…</strong>, open <strong>Waves &amp; optics</strong> and use <strong>Double-slit (linear fringe visibility)</strong>, not the plain double-slit above it.</p>
           <p class="tut-aside">The equation is a single-slit envelope (the sinc²) times the two-slit fringes (the cos). V is the fringe visibility, the thing this experiment measures.</p>`,
         done: modelChosen,
         demo: () => applyFunctionExample([MODEL.formula, MODEL.params, MODEL.guesses, MODEL.symbols].join('|')),
       },
       {
-        id: 'look', title: 'Starting values: your call',
-        text: `<p>Look at the preview: the dashed curve is the model with the library's generic starting values, and it doesn't follow the data. A fit only finds the best curve <em>near</em> where it starts, so starting values matter.</p><p>Starting values are <em>guesses</em>, not answers. They only have to be in the right neighbourhood: the fit will move every one of them. Two honest ways to guess. Pick one:</p>`,
+        id: 'look', title: 'Starting values',
+        text: `<p>In the preview, the dashed curve is the model drawn with the library's generic starting values, and it does not follow the data. A fit finds the best curve <em>near</em> where it starts, so the starting values decide which minimum it reaches.</p><p>Starting values are estimates, not answers. They only have to be in the right neighbourhood: the fit will move every one of them. There are two ways to obtain them; choose one.</p>`,
         choices: [
-          {id: 'adjust', goto: 'adjust-open', label: 'Adjust on the plot', desc: 'Nudge each value until the curve roughly follows the data. The physicist\'s way.'},
-          {id: 'ai', goto: 'ai-open', label: 'Ask an AI', desc: 'Copy a ready-made prompt into ChatGPT or Claude and paste its numbers back.'},
+          {id: 'adjust', goto: 'adjust-open', label: 'Adjust on the plot', desc: 'Set each value by reading it off the plot, until the curve roughly follows the data.'},
+          {id: 'ai', goto: 'ai-open', label: 'Ask an AI', desc: 'Give the data and the equation to a language model and enter the values it suggests.'},
         ],
       },
       // --- branch: adjust on the plot ---
@@ -156,14 +156,14 @@
         demo: () => $('visual-match-open').click(),
       },
       {
-        id: 'adjust-do', branch: 'adjust', title: 'Estimate, don\'t calculate', live: true, tick: annotate, leave: unannotate,
+        id: 'adjust-do', branch: 'adjust', title: 'Estimate each value from the plot', live: true, tick: annotate, leave: unannotate,
         text: () => {
           const g = numbers($('initial-guesses')?.value), f = features();
           const row = (i, label, hint) => `<li class="${TARGETS[i](g[i]) ? 'tut-ok' : ''}">${label} <span>${hint}</span></li>`;
           const peak = f ? Math.round(f.top[1] / 1000) + '000' : 'the tallest peak', sp = f ? f.spacing.toFixed(2) : '0.75';
-          return `<p>A starting value is a <strong>rough estimate</strong> you read off the plot by eye. Nothing here needs to be exact: the fit takes it from there. If the tallest peak looks like "about 46 thousand", that is the number. The letters on the preview show where each estimate comes from. Type each into its box (or use − / + with a bigger Step) and watch the dashed curve move.</p>
+          return `<p>A starting value is a <strong>rough estimate</strong> read off the plot by eye; the fit refines it. If the tallest peak is about 46 thousand, that is the number. The letters on the preview mark where each estimate comes from. Type each value into its box (or step it with − / + and a larger Step) and watch the dashed curve move.</p>
           <ul class="tut-check">${row(0, 'count_scale ≈ 58000', `A: the tallest peak is about ${peak}; the envelope is a bit taller than any one fringe, so take about 1.3 × that`)}${row(1, 'background ≈ 700', 'B: the floor the pattern falls to far from the centre, below what this plot shows')}${row(2, 'envelope_scale ≈ 1', 'leave it')}${row(3, 'fringe_frequency ≈ 4.1', `C: fringes repeat every ${sp}, and π ÷ ${sp} ≈ ${f ? (Math.PI / f.spacing).toFixed(1) : '4.2'}`)}${row(4, 'envelope_center ≈ 5.5', 'D: the middle of the whole pattern, where the envelope peaks')}${row(5, 'fringe_origin ≈ 5.75', 'E: where the brightest single fringe sits')}${row(6, 'visibility ≈ 0.5', 'F: how deep the dips go between fringes, 0 (no dips) to 1 (down to the floor)')}${row(7, 'visibility_slope ≈ 0', 'leave it')}</ul>
-          <p>Each line ticks when your estimate is in the right neighbourhood, and the bands are wide on purpose: 50000 or 70000 for count_scale is as good as 58000. If the dashed curve is in the same place as the data and wiggles about as often, you're done. The fit sharpens the numbers; you only point it in the right direction.</p>`;
+          <p>Each line ticks when the estimate is within a deliberately wide band: 50000 or 70000 for count_scale is as good as 58000. The values are sufficient when the dashed curve lies over the data and oscillates at about the same spacing. The fit determines the precise numbers; the estimates only start it in the right valley of χ².</p>`;
         },
         done: () => { const g = numbers($('initial-guesses')?.value); return g.length === 8 && TARGETS.every((ok, i) => ok(g[i])); },
         next: 'fit',
@@ -171,16 +171,16 @@
       },
       // --- branch: ask an AI ---
       {
-        id: 'ai-open', branch: 'ai', title: 'Ask uncle ChatGPT', target: '#ask-ai-starting-values',
-        text: `<p>Press <strong>Ask AI for starting values</strong>. The dialog builds a prompt that contains your data and the equation.</p>`,
+        id: 'ai-open', branch: 'ai', title: 'Generate the prompt', target: '#ask-ai-starting-values',
+        text: `<p>Press <strong>Ask AI for starting values</strong>. The dialog assembles a prompt containing the data, the equation and the parameter names.</p>`,
         enter: ctx => { ctx.flags.aiSeen = false; },
         done: ctx => { if ($('ai-starting-dialog')?.open) ctx.flags.aiSeen = true; return ctx.flags.aiSeen; },
         demo: () => $('ask-ai-starting-values')?.click(),
       },
       {
-        id: 'ai-use', branch: 'ai', title: 'Bring the numbers back', target: '#initial-guesses', noScroll: true,
-        text: `<p>Copy the prompt, paste it into ChatGPT or Claude, and ask for the eight starting values. Back here, press <strong>Go to manual entry</strong> and paste the numbers into <strong>Initial guesses</strong>, comma-separated, in the order shown.</p>
-          <p class="tut-aside">Nothing is sent anywhere by this tool. And an AI can be wrong: check the dashed curve before you fit.</p>`,
+        id: 'ai-use', branch: 'ai', title: 'Enter the suggested values', target: '#initial-guesses', noScroll: true,
+        text: `<p>Copy the prompt into a language model of your choice and ask for the eight starting values. Then press <strong>Go to manual entry</strong> and paste them into <strong>Initial guesses</strong>, comma-separated, in the order shown.</p>
+          <p class="tut-aside">The tool itself transmits nothing. A language model's values are estimates of unknown quality: confirm that the dashed curve follows the data before fitting.</p>`,
         done: guessesChanged, next: 'fit',
         demo: () => { const el = $('initial-guesses'); el.value = GOOD; fire(el); fire(el, 'change'); },
       },
@@ -196,21 +196,21 @@
         text: () => {
           const r = result();
           if (!r) return '<p>Run the fit to see the result here.</p>';
-          if (r.converged === false) return `<p>The fit did not converge: from these starting values ROOT could not find a minimum. That happens, and it is why the starting values mattered.</p><p><button type="button" class="link-btn" data-goto="look">Try another way to get starting values</button></p>`;
+          if (r.converged === false) return `<p>The fit did not converge: from these starting values Minuit did not reach a minimum. This is the usual failure mode of a nonlinear fit, and the reason the starting values matter.</p><p><button type="button" class="link-btn" data-goto="look">Choose starting values again</button></p>`;
           const p = Object.fromEntries((r.params || []).map(q => [q.name, q]));
           const V = p.visibility, chi = r.chi2_ndf != null ? Number(r.chi2_ndf) : (r.chi2 && r.ndf ? r.chi2 / r.ndf : null);
           return `<p>Converged. ${V ? `Fringe visibility <strong>V = ${fmt(V.value)} ± ${fmt(V.error)}</strong>.` : ''} The uncertainty comes from how sharply χ² rises when V moves away from its best value.</p>
-            <p>χ²/NDF = <strong>${chi != null ? fmt(chi) : '?'}</strong>. Is that a good fit?</p>
-            <button type="button" class="tut-reveal" data-reveal>Show answer</button><div class="tut-answer" hidden><p>Near 1 means the scatter of the points about the curve matches their error bars. ${chi != null && chi > 1.2 ? `${fmt(chi)} is a little high: the points scatter more than their error bars say, so either the uncertainties are slightly underestimated or the model is missing a small effect. Still a perfectly usable fit.` : 'This is a good fit.'}</p></div>
-            <p><button type="button" class="button-like" data-next>Got it</button></p>`;
+            <p>χ²/NDF = <strong>${chi != null ? fmt(chi) : '?'}</strong>. Is the fit acceptable?</p>
+            <button type="button" class="tut-reveal" data-reveal>Show answer</button><div class="tut-answer" hidden><p>Near 1 means the scatter of the points about the curve matches their error bars. ${chi != null && chi > 1.2 ? `${fmt(chi)} is a little high: the points scatter more than their error bars say, so either the uncertainties are slightly underestimated or the model is missing a small effect. The fit is usable; the discrepancy should be noted.` : 'The model and the stated uncertainties are consistent with the data.'}</p></div>
+            <p><button type="button" class="button-like" data-next>Continue</button></p>`;
         },
         done: ctx => ctx.flags['read:next'],
       },
       {
-        id: 'done', title: 'That\'s a fit', final: true,
-        text: `<p>You rebuilt the double-slit example from raw data: data in, physics chosen, starting values, fit, result.</p>
-          <p>From here: press <strong>Save</strong> to keep the analysis as a file, or try one of the other ways to get starting values. <button type="button" class="link-btn" data-goto="look">Back to the choice</button> · <button type="button" class="link-btn" data-restart>Start over</button></p>
-          <p><a href="tutorials.html">More tutorials</a></p>`,
+        id: 'done', title: 'Finished', final: true,
+        text: `<p>The double-slit example has been rebuilt from raw data: data entry, model, starting values, fit, result.</p>
+          <p>Press <strong>Save</strong> to keep the analysis as a session file, or repeat the starting-value step by the other method. <button type="button" class="link-btn" data-goto="look">Starting values</button> · <button type="button" class="link-btn" data-restart>Start over</button></p>
+          <p><a href="tutorials.html">Other tutorials</a></p>`,
       },
     ],
   };
