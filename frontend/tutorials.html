@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Hands-on tutorials for ROOT-A-TRON 3000: fit real data step by step inside the app.">
+  <title>Tutorials · ROOT-A-TRON 3000</title>
+  <link rel="stylesheet" href="home.css?v=20261015-tutorials">
+  <link rel="stylesheet" href="site-brand.css?v=1">
+  <link rel="stylesheet" href="documentation.css?v=4">
+  <style>
+    .tut-hub { display: grid; gap: 14px; margin-top: 20px; max-width: 720px; }
+    .tut-card { position: relative; padding-right: 110px; }
+    .tut-card .tut-time { position: absolute; right: 18px; top: 18px; font-size: 13px; color: #526273; }
+    .tut-card .tut-state { position: absolute; right: 18px; bottom: 16px; font-size: 12px; font-weight: 600; color: #23613d; }
+    .tut-card.is-soon { opacity: .6; pointer-events: none; }
+    .tut-how { max-width: 720px; color: #3a4553; }
+  </style>
+<link rel="icon" href="favicon.ico?v=1" sizes="any"><link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png?v=1"><link rel="apple-touch-icon" href="apple-touch-icon.png?v=1">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to tutorials</a>
+<header class="site-header"><a class="site-name" href="index.html">ROOT-A-TRON 3000</a><nav aria-label="Main"><a href="index.html">Home</a><a href="documentation.html">Documentation</a></nav></header>
+<main id="main" class="documentation-page" tabindex="-1">
+<h1>Tutorials</h1>
+<p class="tut-how">Each tutorial runs inside the real app on real data. A panel at the side tells you the next step and ticks it off when you have done it. Stuck? Every step has a <strong>Show me</strong> that does it for you. You can leave and pick up where you stopped.</p>
+<div class="tut-hub">
+  <a class="doc-card tut-card" href="modern.html?tutorial=first-fit" data-lesson="first-fit"><h2>Your first fit</h2><p>Download real double-slit data, paste it in, choose the physics, get starting values your way, fit, and read the fringe visibility off the result.</p><span class="tut-time">≈ 5 min</span><span class="tut-state"></span></a>
+  <a class="doc-card tut-card is-soon" href="#" aria-disabled="true"><h2>Uncertainties</h2><p>Per point, constant or none; what an x uncertainty does to a fit; reading χ²/NDF.</p><span class="tut-time">Soon</span></a>
+  <a class="doc-card tut-card is-soon" href="#" aria-disabled="true"><h2>When a fit won't converge</h2><p>Fit ranges, point exclusions, brute force, and knowing when the model is wrong.</p><span class="tut-time">Soon</span></a>
+  <a class="doc-card tut-card is-soon" href="#" aria-disabled="true"><h2>From fit to answer</h2><p>Take a fitted parameter into Analyze Data and calculate a physical quantity with its uncertainty.</p><span class="tut-time">Soon</span></a>
+</div>
+<p><a class="doc-back" href="index.html">← Home</a></p>
+</main>
+<footer class="site-footer"><span>ROOT-A-TRON 3000 <span class="divider">/</span> Minh Tran · 2026</span><span>Powered by CERN ROOT</span></footer>
+<script>
+  for (const card of document.querySelectorAll('[data-lesson]')) {
+    try {
+      const s = JSON.parse(localStorage.getItem('rootfit.tutorial.' + card.dataset.lesson) || 'null');
+      if (s?.done?.includes('read')) card.querySelector('.tut-state').textContent = 'Completed';
+      else if (s?.done?.length) card.querySelector('.tut-state').textContent = 'In progress';
+    } catch {}
+  }
+</script>
+</body>
+</html>

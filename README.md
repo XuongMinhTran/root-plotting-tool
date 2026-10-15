@@ -186,6 +186,8 @@ predicted counts. **Count histogram** is available under **or load an example**,
 
 **Double slit** (also `examples/double-slit.json`) fits the library model "Double-slit (linear fringe visibility)" to 174 detector counts with a fit range of 3.65–7.6, the central fringes. Expected χ²/NDF ≈ 97.8/72.
 
+**Tutorials** (`tutorials.html`, the Tutorials button on the home page) run inside Make a Plot: `modern.html?tutorial=first-fit` docks a panel of steps that tick off as the app's state shows them done, with a "Show me" on every step. Lessons are data in `frontend/tutorials/*.js`; `tutorial.js` runs them. The first lesson rebuilds the double-slit example from `frontend/tutorials/double-slit.xlsx` / `.csv` (the 80 fitted points) and branches on how to get starting values: adjust on the plot, ask an AI, or brute force.
+
 The separate `POST /histogram` endpoint accepts a `histogram` object with
 `source: "samples"`, `samples`, `bins`, optional `range` and `edges`, or
 `source: "counts"`, `counts` and `edges`. Set `method` to `poisson` or `chi2`.
