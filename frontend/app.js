@@ -2364,6 +2364,8 @@ function handleWorkspaceKeydown(ev) {
   if (ev.key !== 'Enter' || ev.altKey || ev.shiftKey) return;
   // Keep native activation and multiline editing; Ctrl/Cmd+Enter remains available.
   if (!modified && ev.target?.closest?.('textarea, select, button, a, summary, [contenteditable], [role="button"], .menu-title')) return;
+  // Enter inside the adjust-on-the-plot boxes commits that value; it should not launch a fit halfway through tuning. Ctrl/Cmd+Enter still fits.
+  if (!modified && ev.target?.closest?.('#visual-adjustments')) { ev.target.blur?.(); return; }
   const fit = $('btn-fit');
   if (!fit || fit.disabled || fit.hidden) return;
   ev.preventDefault();

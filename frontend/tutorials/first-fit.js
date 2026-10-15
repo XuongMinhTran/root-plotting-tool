@@ -11,6 +11,9 @@
     symbols: 'N0, N_bg, k_a, k_d, x_1, x_0, V, V_1',
   };
   const GOOD = '58000, 700, 1.0, 4.13, 5.5, 5.75, 0.55, 0.03';
+  // "Close enough" for each starting value: wide bands, since the fit does the rest.
+  const between = (lo, hi) => v => Number.isFinite(v) && v >= lo && v <= hi;
+  const TARGETS = [between(30000, 90000), between(0, 3000), between(0.5, 2), between(3.6, 4.6), between(5.2, 5.8), between(5.4, 6.1), between(0.2, 0.9), between(-0.3, 0.3)];
   const norm = f => String(f || '').replace(/\s+/g, '');
   const numbers = text => (String(text || '').match(/-?\d+(?:\.\d+)?(?:e[-+]?\d+)?/gi) || []).map(Number);
   const active = () => (typeof datasets !== 'undefined' && datasets[activeIdx]) || {};
@@ -104,12 +107,15 @@
         demo: () => $('visual-match-open').click(),
       },
       {
-        id: 'adjust-do', branch: 'adjust', title: 'Make the curve follow the data', target: '#visual-parameters', noScroll: true,
-        text: `<p>Read the plot: the pattern is centred near <em>x</em> ≈ 5.5, peaks around 45&thinsp;000 counts, and the fringes repeat about every 0.75. Try, in this order:</p>
-          <ul><li>envelope_center and fringe_origin ≈ 5.5 (where the pattern is centred)</li><li>count_scale ≈ 58000, background ≈ 700 (height and floor)</li><li>fringe_frequency ≈ 4.1 (fringe spacing), envelope_scale ≈ 1 (envelope width)</li><li>visibility ≈ 0.5, visibility_slope ≈ 0</li></ul>
-          <p class="tut-aside">Use ×10 to make the step bigger for the large numbers. Values and Step accept scientific notation.</p>
-          <p>Roughly right is good enough: the fit does the rest.</p>`,
-        done: guessesChanged, next: 'fit',
+        id: 'adjust-do', branch: 'adjust', title: 'Make the curve follow the data', live: true,
+        text: () => {
+          const g = numbers($('initial-guesses')?.value), row = (i, label, hint) => `<li class="${TARGETS[i](g[i]) ? 'tut-ok' : ''}">${label} <span>${hint}</span></li>`;
+          return `<p>For each value, type a number in its box (or use − / + with a bigger Step). Watch the dashed curve move. Read these off the plot:</p>
+          <ul class="tut-check">${row(0, 'count_scale ≈ 58000', 'about 1.3 × the tallest peak')}${row(1, 'background ≈ 700', 'the floor between fringes')}${row(2, 'envelope_scale ≈ 1', 'leave it')}${row(3, 'fringe_frequency ≈ 4.1', 'π ÷ fringe spacing of 0.75')}${row(4, 'envelope_center ≈ 5.5', 'middle of the whole pattern')}${row(5, 'fringe_origin ≈ 5.75', 'position of the brightest fringe')}${row(6, 'visibility ≈ 0.5', 'how deep the dips are, 0 to 1')}${row(7, 'visibility_slope ≈ 0', 'leave it')}</ul>
+          <p>Roughly right is enough: the fit does the rest. Each line ticks when its value is close enough.</p>`;
+        },
+        done: () => { const g = numbers($('initial-guesses')?.value); return g.length === 8 && TARGETS.every((ok, i) => ok(g[i])); },
+        next: 'fit',
         demo: () => { const el = $('initial-guesses'); el.value = GOOD; fire(el); fire(el, 'change'); },
       },
       // --- branch: ask an AI ---

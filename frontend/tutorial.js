@@ -119,6 +119,10 @@
     if (advancing) return;
     const step = byId[state.step];
     if (!step || step.choices || step.final) return;
+    if (step.live) {   // steps whose text reports progress re-render as the state changes
+      const html = typeof step.text === 'function' ? step.text(ctx) : step.text, box = panel.querySelector('.tut-text');
+      if (box.innerHTML !== html) box.innerHTML = html;
+    }
     let ok = false;
     try { ok = !!step.done?.(ctx); } catch {}
     if (ok) advance(false);
