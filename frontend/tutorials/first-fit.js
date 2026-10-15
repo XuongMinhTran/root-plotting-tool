@@ -23,6 +23,56 @@
   const guessesChanged = () => { const g = numbers($('initial-guesses')?.value); return g.length === 8 && g.join() !== numbers(MODEL.guesses).join(); };
   const fire = (el, type = 'input') => el && el.dispatchEvent(new Event(type, {bubbles: true}));
   const fmt = v => Number(v).toPrecision(4).replace(/\.?0+$/, '');
+  // ---- labels drawn on the starting-curve preview, so "a guess" is something you can see ----
+  // The preview is an SVG (viewBox 624x244) drawn by fit-model.js; this reproduces its data-to-pixel mapping.
+  function features() {
+    const xs = numbers($('col-x')?.value), ys = numbers($('col-y')?.value);
+    if (xs.length < 10 || xs.length !== ys.length) return null;
+    const lo = $('fit-xmin')?.value.trim(), hi = $('fit-xmax')?.value.trim();
+    const low = lo ? Number(lo) : Math.min(...xs), high = hi ? Number(hi) : Math.max(...xs);
+    const pts = xs.map((x, i) => [x, ys[i]]).filter(p => p[0] >= low && p[0] <= high);
+    const yv = pts.map(p => p[1]), y0 = Math.min(...yv), y1 = Math.max(...yv), span = (y1 - y0) || 1, ymin = y0 - span * .08, ymax = y1 + span * .08;
+    const sx = x => 52 + (x - low) / (high - low) * 544, sy = y => 210 - (y - ymin) / (ymax - ymin) * 184;
+    const peaks = [], dips = [];
+    for (let i = 3; i < pts.length - 3; i++) {
+      const w = pts.slice(i - 3, i + 4).map(p => p[1]);
+      if (pts[i][1] === Math.max(...w) && w.filter(v => v === pts[i][1]).length === 1) peaks.push(pts[i]);
+      if (pts[i][1] === Math.min(...w) && w.filter(v => v === pts[i][1]).length === 1) dips.push(pts[i]);
+    }
+    if (peaks.length < 2) return null;
+    const top = peaks.reduce((a, b) => b[1] > a[1] ? b : a);
+    const i = peaks.indexOf(top), next = peaks[i + 1] || peaks[i - 1];
+    const dip = dips.filter(d => (d[0] - top[0]) * (d[0] - next[0]) < 0)[0];
+    const big = peaks.filter(p => p[1] > top[1] * .4);
+    const centre = big.reduce((s, p) => s + p[0] * p[1], 0) / big.reduce((s, p) => s + p[1], 0);
+    return {sx, sy, low, high, ymin, top, next, dip, centre, spacing: Math.abs(next[0] - top[0])};
+  }
+  const LABEL = (x, y, text, anchor = 'start') => `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" font-size="11" font-weight="600" fill="#7a2e0e" text-anchor="${anchor}" paint-order="stroke" stroke="#fff" stroke-width="3">${text}</text>`;
+  function annotate() {
+    const svg = $('guess-preview')?.querySelector('svg');
+    if (!svg || svg.querySelector('#tut-annot')) return;
+    const f = features(); if (!f) return;
+    const {sx, sy, top, next, dip, centre, spacing} = f, c = '#b3410f';
+    const X = sx(top[0]), Y = sy(top[1]);
+    let g = `<g id="tut-annot" font-family="inherit">`;
+    // A: tallest peak -> count_scale (label to the left of the peak, inside the plot)
+    g += `<line x1="${X - 6}" y1="${Y}" x2="${X - 40}" y2="${Y}" stroke="${c}" stroke-width="1.5"/>` + LABEL(X - 44, Y + 4, `A tallest peak ≈ ${Math.round(top[1] / 1000)}k`, 'end');
+    // B: background = the floor far from the centre, below what this plot shows
+    g += `<line x1="52" y1="208" x2="596" y2="208" stroke="${c}" stroke-width="1.5" stroke-dasharray="4 3"/>` + LABEL(592, 204, 'B floor is far below', 'end');
+    // C: fringe spacing bracket along the top, between the tallest peak and its neighbour
+    const x2 = sx(next[0]);
+    g += `<path d="M${X} 36 V30 H${x2} V36" fill="none" stroke="${c}" stroke-width="1.5"/>` + LABEL((X + x2) / 2, 46, `C spacing ${spacing.toFixed(2)}`, 'middle');
+    // D: middle of the whole pattern
+    const xc = sx(centre);
+    g += `<line x1="${xc}" y1="24" x2="${xc}" y2="210" stroke="${c}" stroke-width="1.5" stroke-dasharray="6 4"/>` + LABEL(xc - 4, 60, `D middle ≈ ${centre.toFixed(1)}`, 'end');
+    // E: brightest fringe position
+    g += `<line x1="${X}" y1="${Y + 6}" x2="${X}" y2="210" stroke="${c}" stroke-width="1" stroke-dasharray="2 3"/>` + LABEL(X + 4, 200, `E brightest at ${top[0].toFixed(2)}`);
+    // F: visibility = how deep the dip is between two fringes
+    if (dip) { const xd = sx(dip[0]); g += `<path d="M${xd} ${sy(dip[1])} V${sy((top[1] + next[1]) / 2)}" stroke="${c}" stroke-width="1.5"/><path d="M${xd - 4} ${sy(dip[1])} h8 M${xd - 4} ${sy((top[1] + next[1]) / 2)} h8" stroke="${c}" stroke-width="1.5"/>` + LABEL(xd + 6, (sy(dip[1]) + sy((top[1] + next[1]) / 2)) / 2, 'F dip depth'); }
+    g += '</g>';
+    svg.insertAdjacentHTML('beforeend', g);
+  }
+  const unannotate = () => $('guess-preview')?.querySelector('#tut-annot')?.remove();
   let csvText = null;
   async function csv() {
     if (csvText) return csvText;
@@ -101,17 +151,19 @@
       },
       // --- branch: adjust on the plot ---
       {
-        id: 'adjust-open', branch: 'adjust', title: 'Open the controls', target: '#visual-match-open',
-        text: `<p>Press <strong>Adjust on the plot</strong>.</p>`,
+        id: 'adjust-open', branch: 'adjust', title: 'Open the controls', target: '#visual-match-open', tick: annotate, leave: unannotate,
+        text: `<p>The preview now has labels A to F on it: those are the features a starting value describes. Press <strong>Adjust on the plot</strong>.</p>`,
         done: () => $('visual-match-open')?.getAttribute('aria-expanded') === 'true',
         demo: () => $('visual-match-open').click(),
       },
       {
-        id: 'adjust-do', branch: 'adjust', title: 'Make the curve follow the data', live: true,
+        id: 'adjust-do', branch: 'adjust', title: 'Make the curve follow the data', live: true, tick: annotate, leave: unannotate,
         text: () => {
-          const g = numbers($('initial-guesses')?.value), row = (i, label, hint) => `<li class="${TARGETS[i](g[i]) ? 'tut-ok' : ''}">${label} <span>${hint}</span></li>`;
-          return `<p>For each value, type a number in its box (or use − / + with a bigger Step). Watch the dashed curve move. Read these off the plot:</p>
-          <ul class="tut-check">${row(0, 'count_scale ≈ 58000', 'about 1.3 × the tallest peak')}${row(1, 'background ≈ 700', 'the floor between fringes')}${row(2, 'envelope_scale ≈ 1', 'leave it')}${row(3, 'fringe_frequency ≈ 4.1', 'π ÷ fringe spacing of 0.75')}${row(4, 'envelope_center ≈ 5.5', 'middle of the whole pattern')}${row(5, 'fringe_origin ≈ 5.75', 'position of the brightest fringe')}${row(6, 'visibility ≈ 0.5', 'how deep the dips are, 0 to 1')}${row(7, 'visibility_slope ≈ 0', 'leave it')}</ul>
+          const g = numbers($('initial-guesses')?.value), f = features();
+          const row = (i, label, hint) => `<li class="${TARGETS[i](g[i]) ? 'tut-ok' : ''}">${label} <span>${hint}</span></li>`;
+          const peak = f ? Math.round(f.top[1] / 1000) + '000' : 'the tallest peak', sp = f ? f.spacing.toFixed(2) : '0.75';
+          return `<p>A starting value is a number you read off the plot. The letters on the preview show where each one comes from. Type each into its box (or use − / + with a bigger Step) and watch the dashed curve move.</p>
+          <ul class="tut-check">${row(0, 'count_scale ≈ 58000', `A: the tallest peak is about ${peak}; the envelope is a bit taller than any one fringe, so take about 1.3 × that`)}${row(1, 'background ≈ 700', 'B: the floor the pattern falls to far from the centre, below what this plot shows')}${row(2, 'envelope_scale ≈ 1', 'leave it')}${row(3, 'fringe_frequency ≈ 4.1', `C: fringes repeat every ${sp}, and π ÷ ${sp} ≈ ${f ? (Math.PI / f.spacing).toFixed(1) : '4.2'}`)}${row(4, 'envelope_center ≈ 5.5', 'D: the middle of the whole pattern, where the envelope peaks')}${row(5, 'fringe_origin ≈ 5.75', 'E: where the brightest single fringe sits')}${row(6, 'visibility ≈ 0.5', 'F: how deep the dips go between fringes, 0 (no dips) to 1 (down to the floor)')}${row(7, 'visibility_slope ≈ 0', 'leave it')}</ul>
           <p>Roughly right is enough: the fit does the rest. Each line ticks when its value is close enough.</p>`;
         },
         done: () => { const g = numbers($('initial-guesses')?.value); return g.length === 8 && TARGETS.every((ok, i) => ok(g[i])); },
