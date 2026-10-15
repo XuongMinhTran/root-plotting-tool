@@ -23,7 +23,7 @@
   const panel = document.createElement('aside');
   panel.id = 'tutorial-panel';
   panel.setAttribute('aria-label', 'Tutorial');
-  panel.innerHTML = `<div class="tut-head"><span class="tut-kicker">Tutorial</span><strong class="tut-title">${esc(lesson.title)}</strong><button type="button" class="tut-collapse" aria-expanded="true" title="Hide or show the steps">—</button></div>
+  panel.innerHTML = `<div class="tut-head"><span class="tut-kicker">Tutorial</span><strong class="tut-title">${esc(lesson.title)}</strong><button type="button" class="tut-collapse" aria-expanded="true" title="Hide or show the steps">hide</button></div>
     <ol class="tut-progress" aria-hidden="true"></ol>
     <div class="tut-body"><div class="tut-count"></div><h2 class="tut-step-title"></h2><div class="tut-text"></div><div class="tut-actions"></div><p class="tut-done-note" hidden>✓ Done</p></div>
     <div class="tut-foot"><button type="button" class="link-btn tut-demo" hidden>Show me</button><button type="button" class="link-btn tut-skip" hidden>Skip this step</button><button type="button" class="link-btn tut-exit">Exit tutorial</button></div>`;
@@ -34,7 +34,7 @@
   panel.querySelector('.tut-collapse').addEventListener('click', e => {
     const open = panel.classList.toggle('is-collapsed') === false;
     e.currentTarget.setAttribute('aria-expanded', String(open));
-    e.currentTarget.textContent = open ? '—' : '+';
+    e.currentTarget.textContent = open ? 'hide' : 'show';
   });
   panel.querySelector('.tut-exit').addEventListener('click', () => exit());
   panel.querySelector('.tut-skip').addEventListener('click', () => advance(true));

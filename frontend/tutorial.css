@@ -1,44 +1,40 @@
-/* Tutorial panel docked beside Make a Plot. */
-body.with-tutorial { --tut-w: 340px; }
-@media (min-width: 981px) { body.with-tutorial .workspace { width: min(var(--page), calc(100% - var(--tut-w) - 72px)); margin-right: calc(var(--tut-w) + 24px); } }
-#tutorial-panel { position: fixed; right: 12px; top: 72px; bottom: 12px; width: var(--tut-w); display: flex; flex-direction: column; background: #fff; border: 1px solid #c9d6e4; border-radius: 8px; box-shadow: 0 6px 24px rgba(31, 62, 96, .12); z-index: 30; font-size: 14.5px; line-height: 1.5; overflow: hidden; }
-.tut-head { display: grid; grid-template-columns: 1fr auto; grid-template-rows: auto auto; padding: 12px 14px 8px; border-bottom: 1px solid #e3e9f0; background: #f7f9fc; }
-.tut-kicker { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: #5a3d99; font-weight: 700; }
-.tut-title { grid-row: 2; font-size: 16px; }
-.tut-collapse { grid-row: 1 / span 2; align-self: start; border: 0; background: none; min-height: 0; padding: 2px 8px; font-size: 18px; color: #526273; cursor: pointer; }
-.tut-progress { display: flex; gap: 4px; list-style: none; margin: 0; padding: 10px 14px 0; }
-.tut-progress li { flex: 1; height: 4px; border-radius: 2px; background: #e3e9f0; }
-.tut-progress li.is-done { background: #23613d; }
-.tut-progress li.is-current { background: #346295; }
-.tut-body { flex: 1; overflow: auto; padding: 10px 14px 14px; }
-.tut-count { font-size: 12px; color: #7a8794; }
-.tut-step-title { font-size: 18px; margin: 2px 0 8px; }
-.tut-text p { margin: 0 0 10px; } .tut-text ul { margin: 0 0 10px; padding-left: 20px; } .tut-text li { margin: 2px 0; }
-.tut-text code { background: #f1f4f8; padding: 1px 5px; border-radius: 3px; font-size: 13px; }
-.tut-aside { color: #526273; font-size: 13.5px; border-left: 3px solid #e3e9f0; padding-left: 10px; }
-.tut-actions { display: grid; gap: 8px; margin-top: 4px; }
-.tut-download { display: block; padding: 9px 12px; border: 1px solid #bcdac8; background: #eaf4ee; color: #23613d; font-weight: 600; border-radius: 6px; text-decoration: none; text-align: center; }
-.tut-download:hover { background: #dcece2; }
-.tut-choice { display: grid; gap: 2px; text-align: left; padding: 10px 12px; border: 1px solid #c9d6e4; border-radius: 6px; background: #fff; min-height: 0; }
-.tut-choice:hover { border-color: #346295; background: #eef4fb; }
-.tut-choice strong { font-size: 15px; } .tut-choice span { font-size: 13px; color: #526273; }
-.tut-reveal, .button-like { padding: 7px 12px; border: 1px solid #c9d6e4; border-radius: 6px; background: #fff; min-height: 0; font-weight: 600; }
-.tut-answer { background: #fbf8ef; border: 1px solid #e9dcbe; border-radius: 6px; padding: 8px 12px; margin: 8px 0; }
-.tut-done-note { color: #23613d; font-weight: 700; margin: 6px 0 0; }
-.tut-foot { display: flex; gap: 12px; flex-wrap: wrap; padding: 8px 14px; border-top: 1px solid #e3e9f0; font-size: 13px; }
-.tut-foot .link-btn { padding: 2px 0; min-height: 0; }
-.tut-foot .tut-demo { color: #5a3d99; font-weight: 600; }
-.tut-foot .tut-exit { margin-left: auto; color: #7a8794; }
+/* Tutorial panel docked beside Make a Plot. Plain on purpose: it should look
+ * like a note pinned next to the worksheet, not a product tour. */
+body.with-tutorial { --tut-w: 320px; }
+@media (min-width: 981px) { body.with-tutorial .workspace { width: min(var(--page), calc(100% - var(--tut-w) - 56px)); margin-right: calc(var(--tut-w) + 16px); } }
+#tutorial-panel { position: fixed; right: 8px; top: 68px; bottom: 8px; width: var(--tut-w); display: flex; flex-direction: column; background: #fff; border: 1px solid #c9d6e4; z-index: 30; font-size: 14px; line-height: 1.45; overflow: hidden; }
+.tut-head { display: flex; align-items: baseline; gap: 8px; padding: 8px 12px; border-bottom: 1px solid #c9d6e4; background: #f1f4f8; }
+.tut-kicker { font-size: 12px; color: #526273; }
+.tut-kicker::after { content: ":"; }
+.tut-title { font-size: 14px; }
+.tut-collapse { margin-left: auto; border: 1px solid #c9d6e4; background: #fff; min-height: 0; padding: 0 8px; font-size: 13px; line-height: 20px; color: #343434; cursor: pointer; border-radius: 0; }
+.tut-progress { display: none; }
+.tut-body { flex: 1; overflow: auto; padding: 10px 12px 12px; }
+.tut-count { font-size: 12px; color: #526273; }
+.tut-step-title { font-size: 16px; font-weight: 600; margin: 0 0 6px; }
+.tut-text p { margin: 0 0 8px; } .tut-text ul { margin: 0 0 8px; padding-left: 18px; } .tut-text li { margin: 1px 0; }
+.tut-text code { background: #f1f4f8; padding: 0 4px; font-size: 13px; }
+.tut-aside { color: #526273; font-size: 13px; }
+.tut-aside::before { content: "Note: "; font-weight: 600; }
+.tut-actions { display: grid; gap: 6px; margin-top: 4px; }
+.tut-download { display: block; padding: 6px 10px; border: 1px solid #c9d6e4; background: #fff; color: #346295; text-decoration: underline; }
+.tut-download:hover { background: #f1f4f8; }
+.tut-choice { display: block; text-align: left; padding: 7px 10px; border: 1px solid #c9d6e4; background: #fff; min-height: 0; border-radius: 0; }
+.tut-choice:hover { background: #f1f4f8; }
+.tut-choice strong { display: block; font-size: 14px; } .tut-choice span { font-size: 13px; color: #526273; }
+.tut-reveal, .button-like { padding: 5px 10px; border: 1px solid #c9d6e4; background: #fff; min-height: 0; border-radius: 0; }
+.tut-answer { border-left: 3px solid #c9d6e4; padding: 2px 0 2px 10px; margin: 6px 0; }
+.tut-done-note { color: #23613d; font-weight: 600; margin: 4px 0 0; }
+.tut-foot { display: flex; gap: 12px; flex-wrap: wrap; padding: 8px 12px; border-top: 1px solid #c9d6e4; font-size: 13px; }
+.tut-foot .link-btn { padding: 0; min-height: 0; }
+.tut-foot .tut-exit { margin-left: auto; }
 #tutorial-panel.is-collapsed { bottom: auto; }
-#tutorial-panel.is-collapsed .tut-progress, #tutorial-panel.is-collapsed .tut-body, #tutorial-panel.is-collapsed .tut-foot { display: none; }
-#tutorial-panel.is-final .tut-body { background: #f5fbf7; }
+#tutorial-panel.is-collapsed .tut-body, #tutorial-panel.is-collapsed .tut-foot { display: none; }
 
-.tutorial-target { outline: 3px solid #7c5cc9 !important; outline-offset: 3px; border-radius: 4px; animation: tut-pulse 1.6s ease-in-out infinite; }
-@keyframes tut-pulse { 0%, 100% { outline-color: #7c5cc9; } 50% { outline-color: #d5c9ee; } }
-@media (prefers-reduced-motion: reduce) { .tutorial-target { animation: none; } }
+.tutorial-target { outline: 2px dashed #346295 !important; outline-offset: 2px; }
 
 @media (max-width: 980px) {
-  #tutorial-panel { right: 0; left: 0; top: auto; bottom: 0; width: auto; max-height: 46vh; border-radius: 10px 10px 0 0; }
+  #tutorial-panel { right: 0; left: 0; top: auto; bottom: 0; width: auto; max-height: 46vh; border-width: 1px 0 0; }
   body.with-tutorial { padding-bottom: 46vh; }
-  #tutorial-panel.is-collapsed { max-height: none; } body.with-tutorial:has(#tutorial-panel.is-collapsed) { padding-bottom: 60px; }
+  #tutorial-panel.is-collapsed { max-height: none; } body.with-tutorial:has(#tutorial-panel.is-collapsed) { padding-bottom: 48px; }
 }
