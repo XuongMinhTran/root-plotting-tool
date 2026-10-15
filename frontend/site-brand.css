@@ -36,3 +36,11 @@
 @media (max-width: 480px) {
   .masthead nav a, .masthead nav button { padding: 0 6px; font-size: 12px; }
 }
+/* Narrow screens: let the bar wrap to two rows rather than squeeze the brand. The
+ * Make a Plot masthead keeps its own compact single-row rules in modern.css. */
+@media (max-width: 600px) {
+  .masthead:not(.workspace-masthead) { position: static; height: auto; min-height: 0; flex-wrap: wrap; padding: 4px 12px 0; }
+  .masthead:not(.workspace-masthead) .brand { padding: 8px 2px; }
+  .masthead:not(.workspace-masthead) nav { margin-left: 0; width: 100%; height: auto; flex-wrap: wrap; }
+  .masthead:not(.workspace-masthead) nav a, .masthead:not(.workspace-masthead) nav button { padding: 8px 8px 10px; font-size: 13px; display: flex; }
+}
