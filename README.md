@@ -184,6 +184,8 @@ method and results. CSV reports include a bin table with counts, density and
 predicted counts. **Count histogram** is available under **or load an example**, and as
 `examples/04-count-histogram.json`.
 
+**Double slit** (also `examples/double-slit.json`) fits the library model "Double-slit (linear fringe visibility)" to 174 detector counts with a fit range of 3.65–7.6, the central fringes. Expected χ²/NDF ≈ 97.8/72.
+
 The separate `POST /histogram` endpoint accepts a `histogram` object with
 `source: "samples"`, `samples`, `bins`, optional `range` and `edges`, or
 `source: "counts"`, `counts` and `edges`. Set `method` to `poisson` or `chi2`.
