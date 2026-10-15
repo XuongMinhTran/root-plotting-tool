@@ -58,9 +58,9 @@ body.modern .parameter-help-icon{ display:inline-flex; align-items:center; justi
 .starting-values-notes { margin-top:10px; }
 .starting-values-notes li { font-size:13px; line-height:1.5; }
 #starting-values-error { color:#a53030; }
-body.modern :is(#visual-match-open, #starting-values-manual), #starting-values-manual) { background:#fff; color:#285987; border:1px solid #8caac7; font-weight:600; padding:10px 16px; }
+body.modern :is(#visual-match-open, #starting-values-manual) { background:#fff; color:#285987; border:1px solid #8caac7; font-weight:600; padding:10px 16px; }
 body.modern #visual-match-open.primary{ background:#245b92; color:#fff; border-color:#245b92; }
-body.modern :is(#visual-match-open, #starting-values-manual):disabled, #starting-values-manual):disabled { opacity:.55; }
+body.modern :is(#visual-match-open, #starting-values-manual):disabled { opacity:.55; }
 .visual-mode-label { display:flex; align-items:center; flex-wrap:wrap; gap:10px; font-weight:600; }
 body.modern #visual-adjust-mode{ width:auto; min-width:150px; }
 body.modern #visual-adjustments input[type="text"] { min-height:36px; padding:6px 8px; font-size:14px; }

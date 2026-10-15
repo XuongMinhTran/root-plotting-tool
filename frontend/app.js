@@ -2309,18 +2309,48 @@ EXAMPLES.histogram = {"version": 1, "title": "Count histogram", "notes": "A coun
 
 EXAMPLES.multivariate = {"title": "Beam profile (R²→R surface)", "notes": "A 2-D Gaussian beam profile measured on a 7×7 grid (49 points): counts vs position (x0, x1), an R²→R fit. Poisson √N uncertainties on the counts. Model A·exp(−((x0−x0c)²+(x1−y0c)²)/(2σ²)) + background. Expected near A≈98, centre (0.38, −0.33), σ≈1.53, background≈4.8, χ²/NDF≈0.66. The fit draws the fitted surface over the measured points; edit a guess to see the fit move.", "inputs": {"datasets": [{"name": "Beam profile", "analysis_type": "multivariate", "x": "", "y": "", "ex": "", "ey": "", "mv": {"n": 2, "m": 1, "inNames": ["x0", "x1"], "inVals": ["-4\n-2.667\n-1.333\n0\n1.333\n2.667\n4\n-4\n-2.667\n-1.333\n0\n1.333\n2.667\n4\n-4\n-2.667\n-1.333\n0\n1.333\n2.667\n4\n-4\n-2.667\n-1.333\n0\n1.333\n2.667\n4\n-4\n-2.667\n-1.333\n0\n1.333\n2.667\n4\n-4\n-2.667\n-1.333\n0\n1.333\n2.667\n4\n-4\n-2.667\n-1.333\n0\n1.333\n2.667\n4", "-4\n-4\n-4\n-4\n-4\n-4\n-4\n-2.667\n-2.667\n-2.667\n-2.667\n-2.667\n-2.667\n-2.667\n-1.333\n-1.333\n-1.333\n-1.333\n-1.333\n-1.333\n-1.333\n0\n0\n0\n0\n0\n0\n0\n1.333\n1.333\n1.333\n1.333\n1.333\n1.333\n1.333\n2.667\n2.667\n2.667\n2.667\n2.667\n2.667\n2.667\n4\n4\n4\n4\n4\n4\n4"], "inErr": ["", ""], "outNames": ["counts"], "outVals": ["6\n7\n9\n13\n10\n5\n8\n8\n8\n28\n29\n30\n23\n9\n4\n16\n48\n78\n69\n27\n9\n7\n15\n59\n92\n93\n37\n9\n6\n10\n42\n52\n55\n23\n10\n6\n6\n13\n22\n16\n6\n3\n4\n10\n9\n5\n10\n5\n4"], "outErr": ["2.45\n2.65\n3\n3.61\n3.16\n2.24\n2.83\n2.83\n2.83\n5.29\n5.39\n5.48\n4.8\n3\n2\n4\n6.93\n8.83\n8.31\n5.2\n3\n2.65\n3.87\n7.68\n9.59\n9.64\n6.08\n3\n2.45\n3.16\n6.48\n7.21\n7.42\n4.8\n3.16\n2.45\n2.45\n3.61\n4.69\n4\n2.45\n1.73\n2\n3.16\n3\n2.24\n3.16\n2.24\n2"], "models": ["[0]*exp(-((x0-[1])*(x0-[1])+(x1-[2])*(x1-[2]))/(2*[3]*[3])) + [4]"], "parNames": "A, x0, y0, sigma, background", "parGuesses": "80, 0, 0, 2, 5"}}], "active": 0, "graph_title": "Beam profile", "x_title": "x0", "y_title": "x1", "options": {"grid": true}}};
 
+/** Examples are added as a new dataset next to the user's own, and selected.
+ *  Only an empty workspace takes the example's title, notes and plot labels. */
 async function loadExample(key) {
   const ex = EXAMPLES[key];
   if (!ex) return;
-  const proceed = await askDialog({title:'Load example dataset',
-    message:'Loading this example will replace the current datasets, fit settings, and results. Save your analysis first if you want to keep it.',
-    accept:'Continue', cancel:'Cancel', destructive:true});
-  if (!proceed) return;
-  applyDocument({ revision:workspaceDocument?.revision || null, version: DOC_VERSION, title: ex.title, notes: ex.notes, inputs: ex.inputs, results: null });
-  documentCreated = null;
-  restoredUnsavedChanges = true;
-  showMessage('info', `Loaded the example "${ex.title}". Press Fit.`);
+  syncActiveFromColumns();
+  const empty = datasets.every(d => !d.analysis_type && !d.derivedFrom && !d.result
+    && !parseColumn(d.x).values.length && !parseColumn(d.y).values.length);
+  if (empty) {
+    applyDocument({ revision:workspaceDocument?.revision || null, version: DOC_VERSION, title: ex.title, notes: ex.notes, inputs: ex.inputs, results: null });
+    documentCreated = null;
+    restoredUnsavedChanges = true;
+    showMessage('info', `Loaded the example "${ex.title}". Press Fit.`);
+    autosave();
+    return;
+  }
+  const inputs = ex.inputs;
+  const legacyFit = {formula:inputs.formula ?? '', param_names:inputs.param_names ?? '', initial_guesses:inputs.initial_guesses ?? '', x_min:'', x_max:''};
+  const added = (inputs.datasets || []).map(source => {
+    const d = JSON.parse(JSON.stringify(source));
+    let name = d.name || ex.title, n = 2;
+    while (datasets.some(other => other.name === name)) name = `${d.name || ex.title} (${n++})`;
+    return {
+      ...d, id: window.WorkspaceStore?.id(), name,
+      analysis_type: ['histogram', 'multivariate'].includes(d.analysis_type) ? d.analysis_type : 'xy',
+      fit: normalizeFitSettings(d.fit && typeof d.fit === 'object' ? d.fit : legacyFit),
+      histogram: d.histogram && typeof d.histogram === 'object' ? d.histogram : {},
+      x: String(d.x || ''), y: String(d.y || ''), ex: String(d.ex || ''), ey: String(d.ey || ''), result: null,
+    };
+  });
+  if (!added.length) return;
+  // An untouched placeholder (no type, no data) gives way to the example.
+  if (datasets.length === 1 && !datasets[0].analysis_type && !parseColumn(datasets[0].x).values.length && !parseColumn(datasets[0].y).values.length) datasets = [];
+  datasets.push(...added);
+  activeIdx = datasets.length - added.length;
+  // Plot labels belong to the whole analysis: fill them only where they are blank.
+  for (const [id, value] of [['graph-title', inputs.graph_title], ['x-title', inputs.x_title], ['y-title', inputs.y_title]]) {
+    if (value && !$(id).value.trim()) $(id).value = value;
+  }
+  showActiveInColumns();
   autosave();
+  showMessage('info', `Added the example "${ex.title}" as a new dataset, ${added[0].name}. Your other datasets are unchanged.`);
 }
 
 function handleWorkspaceKeydown(ev) {

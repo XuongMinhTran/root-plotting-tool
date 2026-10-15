@@ -346,15 +346,32 @@ $('save').onclick=async()=>{
   saved=snapshot(complete);restoredDirty=false;persist();notify('Complete session saved or download requested: '+filename);
  }catch(e){if(e.name!=='AbortError')notify('The file could not be saved: '+e.message,true);}
 };
-$('open').onclick=()=>$('file').click();$('file').onchange=async()=>{
- const file=$('file').files[0];if(!file)return;
+$('open').onclick=()=>$('file').click();$('file').onchange=()=>openSessionFile($('file').files[0]);
+// Opening and dropping a saved session share one path, including its confirmation.
+async function openSessionFile(file){
+ if(!file)return;
  try{
   if(file.size>50e6)throw Error('Choose a session file smaller than 50 MB.');
   const incoming=S.materialize(S.normalize(JSON.parse(await file.text())));
   if(doc.objects.length&&!await ask('Open session','Replace the current datasets, fits, and calculations in all workspaces? Save first if you want to keep them.'))return;
   history.push(clone(session));incoming.revision=S.read(localStorage).revision;session=incoming;doc=S.projected(session);saved=snapshot();restoredDirty=false;persist();render();notify('Loaded the complete session. It is also available in Make a Plot.');
  }catch(e){notify(e.message,true);}finally{$('file').value='';}
-};
+}
+// Drag a saved .json session anywhere onto the page to open it.
+{
+ let depth=0;const overlay=$('drop-overlay');
+ const hasFiles=ev=>!!ev.dataTransfer&&[...ev.dataTransfer.types].includes('Files');
+ document.addEventListener('dragenter',ev=>{if(!hasFiles(ev)||document.querySelector('dialog[open]'))return;ev.preventDefault();depth++;overlay.hidden=false;});
+ document.addEventListener('dragover',ev=>{if(!overlay.hidden)ev.preventDefault();});
+ document.addEventListener('dragleave',()=>{depth=Math.max(0,depth-1);if(!depth)overlay.hidden=true;});
+ document.addEventListener('drop',ev=>{
+  if(overlay.hidden)return;
+  ev.preventDefault();depth=0;overlay.hidden=true;
+  const file=ev.dataTransfer.files[0];
+  if(file&&!/\.json$/i.test(file.name)&&file.type!=='application/json'){notify('Drop a saved analysis (.json) to open it. To add measurements, use Insert data.',true);return;}
+  openSessionFile(file);
+ });
+}
 $('export-analysis').onclick=()=>{persist();if(autoSaved)AnalysisExport.open(session);};
 $('export').onclick=()=>{try{const o=current(),cols=dataFor(o),n=Math.max(...cols.map(c=>c.rows.length));const quote=x=>'"'+String(x??'').replace(/"/g,'""')+'"';const rows=[cols.flatMap(c=>[c.name+(c.unit?' ['+c.unit+']':''),'u('+c.name+')']),...Array.from({length:n},(_,i)=>cols.flatMap(c=>[c.rows[i]?.value,c.rows[i]?.uncertainty]))];download(rows.map(r=>r.map(quote).join(',')).join('\n'),o.name.replace(/[^\w -]/g,'_')+'.csv','text/csv');}catch(e){notify(e.message,true);}};
 document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>$(b.dataset.close).close());

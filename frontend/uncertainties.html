@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Analyze Data · ROOT-A-TRON 3000</title>
-<link rel="stylesheet" href="analysis.css?v=20260920-parity">
+<link rel="stylesheet" href="analysis.css?v=20261015-drop">
 <link rel="stylesheet" href="multivariate.css?v=1">
 <script defer src="vendor/mathlive/mathlive.min.js"></script>
 <script defer src="equation-parser.js?v=20260919-units"></script>
-<script defer src="units.js?v=1"></script><script defer src="analysis-core.js?v=20260919-units"></script><script defer src="workspace-store.js?v=1"></script><script defer src="multivariate.js?v=1"></script><script defer src="insert-data.js?v=20260920-types"></script><script defer src="analysis.js?v=20260920-measure"></script>
+<script defer src="units.js?v=1"></script><script defer src="analysis-core.js?v=20260919-units"></script><script defer src="workspace-store.js?v=1"></script><script defer src="multivariate.js?v=1"></script><script defer src="insert-data.js?v=20260920-types"></script><script defer src="analysis.js?v=20261015-drop"></script>
 <link rel="stylesheet" href="site-brand.css?v=1">
 <link rel="stylesheet" href="analysis-features.css?v=20260919-export">
 <script defer src="analysis-export.js?v=20260919-pdf"></script>
@@ -43,6 +43,7 @@
 </main>
 <footer><span>ROOT-A-TRON 3000</span><span>Powered by CERN ROOT</span></footer>
 <input id="file" type="file" accept=".json,application/json" hidden>
+<div id="drop-overlay" class="drop-overlay" hidden><div>Drop a saved analysis (.json) to open it</div></div>
 <dialog id="source-dialog" aria-labelledby="source-heading"><form id="source-form"><h2 id="source-heading">Add data</h2>
 <label>Name<input id="source-name" required maxlength="120"></label>
 <label>Data type<select id="source-type"><option value="measurements">Measurement columns</option><option value="values">Quantities with uncertainties</option></select></label>

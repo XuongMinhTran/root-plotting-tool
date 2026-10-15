@@ -71,3 +71,7 @@ table.grid td.rowdel{width:34px;text-align:center}
 .table-body .table-fit-settings legend{font-size:13px;font-weight:600;padding:0 6px}
 .table-body .table-fit-settings .ins-hist-row{grid-template-columns:1fr 1fr}
 @media(max-width:640px){.table-body .ins-hist-row{grid-template-columns:1fr}}
+
+/* Dropping a saved session onto the page */
+.drop-overlay { position:fixed; inset:0; z-index:60; display:grid; place-items:center; pointer-events:none; background:rgba(234,240,247,.9); border:3px dashed #346295; color:#346295; font-size:19px; font-weight:600; }
+.drop-overlay[hidden] { display:none; }

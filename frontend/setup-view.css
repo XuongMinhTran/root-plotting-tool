@@ -57,7 +57,6 @@ body.modern .pop-menu button:disabled { color: #a6aeb6; background: none; }
 
 /* ============================================================ setup step */
 
-body.modern.on-setup { background: #f4f6f8; }
 .workspace:has(#step-data:not([hidden])) { max-width: var(--page); }
 .setup-page { margin-bottom: 8px; }
 
@@ -66,7 +65,7 @@ body.modern.on-setup { background: #f4f6f8; }
   gap: 24px; align-items: start;
 }
 .setup-layout.is-stacked { grid-template-columns: minmax(0, 1fr); }
-.setup-layout .card { border: 1px solid #e1e6ec; border-radius: 8px; margin: 0; box-shadow: 0 1px 2px rgba(20, 40, 70, .04); }
+.setup-layout .card { margin: 0; }   /* same card style as Fit model and Results */
 .setup-card { padding: 26px 30px 24px; min-width: 0; }
 
 .setup-card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
@@ -210,7 +209,6 @@ body.modern .setup-preview-note { margin: 10px 0 0; font-size: 13.5px; color: va
 .setup-status { flex: 1; min-width: 0; font-size: 14.5px; color: var(--ink-soft); }
 .setup-status.has-issue { color: #9a4b00; }
 .fit-bar #modern-next { margin-left: auto; }
-body.modern.on-setup .fit-bar { padding: 16px 0; }
 
 @media (max-width: 760px) {
   .worksheet-head { gap: 6px 12px; margin-bottom: 18px; }
@@ -235,3 +233,18 @@ body.modern.on-setup .fit-bar { padding: 16px 0; }
   body.modern.on-setup .fit-bar { flex-wrap: nowrap; }
   body.modern.on-setup .fit-bar #modern-next { padding: 10px 16px; font-size: 14px; }
 }
+
+/* ============================================================ action colours
+ * One meaning per colour, used sparingly: green keeps your work, amber changes
+ * what gets fitted, light blue is a secondary fit action, violet is AI, red
+ * stops or deletes. Everything else stays neutral; solid blue stays primary. */
+body.modern :is(#btn-save, .fit-bar-save) { background: #eaf4ee; color: #23613d; border-color: #bcdac8; font-weight: 600; }
+body.modern :is(#btn-save, .fit-bar-save):hover:not(:disabled) { background: #dcede3; border-color: #9fcab1; }
+body.modern #point-exclusions { background: #fbf2e6; color: #7a4a05; border-color: #e9cfa3; font-weight: 600; }
+body.modern #point-exclusions:hover:not(:disabled) { background: #f6e6cf; border-color: #d9b47a; }
+body.modern .fit-bar .brute-force-fit { background: #eaf2fb; }
+body.modern .fit-bar .brute-force-fit:hover:not(:disabled) { background: #dce9f8; }
+body.modern #ask-ai-starting-values { background: #f3effb; color: #5a3d99; border: 1px solid #d5c9ee; font-weight: 600; }
+body.modern #ask-ai-starting-values:hover:not(:disabled) { background: #e9e1f8; border-color: #bfaee6; }
+body.modern #starting-values-stop { background: #fbeceb; color: #a3231b; border-color: #f1d2ce; font-weight: 600; }
+body.modern #starting-values-stop:hover:not(:disabled) { background: #f6dcd9; border-color: #e8bdb8; }
