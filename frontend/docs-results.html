@@ -3,32 +3,53 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Convergence, chi-square, residuals and pulls, and excluding points.">
-  <title>Reading the results · ROOT-A-TRON 3000</title>
+  <meta name="description" content="Reading the fit report: convergence status, parameter uncertainties from the covariance matrix, chi-square and NDF, p-value, residuals and pulls, correlations, confidence bands, and point exclusions.">
+  <title>The fit report · ROOT-A-TRON 3000</title>
   <link rel="stylesheet" href="home.css?v=20260917-primary-tools">
-  <link rel="stylesheet" href="site-brand.css?v=1">
-  <link rel="stylesheet" href="documentation.css?v=4">
+  <link rel="stylesheet" href="site-brand.css?v=20261015-masthead">
+  <link rel="stylesheet" href="documentation.css?v=20261015-rewrite">
 <link rel="icon" href="favicon.ico?v=1" sizes="any"><link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png?v=1"><link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png?v=1"><link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=1"><link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?v=1"><link rel="apple-touch-icon" href="apple-touch-icon.png?v=1">
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to documentation</a>
-<header class="site-header"><a class="site-name" href="index.html">ROOT-A-TRON 3000</a><nav aria-label="Main"><a href="index.html">Home</a><a href="documentation.html">Documentation</a></nav></header>
+<header class="masthead"><a class="brand" href="index.html"><span class="brand-text"><span class="brand-name">ROOT-A-TRON 3000</span></span></a><nav aria-label="Main"><a href="modern.html">Make a Plot</a><a href="uncertainties.html">Analyze Data</a><a href="tutorials.html">Tutorials</a><a href="documentation.html" aria-current="page">Documentation</a><a href="index.html">Home</a></nav></header>
 <main id="main" class="documentation-page" tabindex="-1">
-<p class="doc-crumb"><a href="documentation.html">Documentation</a> › Reading the results</p><h1>Reading the results</h1>
-<p>After a fit, the report shows the convergence status, the fitted parameters with uncertainties, and goodness-of-fit statistics. Convergence means the fitting procedure met its stopping conditions; it does not by itself establish that the model describes the experiment adequately.</p>
+<p class="doc-crumb"><a href="documentation.html">Documentation</a> › The fit report</p>
+<h1>The fit report</h1>
+<p>The Results step shows the plot with the fitted curve, and the report: the convergence status, each parameter with its uncertainty, the goodness-of-fit statistics, and optional diagnostics. Each part answers a different question, and none of them answers all of them.</p>
+
+<h2>Convergence status</h2>
+<p>The status is Minuit's own verdict on the minimisation, reported verbatim. <em>Fit converged</em> (status 0) means the minimiser met its stopping conditions and the covariance matrix is accurate. The others return numbers that should not be used as they stand: <em>covariance matrix was made positive-definite</em> (1) means the uncertainties are approximate; <em>Hesse matrix is invalid</em> (2) means they are not reliable at all; <em>estimated distance to minimum is above the limit</em> (3) and <em>maximum number of function calls</em> (4) mean the fit stopped before reaching a minimum. The usual causes are starting values far from the answer, a parameter the data cannot determine (see correlations below), or a model that cannot describe the data. Convergence says the procedure finished; it says nothing about whether the model is right. That is what the statistics and diagnostics are for.</p>
+
 <h2>Parameters and uncertainties</h2>
-<p>Each parameter is reported with its standard uncertainty from the fit's covariance matrix. Quote a result to a precision consistent with its uncertainty - usually one or two significant figures on the uncertainty, with the value rounded to the same decimal place.</p>
-<h2>χ², NDF, and χ²/NDF</h2>
-<p>χ² measures the total squared mismatch between data and model in units of the measurement uncertainties. NDF (degrees of freedom) is the number of fitted points minus the number of free parameters. Their ratio, χ²/NDF, is near 1 when the model fits the data to within the stated error bars. A value much greater than 1 suggests the model is wrong or the uncertainties are underestimated; much less than 1 suggests the uncertainties are overestimated. The <strong>p-value</strong> is the probability of a χ² this large or larger if the model were correct.</p>
-<p class="hint-note">A reduced χ² near 1 is consistent with a good fit but does not prove the model; a poor value is informative but should be read together with the residuals. Reduced χ² alone cannot classify a fit as good or bad.</p>
+<p>Each parameter is reported with its standard uncertainty, the square root of the corresponding diagonal element of the covariance matrix. Minuit obtains the covariance from the second derivatives of χ² at the minimum (the Hesse matrix), inverted: this is the uncertainty for which χ² rises by one when that parameter is moved away from its best value and all the others are re-optimised. It is a 68% interval under the usual assumptions (Gaussian errors, a model that is approximately linear near the minimum). With no Y uncertainties supplied, the fit assumes σ = 1 for every point and the reported parameter uncertainties inherit that assumption; they are then only meaningful if your data really do scatter by about one unit.</p>
+<p>Quote a result to a precision consistent with its uncertainty: one or two significant figures on the uncertainty, and the value rounded to the same decimal place. 2.4 ± 0.08 s, not 2.3871 ± 0.0813 s.</p>
+
+<h2>χ², NDF and the p-value</h2>
+<p>χ² at the minimum is the sum over fitted points of (residual / uncertainty)². <strong>NDF</strong>, the number of degrees of freedom, is the number of fitted points minus the number of free parameters. If the model is correct and the uncertainties are right, each point contributes about 1 on average, so χ² ≈ NDF and the reduced chi-square <strong>χ²/NDF</strong> is near 1; more precisely, χ² is then distributed as a chi-square variable with NDF degrees of freedom, which has mean NDF and standard deviation √(2·NDF). The <strong>p-value</strong> is the probability that a correct model would give a χ² at least this large.</p>
+<ul>
+<li>χ²/NDF ≫ 1 (p ≈ 0): the points scatter about the curve more than their error bars allow. Either the model is missing something, or the uncertainties are underestimated. The residuals tell which: a trend means the model, random excess means the uncertainties.</li>
+<li>χ²/NDF ≪ 1 (p ≈ 1): the points sit closer to the curve than their error bars say they should. The uncertainties are overestimated, or the data have been smoothed, or the model has enough free parameters to follow noise.</li>
+<li>χ²/NDF ≈ 1: consistent with the model and the stated uncertainties. This does not prove the model; it means the data cannot distinguish it from the truth at this precision.</li>
+</ul>
+<p>How far from 1 is "far" depends on NDF: with 5 degrees of freedom a χ²/NDF of 1.6 is unremarkable (p ≈ 0.15); with 500 it is decisive. Read the p-value rather than the ratio alone. For a histogram fitted by Poisson likelihood, the report gives the deviance in place of χ², which behaves the same way at high counts, and no p-value.</p>
+
 <h2>Residuals and pulls</h2>
-<p>Optional diagnostic plots appear below the main plot: <strong>residuals</strong> (data − fit), <strong>pulls</strong> (residual ÷ uncertainty), the <strong>data/fit ratio</strong>, the <strong>percentage difference</strong>, and a <strong>histogram of residuals</strong>. For a good fit the pulls scatter like a standard normal - roughly two-thirds within ±1 and very few beyond ±3 - with no trend across X. A bow or wave in the residuals is the clearest sign of a wrong model.</p>
-<h2>Correlations and the confidence band</h2>
-<p>The parameter correlation matrix shows how strongly the fitted parameters trade off against one another; large correlations mean the data do not determine those parameters separately. An optional pointwise <strong>confidence band</strong> (68%, 95%, or 99%) shows the uncertainty in the fitted curve from the parameter covariance. It is not a prediction interval for new measurements.</p>
-<h2>Excluding points</h2>
-<p>Use <strong>Point exclusions…</strong> to remove specific measurements from an XY fit without deleting them - for a known bad reading, detector saturation, or a point outside the regime your model describes. Select rows (Shift-click for a range), mark them excluded, and optionally record a reason. Excluded points appear as open grey markers, are omitted from the fit and diagnostics, and their reasons are saved and exported. The original values remain in your data. To restrict a fit to a range instead of individual points, set a fit range under the parameter table.</p>
-<h2>If a fit fails or looks wrong</h2>
-<p>Check the parameter order, signs, units, and the function definition first, then try other physically reasonable starting values. If very different guesses reach the same curve and parameters, the result is numerically stable; if they reach different solutions, compare the fit statistic and residuals and consider whether your measured range can distinguish them. Large uncertainties or strong correlations indicate information missing from the data - changing the guesses cannot supply it. Do not adjust measurement uncertainties merely to make a fit look acceptable.</p><p><a class="doc-back" href="documentation.html">← All documentation</a></p>
+<p>Optional panels under the plot show, for each point, the <strong>residual</strong> (data − fit), the <strong>pull</strong> (residual ÷ its effective uncertainty), the <strong>data/fit ratio</strong>, the <strong>percentage difference</strong>, or a <strong>histogram of the residuals</strong>. These are the most informative part of the report. For a correct model with correct uncertainties the pulls are a sample from a standard normal distribution: scattered about zero with no trend in <var>x</var>, about two-thirds within ±1, and hardly any beyond ±3. A bow, a wave or a step in the residuals is systematic disagreement, a sign that the model is wrong or incomplete, even when χ²/NDF looks acceptable. A single pull of ±4 is an outlier worth investigating. The diagnostics are computed with the fitted curve held fixed; they are not uncertainty bands.</p>
+
+<h2>Correlations</h2>
+<p>The correlation matrix (the covariance normalised to ±1) shows how the fitted parameters trade off. A correlation near ±1 between two parameters means the data constrain only a combination of them: moving one and compensating with the other leaves the curve almost unchanged. This happens when a feature is outside the measured range (the centre of a peak you only caught the tail of), or when two parameters play the same role (an amplitude and a normalisation). The individual uncertainties are then large and should be read together with the correlation; the uncertainty of a derived quantity that combines both parameters can be much smaller, which Analyze Data accounts for by carrying the full covariance.</p>
+
+<h2>Confidence band</h2>
+<p>An optional band at 68%, 95% or 99% shows the uncertainty of the fitted <em>curve</em>: at each <var>x</var>, the curve's value is propagated from the parameter covariance to first order (ROOT's <code>GetConfidenceIntervals</code>). It is drawn only when the fit converged with an accurate covariance matrix. It is the region in which the true curve plausibly lies given your data; it is <em>not</em> a prediction interval for where a new measurement would fall, which is wider by the measurement uncertainty. No χ² rescaling is applied.</p>
+
+<h2 id="exclusions">Point exclusions</h2>
+<p><strong>Point exclusions…</strong> removes individual measurements from an XY fit without deleting them. Select rows (Shift-click for a range, or type row numbers), mark them excluded, and record a reason. Excluded points stay on the plot as open grey markers, are left out of χ², the diagnostics and the point count, and their reasons are saved with the session and printed in exports. Legitimate reasons are a known fault (a saturated detector, a mis-set instrument), a point outside the regime the model describes, or a transcription error you cannot correct. Excluding a point because it spoils the fit is not one; the reason field exists so that the decision is recorded and can be judged. Exclusions are checked against the data each time you fit, so if the excluded point's values change, you are asked to review them. For a contiguous region, a <a href="docs-fit-functions.html">fit range</a> is simpler.</p>
+
+<h2>When a fit fails or looks wrong</h2>
+<p>Check the obvious first: parameter order and signs, units consistent between the data and the model, and the function itself. Then try other physically reasonable starting values. If several different starts reach the same parameters, the minimum is well defined; if they reach different ones with similar χ², the data do not distinguish them, and the measured range or precision, not the fitting, is the limitation. Large uncertainties and strong correlations say the same thing. Do not adjust the uncertainties to make χ²/NDF come out near 1: they are measurements of your apparatus, not tuning parameters.</p>
+
+<p><a class="doc-back" href="documentation.html">← All documentation</a></p>
 </main>
 <footer class="site-footer"><span>ROOT-A-TRON 3000 <span class="divider">/</span> Minh Tran · 2026</span><span>Powered by CERN ROOT</span></footer>
 </body>

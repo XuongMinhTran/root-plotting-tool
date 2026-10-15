@@ -3,25 +3,53 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="XY data, histograms, and multivariate fits in ROOT-A-TRON 3000.">
-  <title>Analysis types · ROOT-A-TRON 3000</title>
+  <meta name="description" content="Entering XY data with uncertainties, histograms and their binning and likelihoods, and multivariate fits.">
+  <title>Data and analysis types · ROOT-A-TRON 3000</title>
   <link rel="stylesheet" href="home.css?v=20260917-primary-tools">
-  <link rel="stylesheet" href="site-brand.css?v=1">
-  <link rel="stylesheet" href="documentation.css?v=4">
+  <link rel="stylesheet" href="site-brand.css?v=20261015-masthead">
+  <link rel="stylesheet" href="documentation.css?v=20261015-rewrite">
 <link rel="icon" href="favicon.ico?v=1" sizes="any"><link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png?v=1"><link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png?v=1"><link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=1"><link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?v=1"><link rel="apple-touch-icon" href="apple-touch-icon.png?v=1">
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to documentation</a>
-<header class="site-header"><a class="site-name" href="index.html">ROOT-A-TRON 3000</a><nav aria-label="Main"><a href="index.html">Home</a><a href="documentation.html">Documentation</a></nav></header>
+<header class="masthead"><a class="brand" href="index.html"><span class="brand-text"><span class="brand-name">ROOT-A-TRON 3000</span></span></a><nav aria-label="Main"><a href="modern.html">Make a Plot</a><a href="uncertainties.html">Analyze Data</a><a href="tutorials.html">Tutorials</a><a href="documentation.html" aria-current="page">Documentation</a><a href="index.html">Home</a></nav></header>
 <main id="main" class="documentation-page" tabindex="-1">
-<p class="doc-crumb"><a href="documentation.html">Documentation</a> › Analysis types</p><h1>Analysis types</h1>
-<p>Choose the type that matches your measurement before entering data.</p>
-<h2>XY data</h2>
-<p>One input and one measured output - the common case. Enter X and Y columns, with optional uncertainties on either axis. Uncertainties may be a single value for the whole column or one value per point. When X uncertainties are given, the fit combines them with the Y uncertainties by the effective-variance method (see <a href="docs-uncertainties.html">Uncertainties</a>).</p>
+<p class="doc-crumb"><a href="documentation.html">Documentation</a> › Data and analysis types</p>
+<h1>Data and analysis types</h1>
+<p>The data type decides how the measurements are stored, how they are weighted in the fit and what the model is a function of. Choose it from <strong>Data type</strong> before entering data; a dataset that already has data keeps its type, and choosing another type starts a new dataset.</p>
+
+<h2>One variable, <var>y</var> = <var>f</var>(<var>x</var>)</h2>
+<p>The common case: one measured quantity that depends on one controlled or measured quantity. The table has four columns, X, X uncertainty, Y and Y uncertainty. Each uncertainty column has a mode:</p>
+<ul>
+<li><strong>Per point</strong>: one value per row. Use it when the uncertainty varies, as for counts (σ = √<var>N</var>) or readings from different instrument ranges.</li>
+<li><strong>Constant</strong>: a single value applied to every row, typed in the header. Use it for a fixed instrument resolution, such as a ruler read to ±0.5 mm.</li>
+<li><strong>None</strong>: the quantity is treated as exact. For X this is often right (a set voltage, a chosen length). For Y it means the fit is unweighted: every point counts equally, χ² is computed as if each point had σ = 1 and so is in arbitrary units, χ²/NDF and the p-value lose their meaning, and the parameter uncertainties assume that same σ = 1 and should not be quoted. Prefer a real estimate, even a rough one.</li>
+</ul>
+<p>How X uncertainties enter the fit is described under <a href="docs-uncertainties.html#effective-variance">effective variance</a>.</p>
+<h3>Entering data</h3>
+<p>Type into the cells, or paste a block copied from a spreadsheet; it fills rightwards and downwards from the cell you paste into, in the order the columns are shown. If the first pasted row is a header, the columns are matched by name: <code>x</code>, <code>y</code>, and for uncertainties any of <code>u(y)</code>, <code>dy</code>, <code>σy</code>, <code>y uncertainty</code>, <code>y error</code> and similar. A pasted column that lands on a Constant or None uncertainty switches it to Per point. <strong>Import CSV</strong> does the same from a <code>.csv</code>, <code>.tsv</code> or <code>.txt</code> file. Columns can be dragged into any order by the grip at the left of their header; the order is only for display and is remembered per data type.</p>
+<p>The preview beside the table redraws as you type, so a swapped column or a misplaced decimal point shows up before you fit. The status line under the table reports the point count and the uncertainty modes, and names anything that stops the dataset from being fitted (a missing value, a negative uncertainty, a gap in a per-point column).</p>
+<h3>Several datasets</h3>
+<p>A worksheet can hold any number of datasets, each with its own type, model and result; <strong>+ New dataset</strong> adds one and the tabs switch between them. <strong>Options</strong> renames, duplicates or deletes the current dataset and resets its column order. Plot titles and axis labels belong to the worksheet as a whole. Each dataset is fitted separately.</p>
+
 <h2>Histogram</h2>
-<p>A distribution of a single measured quantity. Enter individual measurements to be binned, or existing bin edges and counts. Histograms can be fitted with a <strong>Poisson likelihood</strong> (recommended for low counts; it includes empty bins) or with a <strong>χ²</strong> using √count uncertainties (which excludes empty bins).</p>
-<h2>Multivariate (R<sup>n</sup> → R<sup>m</sup>)</h2>
-<p>A model whose inputs and outputs can each have several dimensions - a quantity that depends on two or three variables, or several outputs measured together. Choose the number of inputs <em>n</em> and outputs <em>m</em>, then enter one column per input and per output (each with optional uncertainties) and one model per output. Write models with inputs <code>x0</code>, <code>x1</code>, … and parameters <code>[0]</code>, <code>[1]</code>, …; <strong>a parameter that appears in more than one output is shared across them.</strong> With one input and one output the fit draws the curve; with two inputs it draws the fitted surface; with more, it shows a slice along the first input with the others held at their mean. Residual and pull diagnostics work in any dimension. Load the <em>Beam profile</em> example to see a worked R²→R fit.</p><p><a class="doc-back" href="documentation.html">← All documentation</a></p>
+<p>A distribution of one measured quantity, fitted bin by bin. Supply either:</p>
+<ul>
+<li><strong>Individual measurements</strong>, which the tool bins. By default the bins are one unit of <var>x</var> wide across the range of the data (⌈max − min⌉ bins, the last edge inclusive), which suits integer-valued data such as channel numbers; for anything else set a bin count and range, or give explicit <strong>bin edges</strong>.</li>
+<li><strong>Bin counts</strong> that are already histogrammed, as (lower edge, upper edge, count) rows; the bins must touch.</li>
+</ul>
+<p>The model is a <em>density</em>: the fit integrates it over each bin (ROOT fit option <code>I</code> with <code>WIDTH</code>) and compares the integral with the count, so a bin twice as wide is expected to hold twice the count and unequal bins are handled correctly. Named functions such as <code>gausn</code> are normalised, so their first parameter is the total area, not the peak height.</p>
+<p>Two fit methods:</p>
+<ul>
+<li><strong>Poisson likelihood</strong> (default; ROOT option <code>L</code>). Each count is treated as a Poisson variable with the model's integral as its mean. This is exact for counting data and correct at low counts, where √<var>N</var> is a poor uncertainty; empty bins carry information and are included. The report gives the Poisson deviance in place of χ². It behaves like χ² for large counts, but a p-value is not reported because the χ² approximation is unreliable.</li>
+<li><strong>χ² with √count uncertainties</strong>. Each bin gets σ = √<var>N</var>; empty bins have no defined uncertainty and are omitted. Fine when every bin holds tens of counts or more; biased low otherwise, because downward fluctuations get smaller uncertainties and more weight.</li>
+</ul>
+
+<h2>Multivariate, <var>R<sup>n</sup></var> → <var>R<sup>m</sup></var></h2>
+<p>A model with several inputs, several outputs, or both: intensity as a function of two positions, or two quantities measured together that share parameters. Choose the number of inputs <var>n</var> and outputs <var>m</var>, enter one column per input and per output, each with an optional uncertainty column, and write one model per output. Models use <code>x0</code>, <code>x1</code>, … for the inputs and <code>[0]</code>, <code>[1]</code>, … for the parameters; parameters are shared by index, so <code>[2]</code> in two output models is one parameter fitted to both.</p>
+<p>The fit minimises one global χ² over every output and point, with input uncertainties folded in by the same effective-variance rule as the XY fit, using numerical derivatives of each model with respect to each input. Minuit does the minimisation, so the report has the same form: parameters with uncertainties from the covariance matrix, χ², NDF and the status. With one input the result is drawn as a curve, with two as a fitted surface, and with more as a slice along the first input with the others held at their means. Residual and pull diagnostics are available in any dimension. The <em>Beam profile</em> example is a 2-D Gaussian on a 7×7 grid.</p>
+
+<p><a class="doc-back" href="documentation.html">← All documentation</a></p>
 </main>
 <footer class="site-footer"><span>ROOT-A-TRON 3000 <span class="divider">/</span> Minh Tran · 2026</span><span>Powered by CERN ROOT</span></footer>
 </body>

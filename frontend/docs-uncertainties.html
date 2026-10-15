@@ -3,21 +3,44 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="How uncertainties enter the fit, and propagating them in Analyze Data.">
-  <title>Uncertainties &amp; Analyze Data · ROOT-A-TRON 3000</title>
+  <meta name="description" content="How uncertainties weight a fit, the effective-variance treatment of x uncertainties, and how Analyze Data propagates uncertainties and units through calculations.">
+  <title>Uncertainties and Analyze Data · ROOT-A-TRON 3000</title>
   <link rel="stylesheet" href="home.css?v=20260917-primary-tools">
-  <link rel="stylesheet" href="site-brand.css?v=1">
-  <link rel="stylesheet" href="documentation.css?v=4">
+  <link rel="stylesheet" href="site-brand.css?v=20261015-masthead">
+  <link rel="stylesheet" href="documentation.css?v=20261015-rewrite">
 <link rel="icon" href="favicon.ico?v=1" sizes="any"><link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png?v=1"><link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png?v=1"><link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=1"><link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?v=1"><link rel="apple-touch-icon" href="apple-touch-icon.png?v=1">
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to documentation</a>
-<header class="site-header"><a class="site-name" href="index.html">ROOT-A-TRON 3000</a><nav aria-label="Main"><a href="index.html">Home</a><a href="documentation.html">Documentation</a></nav></header>
+<header class="masthead"><a class="brand" href="index.html"><span class="brand-text"><span class="brand-name">ROOT-A-TRON 3000</span></span></a><nav aria-label="Main"><a href="modern.html">Make a Plot</a><a href="uncertainties.html">Analyze Data</a><a href="tutorials.html">Tutorials</a><a href="documentation.html" aria-current="page">Documentation</a><a href="index.html">Home</a></nav></header>
 <main id="main" class="documentation-page" tabindex="-1">
-<p class="doc-crumb"><a href="documentation.html">Documentation</a> › Uncertainties &amp; Analyze Data</p><h1>Uncertainties &amp; Analyze Data</h1>
-<p>Measurement uncertainties enter the fit as weights: a point with a smaller uncertainty pulls the curve more strongly. With uncertainties on both axes, ROOT combines them by the <strong>effective-variance</strong> method - each point's effective variance is σ<sub>y</sub>² + (f′(x)·σ<sub>x</sub>)², re-evaluated as the parameters change. With no Y uncertainties the fit is unweighted and χ² is reported in arbitrary units.</p>
+<p class="doc-crumb"><a href="documentation.html">Documentation</a> › Uncertainties and Analyze Data</p>
+<h1>Uncertainties and Analyze Data</h1>
+
+<h2>Uncertainties in the fit</h2>
+<p>Every uncertainty entered is a <em>standard uncertainty</em>: one standard deviation, the 68% half-width. Not a maximum error, not a 95% interval. The fit uses them as weights: each point enters χ² as (residual/σ)², so a point with half the uncertainty counts four times as much. The uncertainties also set the scale of the reported parameter uncertainties, which is why they must be real estimates and not placeholders.</p>
+<h3 id="effective-variance">X uncertainties: effective variance</h3>
+<p>A least-squares fit measures distance in <var>y</var> only. An uncertainty in <var>x</var> is included by asking how much it would move <var>y</var>: where the curve has slope <var>f</var>′, an error σ<sub><var>x</var></sub> in <var>x</var> is equivalent to an error <var>f</var>′·σ<sub><var>x</var></sub> in <var>y</var>. The two are combined in quadrature into an effective variance for each point,</p>
+<pre>σ<sub>eff,i</sub>² = σ<sub>y,i</sub>² + ( f′(x<sub>i</sub>; p) · σ<sub>x,i</sub> )²</pre>
+<p>and χ² uses σ<sub>eff</sub>. Because <var>f</var>′ depends on the parameters, the weights are re-evaluated as the fit proceeds (this is ROOT's default for <code>TGraphErrors</code>; the tool does not pass the <code>EX0</code> option that would ignore <var>x</var> errors). The consequence is that an <var>x</var> uncertainty matters most where the curve is steep and not at all where it is flat. The multivariate fit applies the same rule with one term per input, using numerical derivatives. Pulls in the diagnostics are residuals divided by σ<sub>eff</sub>.</p>
+<h3>Histograms</h3>
+<p>Counts have Poisson uncertainty; √<var>N</var> is its large-count approximation. The Poisson-likelihood method uses the exact distribution and needs no uncertainty column; the χ² method assigns √<var>N</var> and omits empty bins. See <a href="docs-analysis-types.html">Data and analysis types</a>.</p>
+
 <h2>Analyze Data</h2>
-<p>The <strong>Analyze Data</strong> page calculates further quantities from your measurements and fitted parameters and <strong>propagates their uncertainties automatically</strong>. Define a new column or single value with an expression (a difference, a ratio, or a derived physical quantity), and the result carries the correctly combined uncertainty. Columns can track <strong>units</strong>, so a computed quantity reports both its value and its unit. Results and calculated columns carry through to the export.</p><p><a class="doc-back" href="documentation.html">← All documentation</a></p>
+<p>Analyze Data holds the session's datasets as three kinds of object: <strong>raw data</strong> (the measurement columns with their uncertainties and units), <strong>fit results</strong> (the parameters with their full covariance matrix, linked to the dataset they came from) and <strong>calculations</strong>. Select any of them in the list to see its table; measurement columns also offer a plot and summary statistics (<var>n</var>, mean, sample standard deviation, standard error), and fit results their covariance and correlation matrices.</p>
+<h3>Calculations</h3>
+<p><strong>Calculate quantity or column</strong> opens a formula bar: <code>Name = formula = result</code>. Every column, fitted parameter and earlier calculation of the dataset is shown as a chip with a short symbol (the fit's own symbol from the equation editor where there is one, otherwise one derived from the name). Clicking a chip inserts its symbol; typing a symbol that matches one links it; any other symbol is asked about, and can be a number you enter with its own uncertainty and unit. The result updates as you type. Whether the result is a single value or a column follows from the inputs: a formula using only parameters and constants gives a value, one using a column gives one value per row. Calculations can use earlier calculations, and the dependencies are tracked: editing a source marks what depends on it stale, and deleting a source removes its dependent calculations after confirmation, so a number is never silently recomputed from the wrong thing.</p>
+<h3 id="propagation">How uncertainties propagate</h3>
+<p>For a result <var>q</var> = <var>g</var>(<var>a</var>, <var>b</var>, …) the uncertainty is propagated to first order,</p>
+<pre>σ<sub>q</sub>² = Σ<sub>jk</sub> (∂g/∂a<sub>j</sub>) V<sub>jk</sub> (∂g/∂a<sub>k</sub>)</pre>
+<p>where <var>V</var> is the covariance matrix of the inputs. The partial derivatives are evaluated numerically by central differences at the input values, with a check that the derivative is stable and that the function is differentiable there (a calculation sitting on the corner of an <code>abs</code> or <code>max</code> is refused). The covariance is assembled from the sources: fitted parameters from one fit carry their full covariance, so a quantity built from two correlated parameters gets the correct, often much smaller, uncertainty rather than the sum in quadrature; measurement rows are independent of one another; separately entered quantities and numbers typed into the formula are assumed independent. If a calculation uses another calculation, the chain is followed back to the original sources, so a shared input is never counted twice. An input without an uncertainty makes the result's uncertainty unspecified rather than zero.</p>
+<p>First-order propagation is accurate when the uncertainties are small compared with the scale on which <var>g</var> curves. It is inadequate near a singularity (dividing by a quantity whose uncertainty reaches zero) or for strongly nonlinear functions of large relative uncertainties; in those cases the reported uncertainty is a lower bound and the result should be treated with care.</p>
+<h3>Units</h3>
+<p>Each source carries a unit, and the formula bar suggests the result unit from them, chosen for a readable magnitude: a time of 0.0017 s is offered as ms, a length of 530 nm as nm. Any compatible unit can be typed instead and the value is converted; an incompatible one is refused with the unit that would fit. The unit grammar is multiplicative: SI base and derived units (m, kg, s, A, K, mol, cd, Hz, N, Pa, J, W, C, V, Ω, F, H, T, Wb), eV, L, min, h, rad, deg and counts, with the SI prefixes, combined with <code>*</code>, <code>/</code>, parentheses and numerical powers: <code>m/s^2</code>, <code>J/(mol*K)</code>, <code>mm^-1</code>. A blank unit means a dimensionless number. Dimensional consistency is checked through the formula, so adding metres to seconds, or taking the exponential of something with dimensions, is reported as an error; angles may be given in rad or deg. Celsius, Fahrenheit and decibels are not supported, because they are not multiplicative. Units on a source describe the numbers as they are; they do not convert the fitted data.</p>
+<h3>Stale results</h3>
+<p>A fit result remembers a signature of the data and model it was computed from. Editing the data, the model or the exclusions in Make a Plot marks the fit stale: it is shown as such, and calculations that use its parameters refuse to evaluate until the dataset is refitted. Refitting updates every dependent calculation.</p>
+
+<p><a class="doc-back" href="documentation.html">← All documentation</a></p>
 </main>
 <footer class="site-footer"><span>ROOT-A-TRON 3000 <span class="divider">/</span> Minh Tran · 2026</span><span>Powered by CERN ROOT</span></footer>
 </body>

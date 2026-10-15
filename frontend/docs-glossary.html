@@ -3,31 +3,45 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Definitions of the terms used in ROOT-A-TRON 3000.">
+  <meta name="description" content="Definitions of the statistical and fitting terms used in ROOT-A-TRON 3000.">
   <title>Glossary · ROOT-A-TRON 3000</title>
   <link rel="stylesheet" href="home.css?v=20260917-primary-tools">
-  <link rel="stylesheet" href="site-brand.css?v=1">
-  <link rel="stylesheet" href="documentation.css?v=4">
+  <link rel="stylesheet" href="site-brand.css?v=20261015-masthead">
+  <link rel="stylesheet" href="documentation.css?v=20261015-rewrite">
 <link rel="icon" href="favicon.ico?v=1" sizes="any"><link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png?v=1"><link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png?v=1"><link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=1"><link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?v=1"><link rel="apple-touch-icon" href="apple-touch-icon.png?v=1">
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to documentation</a>
-<header class="site-header"><a class="site-name" href="index.html">ROOT-A-TRON 3000</a><nav aria-label="Main"><a href="index.html">Home</a><a href="documentation.html">Documentation</a></nav></header>
+<header class="masthead"><a class="brand" href="index.html"><span class="brand-text"><span class="brand-name">ROOT-A-TRON 3000</span></span></a><nav aria-label="Main"><a href="modern.html">Make a Plot</a><a href="uncertainties.html">Analyze Data</a><a href="tutorials.html">Tutorials</a><a href="documentation.html" aria-current="page">Documentation</a><a href="index.html">Home</a></nav></header>
 <main id="main" class="documentation-page" tabindex="-1">
-<p class="doc-crumb"><a href="documentation.html">Documentation</a> › Glossary</p><h1>Glossary</h1>
+<p class="doc-crumb"><a href="documentation.html">Documentation</a> › Glossary</p>
+<h1>Glossary</h1>
 <dl class="doc-glossary">
-  <dt>Parameter</dt><dd>A number the fit adjusts to describe the data, written <code>[0]</code>, <code>[1]</code>, … in a ROOT expression.</dd>
-  <dt>Initial guess</dt><dd>The starting value for a parameter, from which the fit's search begins. Not an uncertainty and not a fixed value.</dd>
-  <dt>χ² (chi-square)</dt><dd>The total squared mismatch between data and model, measured in units of the data uncertainties.</dd>
-  <dt>NDF</dt><dd>Number of degrees of freedom: fitted points minus free parameters.</dd>
-  <dt>χ²/NDF (reduced χ²)</dt><dd>χ² per degree of freedom; near 1 when the model fits within the stated uncertainties.</dd>
-  <dt>p-value</dt><dd>The probability of a χ² at least this large if the model were correct.</dd>
-  <dt>Residual</dt><dd>Data minus fit at a point.</dd>
-  <dt>Pull</dt><dd>A residual divided by its uncertainty; the pulls of a good fit scatter like a standard normal.</dd>
-  <dt>Covariance / correlation</dt><dd>How the uncertainties of fitted parameters are linked; strong correlation means the data do not separate those parameters well.</dd>
-  <dt>Confidence band</dt><dd>The uncertainty in the fitted curve itself, from the parameter covariance - not a prediction interval for new data.</dd>
-  <dt>Effective variance</dt><dd>The method that folds X uncertainties into the fit alongside the Y uncertainties.</dd>
-</dl><p><a class="doc-back" href="documentation.html">← All documentation</a></p>
+<dt>Model</dt><dd>A function <var>f</var>(<var>x</var>; <var>p</var>) proposed to describe the data, with parameters <var>p</var> to be determined.</dd>
+<dt>Parameter</dt><dd>A quantity the fit adjusts, written <code>[0]</code>, <code>[1]</code>, … in a ROOT expression or as a symbol in the equation editor.</dd>
+<dt>Starting value (initial guess)</dt><dd>The value of a parameter at which the minimiser begins. Not an uncertainty, and not a constraint.</dd>
+<dt>Standard uncertainty</dt><dd>One standard deviation of a measured or derived quantity: the half-width of its 68% interval. The only kind of uncertainty the tool uses.</dd>
+<dt>Residual</dt><dd>Data minus model at a point, <var>y<sub>i</sub></var> − <var>f</var>(<var>x<sub>i</sub></var>).</dd>
+<dt>Pull</dt><dd>A residual divided by the point's effective uncertainty. For a correct model and correct uncertainties the pulls follow a standard normal distribution.</dd>
+<dt>χ² (chi-square)</dt><dd>The sum over fitted points of pull². The quantity the fit minimises.</dd>
+<dt>NDF</dt><dd>Degrees of freedom: fitted points minus free parameters.</dd>
+<dt>χ²/NDF (reduced chi-square)</dt><dd>χ² per degree of freedom; about 1 when the model and the uncertainties are both right. Its spread is roughly √(2/NDF).</dd>
+<dt>p-value</dt><dd>The probability that a correct model would produce a χ² at least as large as the one observed.</dd>
+<dt>Poisson deviance</dt><dd>The likelihood-ratio statistic reported for histogram fits by Poisson likelihood; plays the role of χ² and approaches it at large counts.</dd>
+<dt>Minuit</dt><dd>ROOT's minimiser. Its status code is the convergence status in the report.</dd>
+<dt>Hesse matrix</dt><dd>The matrix of second derivatives of χ² at the minimum; its inverse is the covariance matrix.</dd>
+<dt>Covariance matrix</dt><dd>The matrix whose diagonal holds the squared parameter uncertainties and whose off-diagonal elements express how pairs of parameters vary together.</dd>
+<dt>Correlation</dt><dd>Covariance normalised to the range −1 to 1. Near ±1 means the data determine only a combination of the two parameters.</dd>
+<dt>Effective variance</dt><dd>σ<sub>y</sub>² + (<var>f</var>′·σ<sub>x</sub>)²: the method by which an <var>x</var> uncertainty is included in the fit.</dd>
+<dt>Confidence band</dt><dd>The uncertainty of the fitted curve itself at each <var>x</var>, from the parameter covariance. Not a prediction interval for new data.</dd>
+<dt>Fit range</dt><dd>The interval of <var>x</var> inside which points are fitted; points outside are plotted but ignored.</dd>
+<dt>Point exclusion</dt><dd>A single measurement left out of the fit, with a recorded reason, while remaining in the data and on the plot.</dd>
+<dt>Stale</dt><dd>A fit result whose data or model have changed since it was computed. Calculations that depend on it are blocked until it is refitted.</dd>
+<dt>Propagation of uncertainty</dt><dd>Carrying the uncertainties and covariances of inputs through a calculation to the uncertainty of its result; done here to first order with numerical derivatives.</dd>
+<dt>Session</dt><dd>Everything in both pages: datasets, models, results and calculations. Autosaved in the browser; saved to a <code>.json</code> file with Save.</dd>
+</dl>
+
+<p><a class="doc-back" href="documentation.html">← All documentation</a></p>
 </main>
 <footer class="site-footer"><span>ROOT-A-TRON 3000 <span class="divider">/</span> Minh Tran · 2026</span><span>Powered by CERN ROOT</span></footer>
 </body>

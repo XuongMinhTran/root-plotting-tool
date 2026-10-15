@@ -3,24 +3,38 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Writing a ROOT fit expression, named functions, and the guided model library.">
-  <title>Fit functions &amp; the model library · ROOT-A-TRON 3000</title>
+  <meta name="description" content="Writing a ROOT expression, how the equation editor translates to it, and the model library.">
+  <title>Fit functions · ROOT-A-TRON 3000</title>
   <link rel="stylesheet" href="home.css?v=20260917-primary-tools">
-  <link rel="stylesheet" href="site-brand.css?v=1">
-  <link rel="stylesheet" href="documentation.css?v=4">
+  <link rel="stylesheet" href="site-brand.css?v=20261015-masthead">
+  <link rel="stylesheet" href="documentation.css?v=20261015-rewrite">
 <link rel="icon" href="favicon.ico?v=1" sizes="any"><link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png?v=1"><link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png?v=1"><link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=1"><link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?v=1"><link rel="apple-touch-icon" href="apple-touch-icon.png?v=1">
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to documentation</a>
-<header class="site-header"><a class="site-name" href="index.html">ROOT-A-TRON 3000</a><nav aria-label="Main"><a href="index.html">Home</a><a href="documentation.html">Documentation</a></nav></header>
+<header class="masthead"><a class="brand" href="index.html"><span class="brand-text"><span class="brand-name">ROOT-A-TRON 3000</span></span></a><nav aria-label="Main"><a href="modern.html">Make a Plot</a><a href="uncertainties.html">Analyze Data</a><a href="tutorials.html">Tutorials</a><a href="documentation.html" aria-current="page">Documentation</a><a href="index.html">Home</a></nav></header>
 <main id="main" class="documentation-page" tabindex="-1">
-<p class="doc-crumb"><a href="documentation.html">Documentation</a> › Fit functions &amp; the model library</p><h1>Fit functions &amp; the model library</h1>
-<p>The fit function is written as a ROOT expression. Use <code>x</code> for the independent variable and <code>[0]</code>, <code>[1]</code>, … for the parameters to be fitted. Multiplication is <code>*</code>, division <code>/</code>, and powers <code>pow(x,2)</code> or <code>x^2</code>. Supported functions include <code>exp</code>, <code>log</code>, <code>sqrt</code>, <code>sin</code>, <code>cos</code>, and the <code>TMath::</code> family; <code>TMath::Pi()</code> is π. ROOT also provides named functions such as <code>gaus</code>, <code>expo</code>, <code>landau</code>, and polynomials <code>pol0</code>…<code>polN</code>, which can be combined with parameter offsets, for example <code>gaus(0)+pol1(3)</code>.</p>
-<p>The Standard workspace additionally offers an <strong>equation editor</strong>: type an ordinary formula such as <code>A exp(-x/tau) + B</code> and it is translated to the ROOT expression for you, with the symbols becoming fit parameters.</p>
+<p class="doc-crumb"><a href="documentation.html">Documentation</a> › Fit functions</p>
+<h1>Fit functions</h1>
+<p>A fit function is ultimately a ROOT <code>TFormula</code> expression. You can write one directly, or use the equation editor, which translates ordinary mathematical notation into that expression and shows you the result.</p>
+
+<h2>ROOT expressions</h2>
+<p>Write <code>x</code> for the independent variable and <code>[0]</code>, <code>[1]</code>, … for the parameters. Parameters are identified by their index, not by name: in <code>[0]*x+[1]</code>, <code>[0]</code> is the slope and <code>[1]</code> the intercept, and the report names, starting values and Analyze Data symbols all follow that order. Arithmetic is <code>+ - * /</code>, powers are <code>pow(x,2)</code> or <code>x^2</code>, and the usual functions are available: <code>exp</code>, <code>log</code> (natural), <code>log10</code>, <code>sqrt</code>, <code>abs</code>, <code>sin</code>, <code>cos</code>, <code>tan</code>, their inverses and hyperbolic forms, and the <code>TMath::</code> library (<code>TMath::Pi()</code>, <code>TMath::Erf(x)</code>, …). A conditional <code>a==0?1:b</code> avoids a 0/0, as in a sinc function.</p>
+<p>ROOT also defines named functions: <code>gaus</code> (amplitude, mean, sigma), <code>gausn</code> (the same, normalised to unit area), <code>expo</code> (exp(<var>a</var> + <var>b x</var>)), <code>landau</code>, and the polynomials <code>pol0</code> … <code>pol9</code>. They can be combined with a parameter offset in parentheses: <code>gaus(0)+pol1(3)</code> uses <code>[0]</code>–<code>[2]</code> for the peak and <code>[3]</code>, <code>[4]</code> for the line. For a plain polynomial or a single named function ROOT can estimate starting values itself; for a sum it cannot, and the starting values matter.</p>
+<p>Expressions are checked on the server before fitting; a function ROOT does not know, or unbalanced brackets, come back as an error naming the problem.</p>
+
+<h2>The equation editor</h2>
+<p>The <em>Equation editor</em> mode accepts a formula typed the way it would be written by hand, rendered as mathematics as you type: <code>A exp(-x/tau) + B</code>, <code>a x^2 + b x + c</code>, <code>I_0 cos(k x)^2</code>. Every letter or symbol other than <code>x</code> becomes a fit parameter, in order of first appearance, and the generated ROOT expression is shown under the editor. The translation is deliberately limited to what ROOT can express, so it is exact: adjacent symbols multiply, <code>/</code> makes a fraction, <code>^</code> a power and <code>_</code> a subscript, <code>\sqrt</code> a root, and Greek letters are typed as <code>\tau</code>, <code>\lambda</code> and so on followed by Space. Functions take parentheses. <code>e</code> and <code>pi</code> are constants, not parameters. Anything outside this grammar is refused with a message rather than guessed at; switch to the ROOT expression mode for it.</p>
+<p>Parameter symbols from the editor carry through the whole analysis: the report, the AI prompt and the Analyze Data chips use τ rather than <code>[1]</code>. The <em>Report name</em> column of the parameter table lets you give a parameter a longer name for the report without changing its symbol.</p>
+
 <h2>The model library</h2>
-<p>Rather than remember the expression for every experiment, press <strong>Model library…</strong> next to the fit function. It opens a browsable, searchable collection of the models most common in undergraduate labs, grouped by topic - mechanics and motion, waves and optics, thermal and statistical, electricity and magnetism, modern physics, and general shapes.</p>
-<p>Each entry shows the model, a one-line description of the experiment it fits, and the variables it expects. Choosing <strong>Use</strong> fills in the fit function, the parameter names, and starting guesses. Those guesses are a starting point, not an answer - adjust them to your own data before fitting.</p>
-<p>For how to estimate the starting values for each model - whether or not you used the library - see the full <a href="docs-starting-values.html"><strong>Starting parameter guides</strong></a>.</p><p><a class="doc-back" href="documentation.html">← All documentation</a></p>
+<p><strong>Choose a model…</strong> opens a searchable library grouped by topic: mechanics and motion, waves and optics, thermal and statistical, electricity and magnetism, modern physics, and general shapes. Each entry gives the model as an equation, the experiment it describes, the variables it expects on each axis, and short guidance on reading each starting value from the data. <strong>Use</strong> fills the equation, the parameter names and generic starting values. Those values are placeholders for a typical scale, not estimates from your data; the preview on the Fit model step will usually show the curve nowhere near the points until you set them (see <a href="docs-starting-values.html">Starting values</a>).</p>
+<p>The library is not a constraint. Any model can be edited after loading, and a model written from scratch is fitted exactly the same way.</p>
+
+<h2>Fit range</h2>
+<p>Under the parameter table, a <strong>fit range</strong> restricts the fit to points with <var>x</var> inside [min, max] (ROOT option <code>R</code>). Points outside stay on the plot but do not enter χ². Use it when the model describes only part of the data, for example the linear region of a saturating curve. To leave out particular points rather than a range, use <a href="docs-results.html#exclusions">point exclusions</a>.</p>
+
+<p><a class="doc-back" href="documentation.html">← All documentation</a></p>
 </main>
 <footer class="site-footer"><span>ROOT-A-TRON 3000 <span class="divider">/</span> Minh Tran · 2026</span><span>Powered by CERN ROOT</span></footer>
 </body>

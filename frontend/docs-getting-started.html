@@ -3,27 +3,57 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="How to fit data with ROOT-A-TRON 3000, and the three workspaces.">
+  <meta name="description" content="What ROOT-A-TRON 3000 does, how a least-squares fit works, the two pages, sessions and the backend.">
   <title>Getting started · ROOT-A-TRON 3000</title>
   <link rel="stylesheet" href="home.css?v=20260917-primary-tools">
-  <link rel="stylesheet" href="site-brand.css?v=1">
-  <link rel="stylesheet" href="documentation.css?v=4">
+  <link rel="stylesheet" href="site-brand.css?v=20261015-masthead">
+  <link rel="stylesheet" href="documentation.css?v=20261015-rewrite">
 <link rel="icon" href="favicon.ico?v=1" sizes="any"><link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png?v=1"><link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png?v=1"><link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=1"><link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?v=1"><link rel="apple-touch-icon" href="apple-touch-icon.png?v=1">
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to documentation</a>
-<header class="site-header"><a class="site-name" href="index.html">ROOT-A-TRON 3000</a><nav aria-label="Main"><a href="index.html">Home</a><a href="documentation.html">Documentation</a></nav></header>
+<header class="masthead"><a class="brand" href="index.html"><span class="brand-text"><span class="brand-name">ROOT-A-TRON 3000</span></span></a><nav aria-label="Main"><a href="modern.html">Make a Plot</a><a href="uncertainties.html">Analyze Data</a><a href="tutorials.html">Tutorials</a><a href="documentation.html" aria-current="page">Documentation</a><a href="index.html">Home</a></nav></header>
 <main id="main" class="documentation-page" tabindex="-1">
-<p class="doc-crumb"><a href="documentation.html">Documentation</a> › Getting started</p><h1>Getting started</h1>
-<p>ROOT-A-TRON 3000 fits mathematical models to measured data using CERN's ROOT toolkit, the same fitting engine used in particle physics. A fit adjusts the parameters of a function until it best describes your measurements, and reports the fitted values with their uncertainties.</p>
-<p><strong>Make a Plot</strong> walks through three steps - set up your data, choose a fit model, read the results. A second page, <strong>Analyze Data</strong>, calculates further quantities from your data and fitted parameters with full uncertainty propagation. Switch between them from the links at the top of each page.</p>
-<h2>The usual workflow</h2>
+<p class="doc-crumb"><a href="documentation.html">Documentation</a> › Getting started</p>
+<h1>Getting started</h1>
+<p>ROOT-A-TRON 3000 fits a mathematical model to measured data and reports the fitted parameters with their uncertainties. The fitting is done by <a href="https://root.cern" rel="noopener" target="_blank">CERN ROOT</a>, the analysis toolkit used in particle physics, running on a server; the browser handles data entry, plotting and the propagation of uncertainties through later calculations.</p>
+
+<h2>What a fit is</h2>
+<p>A model is a function <var>f</var>(<var>x</var>; <var>p</var>) of the independent variable <var>x</var> with a vector of parameters <var>p</var>. A fit chooses the parameters for which the model is closest to the <var>N</var> measured points (<var>x<sub>i</sub></var>, <var>y<sub>i</sub></var> ± σ<sub><var>i</var></sub>). "Closest" is defined by the chi-square,</p>
+<pre>χ²(p) = Σ<sub>i</sub> [ (y<sub>i</sub> − f(x<sub>i</sub>; p)) / σ<sub>i</sub> ]²</pre>
+<p>the sum of squared residuals, each measured in units of that point's uncertainty. A point with a small uncertainty therefore pulls harder than one with a large uncertainty. ROOT minimises χ² numerically with Minuit: starting from the values you supply, it steps through parameter space until it reaches a minimum. For a model that is linear in its parameters (a straight line, a polynomial) the minimum is unique and any starting point reaches it. For a nonlinear model (an exponential, a peak, an oscillation) χ² can have several local minima, and the minimiser finds the one nearest to where it started. That is why <a href="docs-starting-values.html">starting values</a> matter.</p>
+<p>At the minimum, the curvature of χ² in each parameter direction sets that parameter's uncertainty: a parameter the data constrain tightly sits in a steep valley and gets a small uncertainty. The full curvature matrix, inverted, is the covariance matrix, from which the reported uncertainties and correlations come. How to read all of this is on <a href="docs-results.html">The fit report</a>.</p>
+
+<h2>The two pages</h2>
+<p><strong>Make a Plot</strong> is the fitting worksheet, in three steps shown as tabs: <em>Set up analysis</em> (the data), <em>Fit model</em> (the function and its starting values) and <em>Results</em> (the plot and report). A worksheet can hold several datasets, each with its own data, model and result; switch between them with the tabs above the data table.</p>
+<p><strong>Analyze Data</strong> takes the same datasets and their fit results and lets you calculate further quantities from them, with uncertainties propagated and units checked: a half-life from a fitted lifetime, <var>g</var> from a pendulum slope, a wavelength from a fringe spacing. It also tabulates and exports everything.</p>
+<p>The two pages share one session. A fit run in Make a Plot appears in Analyze Data at once; a dataset pasted into Analyze Data is available for fitting. Editing a dataset's values or model after it has been fitted marks that fit <em>stale</em>, and calculations that depend on it are blocked until it is refitted, so a number can never quietly come from data that has since changed.</p>
+
+<h2>A first analysis</h2>
 <ol>
-  <li>Choose an <strong>analysis type</strong> and enter your measurements - paste columns, or load an example. See <a href="docs-analysis-types.html">Analysis types</a>.</li>
-  <li>Choose a <strong>fit function</strong> - write one, or pick from the <a href="docs-fit-functions.html">model library</a>.</li>
-  <li>Enter <strong>starting guesses</strong> for the parameters and press <strong>Fit</strong>. See the <a href="docs-starting-values.html">Starting parameter guides</a>.</li>
-  <li><a href="docs-results.html">Read the results</a>: fitted parameters, uncertainties, and goodness-of-fit.</li>
-</ol><p><a class="doc-back" href="documentation.html">← All documentation</a></p>
+<li>On <em>Set up analysis</em>, choose the data type, then paste your columns into the table or type them. Set the uncertainty mode for each column. See <a href="docs-analysis-types.html">Data and analysis types</a>.</li>
+<li>On <em>Fit model</em>, choose a model from the library or write one. See <a href="docs-fit-functions.html">Fit functions</a>.</li>
+<li>Give each parameter a starting value by adjusting the curve on the plot, by typing values, or by asking an AI with the prompt the page builds. See <a href="docs-starting-values.html">Starting values</a>.</li>
+<li>Press <strong>Fit</strong> (or Ctrl/Cmd+Enter). Read the status, the parameters and χ²/NDF, and look at the residuals. See <a href="docs-results.html">The fit report</a>.</li>
+<li>Derive what you actually wanted to measure in <em>Analyze Data</em>, then <a href="docs-exporting.html">export</a>.</li>
+</ol>
+<p>The <strong>or load an example</strong> menu above the data table adds a worked dataset (a straight line, an exponential decay, a Gaussian peak, a double-slit pattern, a count histogram, a beam profile) alongside your own, with a model and starting values already chosen.</p>
+
+<h2>Sessions, saving and autosave</h2>
+<p>Everything you enter is saved continuously in the browser's local storage, so a reload or a closed tab loses nothing; the same storage is shared by both pages. It is specific to one browser on one computer and can be cleared by the browser, so for anything you want to keep, press <strong>Save</strong>. That downloads a <code>.json</code> session file holding every dataset, its uncertainties and exclusions, its model and starting values, the last fit result including the drawn canvas, and all calculations. <strong>Open…</strong> (or dropping a session file onto Analyze Data) restores it exactly, in any browser; the stored canvas redraws without contacting the backend. Session files are plain JSON and can be inspected or version-controlled.</p>
+
+<h2>The backend</h2>
+<p>Fitting requests go to a small Flask service with PyROOT. The public copy runs on a free tier that sleeps after a period of inactivity; the first fit after a pause can take up to a minute while it wakes, and the status line says so. The footer of Make a Plot shows whether the backend is reachable. Only the selected dataset and model are sent; nothing is stored on the server, and no AI service is ever contacted by the tool itself. The backend can also be run locally with the <code>start</code> script in the repository, in which case fits never leave your machine.</p>
+
+<h2>Keyboard</h2>
+<ul>
+<li><strong>Ctrl/Cmd+Enter</strong> runs the fit from anywhere on the Fit model step. Plain Enter in a text field also fits, except inside the adjust-on-the-plot controls, where it commits the value.</li>
+<li><strong>Ctrl/Cmd+E</strong> opens the full data table editor.</li>
+<li>In the data table, Tab and Shift+Tab move across cells, Enter and the arrow keys move between rows, and pasting a block from a spreadsheet fills as many cells as it contains. The six-dot grip on each column header drags it; with the grip focused, the arrow keys move it.</li>
+<li>Escape closes dialogs and help panels.</li>
+</ul>
+
+<p><a class="doc-back" href="documentation.html">← All documentation</a></p>
 </main>
 <footer class="site-footer"><span>ROOT-A-TRON 3000 <span class="divider">/</span> Minh Tran · 2026</span><span>Powered by CERN ROOT</span></footer>
 </body>

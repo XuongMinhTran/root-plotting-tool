@@ -3,18 +3,32 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Documentation for ROOT-A-TRON 3000: fitting data, choosing a model and starting values, reading results, and exporting.">
+  <meta name="description" content="Reference documentation for ROOT-A-TRON 3000: data entry, fit functions, starting values, the fit report, uncertainties, Analyze Data and export.">
   <title>Documentation · ROOT-A-TRON 3000</title>
   <link rel="stylesheet" href="home.css?v=20260917-primary-tools">
-  <link rel="stylesheet" href="site-brand.css?v=1">
-  <link rel="stylesheet" href="documentation.css?v=4">
+  <link rel="stylesheet" href="site-brand.css?v=20261015-masthead">
+  <link rel="stylesheet" href="documentation.css?v=20261015-rewrite">
 <link rel="icon" href="favicon.ico?v=1" sizes="any"><link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png?v=1"><link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png?v=1"><link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=1"><link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?v=1"><link rel="apple-touch-icon" href="apple-touch-icon.png?v=1">
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to documentation</a>
-<header class="site-header"><a class="site-name" href="index.html">ROOT-A-TRON 3000</a><nav aria-label="Main"><a href="index.html">Home</a><a href="documentation.html">Documentation</a></nav></header>
+<header class="masthead"><a class="brand" href="index.html"><span class="brand-text"><span class="brand-name">ROOT-A-TRON 3000</span></span></a><nav aria-label="Main"><a href="modern.html">Make a Plot</a><a href="uncertainties.html">Analyze Data</a><a href="tutorials.html">Tutorials</a><a href="documentation.html" aria-current="page">Documentation</a><a href="index.html">Home</a></nav></header>
 <main id="main" class="documentation-page" tabindex="-1">
-<h1>Documentation</h1><p class="documentation-status">A guide to fitting data with ROOT-A-TRON 3000. Choose a topic.</p><div class="doc-hub"><a class="doc-card" href="docs-getting-started.html"><h2>Getting started</h2><p>The workflow, and the three workspaces.</p></a><a class="doc-card" href="docs-analysis-types.html"><h2>Analysis types</h2><p>XY data, histograms, and multivariate (Rⁿ→Rᵐ) fits.</p></a><a class="doc-card" href="docs-fit-functions.html"><h2>Fit functions &amp; the model library</h2><p>Writing a ROOT expression, named functions, and the guided model library.</p></a><a class="doc-card" href="docs-starting-values.html"><h2>Starting parameter guides</h2><p>How to choose starting parameter values, with guidance for each model.</p></a><a class="doc-card" href="docs-results.html"><h2>Reading the results</h2><p>Convergence, χ²/NDF, p-value, residuals and pulls, and excluding points.</p></a><a class="doc-card" href="docs-uncertainties.html"><h2>Uncertainties &amp; Analyze Data</h2><p>How uncertainties enter the fit, and propagating them in Analyze Data.</p></a><a class="doc-card" href="docs-exporting.html"><h2>Exporting</h2><p>PDF and LaTeX reports, images, CSV, and complete sessions.</p></a><a class="doc-card" href="docs-glossary.html"><h2>Glossary</h2><p>Short definitions of the terms used throughout.</p></a></div><p class="doc-tip">Start with <a href="docs-getting-started.html">Getting started</a>, then <a href="docs-fit-functions.html">Fit functions</a> and the <a href="docs-starting-values.html">Starting parameter guides</a>.</p>
+
+<h1>Documentation</h1><p class="documentation-status">Reference for ROOT-A-TRON 3000. Each page describes what a control does and the method behind it, so a result can be understood and defended, not just produced. For a guided first run, use the <a href="tutorials.html">tutorials</a>.</p>
+<div class="doc-hub">
+<a class="doc-card" href="docs-getting-started.html"><h2>Getting started</h2><p>What a fit is, how the pages fit together, sessions and saving, the backend.</p></a>
+<a class="doc-card" href="docs-analysis-types.html"><h2>Data and analysis types</h2><p>Entering data; per-point, constant and no uncertainties; histograms; multivariate fits.</p></a>
+<a class="doc-card" href="docs-fit-functions.html"><h2>Fit functions</h2><p>ROOT expressions, the equation editor and its translation, the model library.</p></a>
+<a class="doc-card" href="docs-starting-values.html"><h2>Starting values</h2><p>Why they matter, how to read them off a plot, and a guide for every library model.</p></a>
+<a class="doc-card" href="docs-results.html"><h2>The fit report</h2><p>Convergence, uncertainties, χ² and NDF, diagnostics, correlations, confidence bands, exclusions.</p></a>
+<a class="doc-card" href="docs-uncertainties.html"><h2>Uncertainties and Analyze Data</h2><p>How uncertainties weight a fit, and how calculated quantities propagate them with units.</p></a>
+<a class="doc-card" href="docs-exporting.html"><h2>Saving and exporting</h2><p>Sessions, images, CSV, PDF and LaTeX reports.</p></a>
+<a class="doc-card" href="docs-glossary.html"><h2>Glossary</h2><p>The statistical terms used in the report, defined precisely.</p></a>
+</div>
+<p class="doc-tip">Reading order for a first analysis: Getting started → Data and analysis types → Fit functions → Starting values → The fit report.</p>
+
+
 </main>
 <footer class="site-footer"><span>ROOT-A-TRON 3000 <span class="divider">/</span> Minh Tran · 2026</span><span>Powered by CERN ROOT</span></footer>
 </body>

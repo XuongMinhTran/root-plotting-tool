@@ -70,34 +70,6 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 
 /* ============================================================ masthead */
 
-.masthead {
-  position: sticky; top: 0; z-index: 40;
-  background: var(--blue); color: #fff;
-  min-height: var(--masthead-h); height: var(--masthead-h);
-  display: flex; align-items: stretch; gap: 20px;
-  padding: 0 clamp(14px, 3vw, 40px);
-}
-.masthead .brand { flex: 0 1 auto; min-width: 0; }
-.brand-name, .masthead nav a { white-space: nowrap; }
-.masthead .brand { display: flex; align-items: center; gap: 12px; color: #fff; text-decoration: none; overflow: hidden; }
-.masthead .brand:hover { text-decoration: none; }
-.brand-text { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; overflow: hidden; }
-.brand-name { font-size: 15px; font-weight: 700; letter-spacing: .04em; overflow: hidden; text-overflow: ellipsis; }
-
-
-.masthead nav { margin-left: auto; display: flex; gap: 4px; height: 100%; align-items: stretch; }
-.masthead nav a {
-  position: relative; display: flex; align-items: center; padding: 0 14px;
-  color: #e6eef7; font-size: 14px; text-decoration: none;
-}
-.masthead nav a:hover { color: #fff; text-decoration: none; }
-/* ROOT's nav motif: a 4px bar that wipes in from the left, not a color change */
-.masthead nav a::after {
-  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 4px; background: #fff;
-  transform: scaleX(0); transform-origin: left; transition: transform .18s ease-in-out;
-}
-.masthead nav a:hover::after, .masthead nav a[aria-current]::after { transform: scaleX(1); }
-.masthead nav a[aria-current] { color: #fff; font-weight: 600; }
 
 
 /* ============================================================ worksheet bar */

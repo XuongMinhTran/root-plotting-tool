@@ -3,26 +3,36 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="PDF and LaTeX reports, images, CSV, and complete sessions.">
-  <title>Exporting · ROOT-A-TRON 3000</title>
+  <meta name="description" content="Session files, plot images, CSV tables, PDF and LaTeX reports.">
+  <title>Saving and exporting · ROOT-A-TRON 3000</title>
   <link rel="stylesheet" href="home.css?v=20260917-primary-tools">
-  <link rel="stylesheet" href="site-brand.css?v=1">
-  <link rel="stylesheet" href="documentation.css?v=4">
+  <link rel="stylesheet" href="site-brand.css?v=20261015-masthead">
+  <link rel="stylesheet" href="documentation.css?v=20261015-rewrite">
 <link rel="icon" href="favicon.ico?v=1" sizes="any"><link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png?v=1"><link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png?v=1"><link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=1"><link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?v=1"><link rel="apple-touch-icon" href="apple-touch-icon.png?v=1">
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to documentation</a>
-<header class="site-header"><a class="site-name" href="index.html">ROOT-A-TRON 3000</a><nav aria-label="Main"><a href="index.html">Home</a><a href="documentation.html">Documentation</a></nav></header>
+<header class="masthead"><a class="brand" href="index.html"><span class="brand-text"><span class="brand-name">ROOT-A-TRON 3000</span></span></a><nav aria-label="Main"><a href="modern.html">Make a Plot</a><a href="uncertainties.html">Analyze Data</a><a href="tutorials.html">Tutorials</a><a href="documentation.html" aria-current="page">Documentation</a><a href="index.html">Home</a></nav></header>
 <main id="main" class="documentation-page" tabindex="-1">
-<p class="doc-crumb"><a href="documentation.html">Documentation</a> › Exporting</p><h1>Exporting</h1>
-<p>Press <strong>Export</strong> to save your work. The options are:</p>
+<p class="doc-crumb"><a href="documentation.html">Documentation</a> › Saving and exporting</p>
+<h1>Saving and exporting</h1>
+
+<h2>Sessions</h2>
+<p><strong>Save</strong>, on either page, downloads the whole session as one <code>.json</code> file: every dataset with its uncertainties, exclusions and reasons, its model and starting values, the last fit result with its drawn canvas, and every calculation with its bindings. <strong>Open…</strong> restores it, replacing the current session; on Analyze Data a session file can also be dropped onto the page. The stored canvas means a saved fit redraws immediately without the backend. The file is the record of the analysis, and the thing to keep.</p>
+
+<h2>From Make a Plot</h2>
+<p><strong>Export PNG</strong> and <strong>Export SVG</strong> save the current plot as drawn, including any diagnostic panels. PNG is rasterised at high resolution for documents and slides; SVG is vector and editable, for figures that will be resized or restyled.</p>
+
+<h2>From Analyze Data</h2>
+<p><strong>Export</strong> opens a dialog with three formats and a choice of content. Content is chosen by checkbox: graphs, calculated values and columns, fit parameters and diagnostics, raw data with exclusion reasons, the document notes, and the complete session. Which datasets and which calculations to include can be selected individually.</p>
 <ul>
-  <li><strong>PDF report</strong> - a formatted document with the plot, fitted parameters, goodness-of-fit, and any calculated values and notes.</li>
-  <li><strong>LaTeX report</strong> - a <code>.zip</code> containing a LaTeX source file and the figures, ready to drop into a lab report.</li>
-  <li><strong>Individual files</strong> - the plot as PNG and/or SVG, the data and results as CSV, and the session as JSON.</li>
-  <li><strong>Complete session (JSON)</strong> - every dataset, calculation, and setting, which can be reloaded later to continue exactly where you left off.</li>
+<li><strong>PDF report</strong>: a formatted document with the selected graphs, parameter tables, calculations and notes, generated in the browser.</li>
+<li><strong>LaTeX report</strong>: a <code>.zip</code> containing an editable <code>report.tex</code>, the tables as LaTeX, and the figures as PNG and SVG. Upload the whole ZIP to Overleaf as a new project, with <code>report.tex</code> as the main document and pdfLaTeX as the compiler; or compile locally. A compiled PDF is not included, so the text can be edited before it is typeset.</li>
+<li><strong>Individual files</strong>: CSV tables of data, results and calculations (values with their uncertainties), the plots as images, and optionally the session JSON, packaged as a ZIP when there is more than one.</li>
 </ul>
-<p>Plots are exported exactly as drawn on screen - the PNG is rasterized at high resolution and the SVG is vector text from the live figure.</p><p><a class="doc-back" href="documentation.html">← All documentation</a></p>
+<p>Every export is produced locally in the browser; nothing is uploaded.</p>
+
+<p><a class="doc-back" href="documentation.html">← All documentation</a></p>
 </main>
 <footer class="site-footer"><span>ROOT-A-TRON 3000 <span class="divider">/</span> Minh Tran · 2026</span><span>Powered by CERN ROOT</span></footer>
 </body>
