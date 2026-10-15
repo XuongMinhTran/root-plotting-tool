@@ -86,11 +86,11 @@ The **Set up analysis** step is one card: dataset tabs, a **Data type** menu, an
 
 Both interfaces default to a keyboard-operated equation editor for supported models. Type `A exp(-x/tau)+B`, `x_0`, `x^2`, or `sqrt`; common Greek names become symbols automatically. The Typing reference documents multiplication, constants, and supported functions. The editor also supports the unnormalized diffraction function `sinc(z) = sin(z)/z`, with its exact continuous value of 1 at zero. The eight-parameter double-slit model with linear fringe visibility opens as an editable equation, including when imported from its guarded ROOT formula. The editor translates the expression to ROOT and creates parameter fields; rearranging terms preserves parameter identities and initial guesses. ROOT expression mode supports ROOT-specific syntax that the visual editor cannot represent. The advanced ROOT mode remains available in both interfaces, with an auto-growing multiline field and preserved formulas when visual translation is unavailable.
 
-The Fit model flow starts with one **Choose a model** entry point (common presets and the experiment library), followed by the equation and editable starting values. Each step is explained on the page. **Brute force fit**, beside Fit, searches for 20 seconds and then fits. **Brute force options…**, under **Edit values**, offers custom ranges and time. Fit stays in the sticky action bar alongside Save. Plot settings, diagnostics, and confidence bands are optional collapsed controls below the main flow. Starting values display about four significant figures, retain their full precision internally, and expand to the full value when selected.
+The Fit model flow starts with one **Choose a model** entry point (common presets and the experiment library), followed by the equation and editable starting values. Each step is explained on the page. Fit stays in the sticky action bar alongside Save. Plot settings, diagnostics, and confidence bands are optional collapsed controls below the main flow. Starting values display about four significant figures, retain their full precision internally, and expand to the full value when selected.
 
-The inline **Starting curve** preview overlays the current model on included XY measurements within the active fit range. The status records whether values were found by brute force, adjusted manually, or edited, and prompts a review after the data or model changes. The parameter table is under collapsed **Edit values**. The search runs only on demand; loading data or choosing a model does not start one. **Brute force fit** fills the values it finds, then runs Fit. A failed search keeps the current values and does not fit. Editing while a search runs stops it, so its result cannot overwrite the edit.
+The inline **Starting curve** preview overlays the current model on included XY measurements within the active fit range. The status records whether values were adjusted manually or edited, and prompts a review after the data or model changes. The parameter table is under collapsed **Edit values**.
 
-**Adjust on the plot** reveals inline controls and fills blank guesses from model examples, or 1 for other expressions. It defaults to −/+ buttons with an editable positive **Step**, **×10/÷10** to change only the step by an order of magnitude, and **±** to flip the sign. Values and steps accept scientific notation. Changing Step recenters the slider on the current value; in linear mode, each slider increment uses the new Step. Optional sliders offer editable linear ranges or logarithmic magnitude ranges; these ranges do not constrain Fit. The preview uses a steady data scale and updates in the browser without a server search. It does not replace a saved fit or calculate fit uncertainties. Unsupported ROOT functions and histogram models can show the curve returned by a brute force search; live adjustment requires an XY model supported by the equation evaluator.
+**Adjust on the plot** reveals inline controls and fills blank guesses from model examples, or 1 for other expressions. It defaults to −/+ buttons with an editable positive **Step**, **×10/÷10** to change only the step by an order of magnitude, and **±** to flip the sign. Values and steps accept scientific notation. Changing Step recenters the slider on the current value; in linear mode, each slider increment uses the new Step. Optional sliders offer editable linear ranges or logarithmic magnitude ranges; these ranges do not constrain Fit. The preview uses a steady data scale and updates in the browser without the backend. It does not replace a saved fit or calculate fit uncertainties.
 
 Equation drafts and symbol mappings are saved per dataset, including incomplete drafts. An incomplete equation cannot submit the previous valid formula. Unchanged equations survive reloading and reopening; editing the ROOT formula invalidates its old visual representation. MathLive 0.110.0 and its fonts are bundled locally under `frontend/vendor/mathlive/` (MIT license); equation editing does not require a CDN. The parser uses an explicit arithmetic/function grammar and does not evaluate user JavaScript.
 
@@ -110,31 +110,6 @@ and press **Fit** (or Ctrl/Cmd+Enter). A single X or Y error value applies to ev
 JSROOT; the report lists every parameter ± uncertainty, χ², NDF, χ²/NDF and
 the p-value.
 
-**Brute force fit**, beside **Fit**, runs a 20-second search for the parameters whose curve best matches the data, then runs the ROOT fit from the best values found. It is a search, not an estimate: it minimises the same χ² the fit uses, over many starting points. **Brute force options…** (under **Edit values**) sets the search ranges and time and lets you review values before applying them. Both work for XY, histogram and multivariate fits, including custom ROOT formulas. Choose **Quick search (20 seconds)** to
-use automatic search ranges, or **Set ranges and time** for more control.
-The time choices are 5, 10, 20, and 30 seconds, plus 1, 2, 3, and 5 minutes;
-20 seconds is the default. You can cancel while it runs. Click outside the
-window or use its red Close button to dismiss it and stop a running search.
-The Close button stays visible while you scroll. The search compares multiple
-candidates and refines promising ones using the selected data, uncertainties,
-point exclusions and fit range.
-It supports up to 20 parameters. Suggested ranges are heuristics: narrow or
-expand them using what you know about your experiment.
-
-Review the suggested values before **Apply**, then press **Fit** to obtain the
-normal ROOT report and uncertainties. **Undo** restores the previous starting
-values. Search limits apply only to the search; the subsequent fit can move
-outside them. Suggestions can miss other minima, and weakly determined
-parameters or values at a search limit need particular care. The search does
-not identify a model or guarantee a unique solution. Histogram searches integrate
-count-density models over each selected bin, including unequal-width bins.
-Poisson likelihood uses deviance and includes empty bins; chi-square uses
-√count errors and omits empty bins. Multivariate searches use all inputs and
-outputs together, preserve shared parameter indices, and propagate input/output
-uncertainties with the same effective-variance convention as Fit. Their preview
-compares measured and predicted outputs against an agreement diagonal.
-Multivariate searches accept up to 100,000 output measurements in total.
-
 - **Save document** downloads a `.json` file with everything: inputs, the
   last fit result (including the ROOT canvas, so it redraws without a backend),
   title, notes and timestamps. `examples/` contains a few.
@@ -149,7 +124,7 @@ Multivariate searches accept up to 100,000 output measurements in total.
 - **Optional plots** include residuals, pulls, data/fit ratio, percentage difference, and a residual histogram. Select any combination under **Plot settings** on the Fit model step, then fit again. All are off by default. **Advanced optional plot settings** lets you rename each selected plot, set axis labels and Y limits, panel height, point scope, grids, reference lines, uncertainty bars, and histogram bins. Settings are saved with the document; older single-panel selections migrate automatically. Ratio and percentage uncertainty bars hold the fitted model fixed and are not model confidence bands. Undefined points are omitted with an explanatory message.
 - **Export PNG** renders the current plot to an image.
 - The form is autosaved in your browser (localStorage) so a reload does not
-  lose your work; fitting and parameter-search requests send the selected data
+  lose your work; fit requests send the selected data
   and model to your configured backend.
 
 ### Histograms
@@ -186,7 +161,7 @@ predicted counts. **Count histogram** is available under **or load an example**,
 
 **Double slit** (also `examples/double-slit.json`) fits the library model "Double-slit (linear fringe visibility)" to 174 detector counts with a fit range of 3.65–7.6, the central fringes. Expected χ²/NDF ≈ 97.8/72.
 
-**Tutorials** (`tutorials.html`, the Tutorials button on the home page) run inside Make a Plot: `modern.html?tutorial=first-fit` docks a panel of steps that tick off as the app's state shows them done, with a "Show me" on every step. Lessons are data in `frontend/tutorials/*.js`; `tutorial.js` runs them. The first lesson rebuilds the double-slit example from `frontend/tutorials/double-slit.xlsx` / `.csv` (the 80 fitted points) and branches on how to get starting values: adjust on the plot, ask an AI, or brute force.
+**Tutorials** (`tutorials.html`, the Tutorials button on the home page) run inside Make a Plot: `modern.html?tutorial=first-fit` docks a panel of steps that tick off as the app's state shows them done, with a "Show me" on every step. Lessons are data in `frontend/tutorials/*.js`; `tutorial.js` runs them. The first lesson rebuilds the double-slit example from `frontend/tutorials/double-slit.xlsx` / `.csv` (the 80 fitted points) and branches on how to get starting values: adjust on the plot or ask an AI.
 
 The separate `POST /histogram` endpoint accepts a `histogram` object with
 `source: "samples"`, `samples`, `bins`, optional `range` and `edges`, or
@@ -214,31 +189,6 @@ Response fields: `params[]` (name, value, error), `chi2`, `ndf`, `chi2_ndf`,
 objects for JSROOT: `canvas_json`, `graph_json`, `func_json`.
 Errors: `{"error": "..."}` with HTTP 400 (your input) or 500 (server).
 
-Parameter search accepts `analysis_type: "xy"` (default) with the XY fit fields,
-`"histogram"` with the `/histogram` fields, or `"multivariate"` with the
-`/multivariate-fit` fields. Histogram payloads retain binning, counting method,
-and `x_range`; multivariate payloads retain models, shared parameter indices,
-input/output columns, uncertainties, and optional per-input `input_ranges`:
-
-- `POST /parameter-search/prepare` returns suggested `parameters` with
-  `index`, `name`, `initial`, `lower`, `upper`, plus `n_points` and `warnings`.
-- `POST /parameter-search` adds `bounds: [[lower, upper], ...]`,
-  `time_budget` (1–300 seconds) and optional integer `seed`. Equal limits hold
-  a parameter fixed during the search. HTTP 202 returns a `job_id`.
-- `GET /parameter-search/<job_id>` returns `status`, `progress`, and a `result`
-  when complete. Results include `values`, a method-specific `score`,
-  `score_description`, `initial_score`, `evaluations`, warnings and a preview
-  curve (per-output measured/predicted panels for multivariate models). This is an
-  initialization search, so it does not return parameter uncertainties.
-- `DELETE /parameter-search/<job_id>` cancels a running search and stops its
-  worker. Cancellation of an already finished job returns its existing result.
-
-One search runs at a time per backend process; another start returns HTTP 409.
-Jobs and results are held in memory, expire after 15 minutes, and disappear on
-restart. Search workers have a hard deadline in addition to the optimizer's
-time budget. Use the supplied single-process server setup: independent web
-workers would need shared job routing/storage. SciPy is included in the backend
-dependencies; run `./start --rebuild` when updating an existing local image.
 
 Run regression tests in the rebuilt backend image:
 

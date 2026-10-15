@@ -43,7 +43,6 @@
     $('modern-back').hidden = step === 'data';
     $('modern-back').textContent = step === 'results' ? 'Edit fit model' : 'Back to analysis setup';
     $('btn-fit').hidden = step !== 'function';
-    if ($('starting-values-estimate')) $('starting-values-estimate').hidden = step !== 'function';
     // On Set up analysis the bar carries the dataset summary instead of the fit status.
     if ($('setup-status')) $('setup-status').hidden = step !== 'data';
     $('fit-status').hidden = step === 'data';

@@ -49,7 +49,7 @@
       return {...existing, cat:'Common models', name:label.split(/ {2,}/)[0], formula, params, guesses,
         desc:existing?.desc || 'A common fit shape. Choose it, then adjust its parameters to match your measurements.',
         x:existing?.x || 'x', y:existing?.y || 'y',
-        guide:existing?.params === params ? existing.guide : ['Edit the initial guesses or use Brute force fit to get a starting point. Blank values keep ROOT defaults or automatic estimates, where available.']};
+        guide:existing?.params === params ? existing.guide : ['Edit the initial guesses, or ask an AI for a starting point. Blank values keep ROOT defaults or automatic estimates, where available.']};
     }).concat(DATA.models);
   }
 

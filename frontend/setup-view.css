@@ -242,9 +242,5 @@ body.modern :is(#btn-save, .fit-bar-save) { background: #eaf4ee; color: #23613d;
 body.modern :is(#btn-save, .fit-bar-save):hover:not(:disabled) { background: #dcede3; border-color: #9fcab1; }
 body.modern #point-exclusions { background: #fbf2e6; color: #7a4a05; border-color: #e9cfa3; font-weight: 600; }
 body.modern #point-exclusions:hover:not(:disabled) { background: #f6e6cf; border-color: #d9b47a; }
-body.modern .fit-bar .brute-force-fit { background: #eaf2fb; }
-body.modern .fit-bar .brute-force-fit:hover:not(:disabled) { background: #dce9f8; }
 body.modern #ask-ai-starting-values { background: #f3effb; color: #5a3d99; border: 1px solid #d5c9ee; font-weight: 600; }
 body.modern #ask-ai-starting-values:hover:not(:disabled) { background: #e9e1f8; border-color: #bfaee6; }
-body.modern #starting-values-stop { background: #fbeceb; color: #a3231b; border-color: #f1d2ce; font-weight: 600; }
-body.modern #starting-values-stop:hover:not(:disabled) { background: #f6dcd9; border-color: #e8bdb8; }

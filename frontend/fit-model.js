@@ -74,12 +74,12 @@
   function startingStatus(guesses, count, provenance, signature) {
     const values=String(guesses).split(',').map(value=>value.trim());
     const ready=count>0 && Array.from({length:count},(_,i)=>values[i]).every(value=>value && Number.isFinite(Number(value)));
-    if(!ready) return {ready:false, text:values.some(Boolean)?'Starting values are incomplete. Edit them, or use Brute force fit.':'Using model defaults. Edit values to see the starting curve, or use Brute force fit.'};
+    if(!ready) return {ready:false, text:values.some(Boolean)?'Starting values are incomplete. Edit them, adjust on the plot, or ask an AI.':'Using model defaults. Adjust on the plot or edit values to see the starting curve.'};
     const recorded=provenance?.values===valuesKey(guesses);
     const source=recorded?provenance.source:null;
-    const text=source==='automatic'?'Found by brute force.':source==='adjusted'?'Adjusted manually.':source==='edited'?'Edited.':'Starting values set.';
+    const text=source==='automatic'?'Set automatically.':source==='adjusted'?'Adjusted manually.':source==='edited'?'Edited.':'Starting values set.';
     const changed=recorded && provenance.signature!==signature;
-    return {ready:true, text:(changed?text+' The data or model changed; review the curve or run Brute force fit again.':'✓ '+text+' Review the curve, then run Fit.')};
+    return {ready:true, text:(changed?text+' The data or model changed; review the curve before fitting.':'✓ '+text+' Review the curve, then run Fit.')};
   }
   function previewModel(engine, formula, names, guesses, xMin, xMax) {
     const imported=engine.fromRoot(formula,names);
@@ -87,7 +87,7 @@
     const values={};
     imported.parameters.forEach((symbol,i)=> {
       const value=String(guesses[i] ?? '').trim();
-      if(!value || !Number.isFinite(Number(value))) throw new Error('Enter starting values, or use Brute force fit, to see the model curve.');
+      if(!value || !Number.isFinite(Number(value))) throw new Error('Enter starting values to see the model curve.');
       values[symbol]=Number(value);
     });
     if(!Number.isFinite(xMin) || !Number.isFinite(xMax) || xMin>=xMax) throw new Error('Choose a fit range with its minimum below its maximum.');
@@ -109,7 +109,6 @@
   let controlKey='';
   const panel=$('guess-preview-panel'), controls=$('visual-parameters'), openButton=$('visual-match-open');
   const manualButton=$('starting-values-manual'), valuesEditor=$('starting-values-editor');
-  const searches=new Map();
   const currentDataset=()=>typeof datasets==='undefined'?null:datasets[activeIdx];
   const datasetKey=()=>currentDataset()?.id || String(typeof activeIdx==='undefined'?0:activeIdx);
   function signature() {
@@ -119,32 +118,15 @@
   function recordSource(source, curve=null, warnings=[]) {
     const dataset=currentDataset(); if(!dataset) return;
     dataset.startingValues={source,values:valuesKey($('initial-guesses').value),signature:signature(),curve,warnings};
-    searches.delete(datasetKey());
     if(typeof autosave==='function') autosave();
-  }
-  function searchState(state, key=datasetKey()) {
-    if(state) searches.set(key,state); else searches.delete(key);
-    updateStartingStatus();
   }
   function updateStartingStatus() {
     const count=table.querySelectorAll('[data-pguess]').length, provenance=currentDataset()?.startingValues;
-    const state=searches.get(datasetKey()), busy=!!state?.busy;
     const base=startingStatus($('initial-guesses').value,count,provenance,signature());
-    let message=state?.busy || state?.failed?state.message:(count?base.text:'Choose a model with adjustable parameters to set starting values.');
+    let message=count?base.text:'Choose a model with adjustable parameters to set starting values.';
     if ($('analysis-type').value === 'histogram') message = message.replace('to see the starting curve', 'before fitting').replace('review the curve or run', 'review the values or run').replace('Review the curve, then run Fit.', 'Review the values, then run Fit.');
     if($('starting-values-status').textContent!==message) $('starting-values-status').textContent=message;
-    $('starting-values-error').textContent=state?.error || ''; $('starting-values-error').hidden=!state?.error;
-    // Brute force fit lives beside Fit; it needs a model with parameters.
-    const brute=$('starting-values-estimate'), type=$('analysis-type').value;
-    const parameters=type==='multivariate'?document.querySelectorAll('#mv-parameter-rows tr').length:count;
-    brute.disabled=busy || !parameters || !['xy','histogram','multivariate'].includes(type) || (typeof fitBusy!=='undefined' && fitBusy);
     manualButton.disabled=!count;
-    $('starting-values-stop').hidden=!busy; $('starting-values-stop').disabled=!!state?.cancelling;
-    openButton.classList.toggle('primary',!!state?.failed);
-    const warnings=provenance?.values===valuesKey($('initial-guesses').value) && Array.isArray(provenance.warnings)?provenance.warnings:[];
-    const list=$('starting-values-warnings'); list.replaceChildren();
-    warnings.forEach(message=> { const item=document.createElement('li'); item.textContent=String(message); list.append(item); });
-    $('starting-values-notes').hidden=!warnings.length;
   }
   function cachedCurve() {
     const estimate=currentDataset()?.startingValues;
@@ -165,7 +147,7 @@
     try { scope.RootEquation.expression(scope.RootEquation.fromRoot(raw.value,$('param-names').value.split(',')).latex); }
     catch(_) { available=false; }
     openButton.disabled=!available;
-    $('visual-match-help').textContent=available?"Curve doesn't follow the data? Adjust it before running Fit.":($('analysis-type').value!=='xy'?'Edit values for this analysis, or use Brute force fit. Interactive curve adjustment is available for XY models.':'Edit values for this model, or use Brute force fit. Interactive adjustment requires a model supported by the live preview.');
+    $('visual-match-help').textContent=available?"Curve doesn't follow the data? Adjust it before running Fit.":($('analysis-type').value!=='xy'?'Edit values for this analysis. Interactive curve adjustment is available for XY models.':'Edit values for this model. Interactive adjustment requires a model supported by the live preview.');
     $('visual-adjust-mode').disabled=!available;
     const dataset=typeof datasets==='undefined'?null:datasets[activeIdx];
     const key=`${dataset?.id || (typeof activeIdx==='undefined'?0:activeIdx)}|${raw.value}`;
@@ -353,7 +335,7 @@
     catch(error) {
       const cached=cachedCurve();
       if(Array.isArray(cached?.x) && cached.x.length===cached.y?.length) curve=cached.x.map((x,i)=>[x,cached.y[i]]).filter(p=>p.every(Number.isFinite));
-      if(!curve.length) warning=/starting values|undefined|fit range/.test(error.message)?error.message:'Edit starting values, or use Brute force fit, to see this ROOT model curve. Live adjustment is unavailable for this function.';
+      if(!curve.length) warning=/starting values|undefined|fit range/.test(error.message)?error.message:'Edit starting values to see this ROOT model curve. Live adjustment is unavailable for this function.';
     }
     note.textContent=warning || drawStartingCurve(host,points,curve,low,high);
     if(warning) drawStartingCurve(host,points,curve,low,high);
@@ -405,6 +387,6 @@
   // Switching plots restores data programmatically; observe the selector as well.
   document.addEventListener('click',refresh);
   new ResizeObserver(growFormula).observe(raw.parentElement);
-  scope.FitModelUX={...helpers,refresh,growFormula,recordSource,searchState};
+  scope.FitModelUX={...helpers,refresh,growFormula,recordSource};
   refresh();
 })(globalThis);

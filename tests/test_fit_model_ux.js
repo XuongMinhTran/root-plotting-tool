@@ -74,9 +74,9 @@ test('logarithmic sliders move by magnitude while preserving negative signs',()=
 test('starting-value provenance survives equivalent numeric formatting',()=>{
   const signature='data-and-model';
   const saved={source:'automatic',values:ux.valuesKey('1e-9, 2.12345678901234'),signature};
-  assert.match(ux.startingStatus('0.000000001, 2.12345678901234',2,saved,signature).text,/Found by brute force/);
+  assert.match(ux.startingStatus('0.000000001, 2.12345678901234',2,saved,signature).text,/Set automatically/);
   assert.match(ux.startingStatus('1e-9, 2.12345678901235',2,saved,signature).text,/Starting values set/);
-  assert.match(ux.startingStatus('1e-9, 2.12345678901234',2,saved,'changed-data').text,/changed.*Brute force fit again/);
+  assert.match(ux.startingStatus('1e-9, 2.12345678901234',2,saved,'changed-data').text,/changed.*review the curve/);
 });
 test('starting-value status distinguishes manual sources and incomplete values',()=>{
   for(const [source,label] of [['adjusted','Adjusted manually'],['edited','Edited']]) {

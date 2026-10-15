@@ -134,9 +134,6 @@ body.modern .mv-param-table [data-mv-name]{ background: #f7f8fa; border-color: t
 body.modern .mv-param-table [data-mv-guess]{ border: 1px solid #8da8c2; color: #18364f; font-weight: 600; background: #fff; }
 .mv-params label { min-width: min(200px, 100%); }
 #mv-starting-actions { margin-top: 18px; align-items: flex-start; }
-#mv-starting-actions .parameter-search-tools { display: contents; }
-#mv-starting-actions .parameter-search-tools > .hint { display: none; }
 body #mv-starting-actions > button { margin: 0; min-height: 44px; }
 
-#mv-starting-actions .parameter-search-actions { order: -1; }
 body.modern .mv-param-table input[type="text"] { min-height: 38px; padding: 7px 10px; }

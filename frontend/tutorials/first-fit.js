@@ -142,11 +142,10 @@
       },
       {
         id: 'look', title: 'Starting values: your call',
-        text: `<p>Look at the preview: the dashed curve is the model with the library's generic starting values, and it doesn't follow the data. A fit only finds the best curve <em>near</em> where it starts, so starting values matter.</p><p>Starting values are <em>guesses</em>, not answers. They only have to be in the right neighbourhood: the fit will move every one of them. Three honest ways to guess. Pick one:</p>`,
+        text: `<p>Look at the preview: the dashed curve is the model with the library's generic starting values, and it doesn't follow the data. A fit only finds the best curve <em>near</em> where it starts, so starting values matter.</p><p>Starting values are <em>guesses</em>, not answers. They only have to be in the right neighbourhood: the fit will move every one of them. Two honest ways to guess. Pick one:</p>`,
         choices: [
           {id: 'adjust', goto: 'adjust-open', label: 'Adjust on the plot', desc: 'Nudge each value until the curve roughly follows the data. The physicist\'s way.'},
           {id: 'ai', goto: 'ai-open', label: 'Ask an AI', desc: 'Copy a ready-made prompt into ChatGPT or Claude and paste its numbers back.'},
-          {id: 'brute', goto: 'brute', label: 'Brute force', desc: 'Let the computer search for about 20 seconds. Fast, but you learn less.'},
         ],
       },
       // --- branch: adjust on the plot ---
@@ -184,14 +183,6 @@
           <p class="tut-aside">Nothing is sent anywhere by this tool. And an AI can be wrong: check the dashed curve before you fit.</p>`,
         done: guessesChanged, next: 'fit',
         demo: () => { const el = $('initial-guesses'); el.value = GOOD; fire(el); fire(el, 'change'); },
-      },
-      // --- branch: brute force ---
-      {
-        id: 'brute', branch: 'brute', title: 'Let the computer search', target: '#starting-values-estimate',
-        text: `<p>Press <strong>Brute force fit</strong>. For about 20 seconds it tries many combinations, keeps the best and then runs the real fit from there.</p>
-          <p class="tut-aside">Handy when you're stuck, but it can land on a wrong answer that looks plausible. Always check the curve.</p>`,
-        done: () => !!result(), next: 'read',
-        demo: () => $('starting-values-estimate')?.click(),
       },
       // --- main line resumes ---
       {
